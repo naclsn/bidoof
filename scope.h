@@ -1,0 +1,18 @@
+#ifndef __BIDOOF_SCOPE_H__
+#define __BIDOOF_SCOPE_H__
+
+#include "base.h"
+
+typedef struct Scope {
+    Entry* items;
+    sz count;
+    sz size;
+    Obj keepalive;
+} Scope;
+
+bool scope_make(Scope* res, Sym const name);
+void scope_destroy(Scope* self);
+Obj* scope_get(Scope* self, Sym const key);
+Obj* scope_put(Scope* self, Sym const key, Obj* value);
+
+#endif // __BIDOOF_SCOPE_H__

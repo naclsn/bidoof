@@ -1,6 +1,10 @@
 #include "base.h"
 
-void show2(Obj const* self, int indent) {
+int symcmp(Sym const l, Sym const r) {
+    return memcmp(l.ptr, r.ptr, l.len < r.len ? l.len : r.len);
+}
+
+void obj_show(Obj const* self, int indent) {
     printf("(%p) ", (void*)self);
 
     if (!self) printf("(null)");
@@ -27,7 +31,7 @@ void show2(Obj const* self, int indent) {
             printf("{\n");
             for (sz k = 0; k < self->as.lst.len; k++) {
                 printf("%*.s", indent*3, "");
-                show2(self->as.lst.ptr+k, indent+1);
+                obj_show(self->as.lst.ptr+k, indent+1);
                 printf(", \n");
             }
             printf("}");
@@ -48,24 +52,17 @@ void show2(Obj const* self, int indent) {
     if (indent < 1) printf("\n");
 }
 
-Obj* show(Obj* self) {
-    show2(self, 0);
-    return self;
-}
-
-void showDepnts(Obj const* self, int depth) {
+void obj_show_depnts(Obj const* self, int curdepth) {
     struct Depnt* cur = self->depnts;
     while (cur) {
-        printf("\n%*.s-> %p", (depth < 0 ? 1 : depth+1)*3, "", (void*)cur->obj);
-        if (0 <= depth) showDepnts(cur->obj, depth+1);
+        printf("\n%*.s-> %p", (curdepth < 0 ? 1 : curdepth+1)*3, "", (void*)cur->obj);
+        if (0 <= curdepth) obj_show_depnts(cur->obj, curdepth+1);
         cur = cur->next;
     }
-    if (depth < 1) printf("\n");
+    if (curdepth < 1) printf("\n");
 }
 
-////////////////
-
-Obj* call(Obj* self, u8 argc, Obj** argv) {
+Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
     Obj* r = calloc(1, sizeof(Obj) + argc*sizeof(Obj*));
     if (!r) return r;
 
@@ -82,7 +79,11 @@ Obj* call(Obj* self, u8 argc, Obj** argv) {
         Obj* on = argv[k];
 
         struct Depnt* tail = malloc(sizeof *tail);
-        if (!tail) exit(1);
+        if (!tail) {
+            for (; 0 < k; k--) obj_remdep(r, argv[k-1]);
+            free(r);
+            return NULL;
+        }
 
         tail->obj = r;
         tail->next = NULL;
@@ -99,39 +100,47 @@ Obj* call(Obj* self, u8 argc, Obj** argv) {
     return r;
 }
 
-void destroy(Obj* self) {
-    bool (*up)(Obj*) = self->update;
-    self->update = NULL;
-    up(self);
+bool obj_remdep(Obj* self, Obj* dep) {
+    struct Depnt* prev = dep->depnts;
+    for (struct Depnt* cur = prev; cur; prev = cur, cur = cur->next) {
+        if (self == cur->obj) {
+            if (prev != cur)
+                dep->depnts = cur->next;
+            else
+                prev->next = cur->next;
 
-    // for each deps, remove self from depnt
-    // then delete dep if it has no depnt anymore
+            cur->next = NULL;
+            cur->obj = NULL;
+            free(cur);
+
+            return true;
+        }
+    }
+    return false;
+}
+
+void obj_destroy(Obj* self) {
+    bool (*up)(Obj*) = self->update;
+    if (up) {
+        self->update = NULL;
+        up(self);
+    }
+
+    // for each deps, remove self from its depnts
+    // then delete dep if it has no depnts anymore
     for (sz k = 0; k < self->argc; k++) {
         Obj* dep = self->argv[k];
-        struct Depnt* prev = dep->depnts;
-        for (struct Depnt* cur = prev; cur; prev = cur, cur = cur->next) {
-            if (self == cur->obj) {
-                if (prev != cur)
-                    dep->depnts = cur->next;
-                else
-                    prev->next = cur->next;
-
-                cur->next = NULL;
-                cur->obj = NULL;
-                free(cur);
-
-                if (!dep->depnts) destroy(dep);
-                break;
-            }
+        if (obj_remdep(self, self->argv[k]) && !dep->depnts) {
+            obj_destroy(dep);
+            free(dep);
         }
     }
 
     memset(&self->as, 0, sizeof self->as);
-    free(self);
 }
 
 static u16 _static_curr_cycle = 0;
-bool _priv_update_depnts(Obj* self) {
+bool _update_depnts(Obj* self) {
     u32 needs_up = 0;
     u16 count = 0;
 
@@ -149,16 +158,16 @@ bool _priv_update_depnts(Obj* self) {
     for (struct Depnt* cur = self->depnts; cur; cur = cur->next) {
         Obj* it = cur->obj;
         if ((1 << --count) & needs_up) {
-            if (!_priv_update_depnts(it)) return false;
+            if (!_update_depnts(it)) return false;
         }
     }
 
     return true;
 }
 
-bool update(Obj* self) {
+bool obj_update(Obj* self) {
     _static_curr_cycle++;
     if (self->update && !self->update(self)) return false;
     self->cycle = _static_curr_cycle;
-    return _priv_update_depnts(self);
+    return _update_depnts(self);
 }

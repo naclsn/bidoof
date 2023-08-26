@@ -1,5 +1,6 @@
 #include "base.h"
-#include "loader.h"
+#include "exts.h"
+#include "lang.h"
 
 static char* ty_str[] = { [BUF]= "BUF", [NUM]= "NUM", [LST]= "LST", [FUN]= "FUN", [SYM]= "SYM" };
 
@@ -11,28 +12,29 @@ int main_lookup(int argc, char** argv) {
 
     char* ext_name = *argv++;
     argc--;
-    if (!load_names(ext_name)) {
+    if (!exts_load(ext_name)) {
         printf("could not load '%s'\n", ext_name);
         return 1;
     }
 
     if (0 == argc) {
-        printf("%zu name-s:\n", globals.count);
-        for (sz k = 0; k < globals.count; k++)
+        printf("%zu name-s:\n", exts_scope.count);
+        for (sz k = 0; k < exts_scope.count; k++)
             printf("- %p: (%s) %s\n",
-                    (void*)globals.items[k].value,
-                    ty_str[globals.items[k].value->ty],
-                    globals.items[k].key.ptr);
-        return 0;
+                    (void*)exts_scope.items[k].value,
+                    ty_str[exts_scope.items[k].value->ty],
+                    exts_scope.items[k].key.ptr);
     }
 
-    for (; argc--; argv++) {
-        Obj* it = lookup_name(*argv);
-        if (!it) printf("- %s not found\n", *argv);
-        else printf("- %p: (%s) %s\n", (void*)it, ty_str[it->ty], *argv);
+    else {
+        for (; argc--; argv++) {
+            Obj* it = exts_lookup(*argv);
+            if (!it) printf("- %s not found\n", *argv);
+            else printf("- %p: (%s) %s\n", (void*)it, ty_str[it->ty], *argv);
+        }
     }
 
-    unload_all();
+    exts_unload();
     return 0;
 }
 
@@ -65,33 +67,33 @@ int main1(int _argc, char** _argv) {
     Obj* space = &(Obj){.ty= BUF, .as.buf= {.ptr= (u8*)" ", .len= 1}};
 
     Obj* res_args[2] = {under, space};
-    Obj* res = call(Delim, 2, res_args);
+    Obj* res = obj_call(Delim, 2, res_args);
     if (!res) {
         puts("call failed");
         return 1;
     }
 
-    bool yes = update(under);
+    bool yes = obj_update(under);
     if (!yes) {
         puts("update failed");
         return 1;
     }
 
     printf("value of res: ");
-    show(res);
+    obj_show(res, 0);
     printf(" `-> '%.*s'\n", (int)res->as.buf.len, res->as.buf.ptr);
 
     Obj* ser_args[1] = {res};
-    Obj* ser = call(Reverse, 1, ser_args);
+    Obj* ser = obj_call(Reverse, 1, ser_args);
 
-    update(under);
+    obj_update(under);
 
     printf("value of ser: ");
-    show(ser);
+    obj_show(ser, 0);
     printf(" `-> '%.*s'\n", (int)ser->as.buf.len, ser->as.buf.ptr);
 
-    delete(ser);
-    delete(res);
+    obj_destroy(ser);
+    obj_destroy(res);
 
     return 0;
 }

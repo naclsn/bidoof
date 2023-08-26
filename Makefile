@@ -1,4 +1,6 @@
 CFLAGS += -Wall -Wextra -Werror
+NAME ?= bidoof
+EXTS ?= builtin
 
 ifeq ($(OS), Windows_NT)
   as-exe = $(1).exe
@@ -8,15 +10,11 @@ else
   as-lib = lib$(1).so
 endif
 
-name = bidoof
-srcs = main.c base.c loader.c
-exts = builtin
+all: $(foreach ext,$(EXTS),$(call as-lib,$(ext))) $(call as-exe,$(NAME))
+	@printf '%s\n' $^
 
-$(call as-exe,$(name)): $(srcs) $(foreach ext,$(exts),$(call as-lib,$(ext)))
-	$(CC) $(srcs) -o $@ $(CFLAGS)
+$(call as-exe,$(NAME)): *.[ch]
+	$(CC) $^ -o $@ $(CFLAGS)
 
 $(call as-lib,%): ext/%.c
 	$(CC) $^ -o $@ -I. -fPIC -shared $(CFLAGS)
-
-install: $(call as-exe,$(name)) $(foreach ext,$(exts),$(call as-lib,$(ext)))
-	@printf '%s\n' $^
