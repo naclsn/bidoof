@@ -4,6 +4,15 @@
 #include "base.h"
 #include <dlfcn.h>
 
+extern struct GlobalList {
+    struct Entry {
+        Sym key;
+        Obj* value;
+    }* items;
+    sz count;
+    sz size;
+} globals;
+
 bool load_names(char const* filename);
 Obj* lookup_name(char const* name);
 void unload_all(void);

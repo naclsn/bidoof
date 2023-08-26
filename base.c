@@ -81,7 +81,7 @@ Obj* call(Obj* self, u8 argc, Obj** argv) {
     for (sz k = 0; k < argc; k++) {
         Obj* on = argv[k];
 
-        struct Depnt* tail = malloc(sizeof(struct Depnt));
+        struct Depnt* tail = malloc(sizeof *tail);
         if (!tail) exit(1);
 
         tail->obj = r;
@@ -99,13 +99,32 @@ Obj* call(Obj* self, u8 argc, Obj** argv) {
     return r;
 }
 
-void delete(Obj* self) {
+void destroy(Obj* self) {
     bool (*up)(Obj*) = self->update;
     self->update = NULL;
     up(self);
 
     // for each deps, remove self from depnt
-    // then delete dep if it has not depnt anymore
+    // then delete dep if it has no depnt anymore
+    for (sz k = 0; k < self->argc; k++) {
+        Obj* dep = self->argv[k];
+        struct Depnt* prev = dep->depnts;
+        for (struct Depnt* cur = prev; cur; prev = cur, cur = cur->next) {
+            if (self == cur->obj) {
+                if (prev != cur)
+                    dep->depnts = cur->next;
+                else
+                    prev->next = cur->next;
+
+                cur->next = NULL;
+                cur->obj = NULL;
+                free(cur);
+
+                if (!dep->depnts) destroy(dep);
+                break;
+            }
+        }
+    }
 
     memset(&self->as, 0, sizeof self->as);
     free(self);

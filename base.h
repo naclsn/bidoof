@@ -12,42 +12,34 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef size_t sz;
 
-typedef struct Obj Obj;
-typedef struct Buf Buf;
-typedef struct Num Num;
-typedef struct Lst Lst;
-typedef struct Fun Fun;
-typedef struct Sym Sym;
+typedef struct Buf { u8* ptr; sz len;                                 } Buf;
+typedef struct Num { int val;                                         } Num;
+typedef struct Lst { struct Obj* ptr; sz len;                         } Lst;
+typedef struct Fun { bool (*call)(struct Obj* self, struct Obj* res); } Fun;
+typedef struct Sym { char const* ptr; sz const len;                   } Sym;
 
-struct Obj {
-    bool (*update)(Obj* self);
+typedef struct Obj {
+    bool (*update)(struct Obj* self);
 
-    enum { BUF, NUM, LST, FUN, SYM } ty;
-
-    union {
-        struct Buf { u8* ptr; sz len;                   } buf;
-        struct Num { int val;                           } num;
-        struct Lst { Obj* ptr; sz len;                  } lst;
-        struct Fun { bool (*call)(Obj* self, Obj* res); } fun;
-        struct Sym { char const* ptr; sz const len;     } sym;
-    } as;
+    enum  { BUF,     NUM,     LST,     FUN,     SYM,     } ty;
+    union { Buf buf; Num num; Lst lst; Fun fun; Sym sym; } as;
 
     struct Depnt {
-        Obj* obj;
+        struct Obj* obj;
         struct Depnt* next;
     }* depnts;
     u16 cycle;
 
     u8 argc;
-    Obj const* argv[];
-};
+    struct Obj* argv[];
+} Obj;
 
 void show2(Obj const* self, int indent);
 Obj* show(Obj* self);
 void showDepnts(Obj const* self, int depth);
 
 Obj* call(Obj* self, u8 argc, Obj** argv);
-void delete(Obj* self);
+void destroy(Obj* self);
 bool update(Obj* self);
 
 #endif // __BIDOOF_BASE_H__

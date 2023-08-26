@@ -1,18 +1,51 @@
 #include "base.h"
 #include "loader.h"
 
-int main(int argc, char** argv) {
-    if (1 == argc) {
+static char* ty_str[] = { [BUF]= "BUF", [NUM]= "NUM", [LST]= "LST", [FUN]= "FUN", [SYM]= "SYM" };
+
+int main_lookup(int argc, char** argv) {
+    if (0 == argc) {
         puts("missing ext name");
         return 1;
     }
 
-    if (!load_names(argv[1])) {
-        puts("could not :)");
+    char* ext_name = *argv++;
+    argc--;
+    if (!load_names(ext_name)) {
+        printf("could not load '%s'\n", ext_name);
         return 1;
     }
 
+    if (0 == argc) {
+        printf("%zu name-s:\n", globals.count);
+        for (sz k = 0; k < globals.count; k++)
+            printf("- %p: (%s) %s\n",
+                    (void*)globals.items[k].value,
+                    ty_str[globals.items[k].value->ty],
+                    globals.items[k].key.ptr);
+        return 0;
+    }
+
+    for (; argc--; argv++) {
+        Obj* it = lookup_name(*argv);
+        if (!it) printf("- %s not found\n", *argv);
+        else printf("- %p: (%s) %s\n", (void*)it, ty_str[it->ty], *argv);
+    }
+
     unload_all();
+    return 0;
+}
+
+int main(int argc, char** argv) {
+    argv++;
+    argc--;
+
+    if (0 == argc) {
+        puts("no argument");
+        return 0;
+    }
+
+    if (0 == strcmp("-l", *argv)) return main_lookup(--argc, ++argv);
 
     return 0;
 }
