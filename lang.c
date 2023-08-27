@@ -17,6 +17,24 @@
 // <sym> ::= ':' /[0-9A-Za-z_]+/
 // <var> ::= /[a-z_][0-9a-z_]+/
 //
+// --- escape sequences
+//
+// '\a': 0x07
+// '\b': 0x08
+// '\e': 0x1B
+// '\f': 0x0C
+// '\n': 0x0A
+// '\r': 0x0D
+// '\t': 0x09
+// '\v': 0x0B
+// '\\': 0x5C
+// '\'': 0x27
+// '\"': 0x22
+// '\xHH': 2 hex digits byte
+// '\uHHHH': 4 hex digits codepoint below 0x10000
+// '\UHHHHHHHH': 8 hex digits codepoint
+// '\OOO': 3 oct digits (idk y tho, is there this much use for it?)
+//
 // --- syntax extensions
 //
 // <expr> ::= ... | '(=' <math> ')' | '($' <bind> ')'
@@ -151,16 +169,40 @@ void _print_location(Pars* self, char* reason) {
     if (nl) lineEnd = nl - self->s;
 
     printf("%s %s:%zu:%zu\n", reason, "<script>", lineNr, colNr);
-    if (lineEnd <= lineStart)
-        printf("%4zu | %s\n", lineNr, self->s+lineStart);
-    else
-        printf("%4zu | %.*s\n", lineNr, (int)(lineEnd-lineStart), self->s+lineStart);
+    if (lineEnd <= lineStart) printf("%4zu | %s\n", lineNr, self->s+lineStart);
+    else printf("%4zu | %.*s\n", lineNr, (int)(lineEnd-lineStart), self->s+lineStart);
     printf("%4zu | %*s\n", lineNr+1, (int)colNr, "^");
 }
 
-bool _escape(Pars* self, u32* res) {
-    (void)self;
+bool _escape(Sym* slice, u32* res) {
     *res = 0;
+
+    switch (*slice->ptr++) {
+        case 'a': *res = 0x07; return true;
+        case 'b': *res = 0x08; return true;
+        case 'e': *res = 0x1B; return true;
+        case 'f': *res = 0x0C; return true;
+        case 'n': *res = 0x0A; return true;
+        case 'r': *res = 0x0D; return true;
+        case 't': *res = 0x09; return true;
+        case 'v': *res = 0x0B; return true;
+        case '\\': *res = 0x5C; return true;
+        case '\'': *res = 0x27; return true;
+        case '"': *res = 0x22; return true;
+
+        case 'x': // 2 hex digits byte
+            break;
+
+        case 'u': // 4 hex digits codepoint below 0x10000
+            break;
+
+        case 'U': // 8 hex digits codepoint
+            break;
+
+        case '0'...'7': // 3 oct digits (idk y tho, is there this much use for it?)
+            break;
+    }
+
     return false;
 }
 
