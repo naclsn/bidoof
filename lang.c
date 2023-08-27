@@ -1,31 +1,35 @@
 #include "lang.h"
+#include "exts.h"
 
 // <script> ::= <var> '=' <expr> {';' <var> '=' <expr>} [';']
-// <expr> ::= <atom> | <fun> {<expr>} | <expr> ',' <expr>
-// <atom> ::= <str> | <num> | <lst> | <fun> | <sym> | <var> | '(' <expr> ')'
+// <expr> ::
+//      = <str> | <num> | <lst> | <fun> | <sym> | <var>
+//      | <fun> <expr> {<expr>}
+//      | '(' <expr> ')'
+//      | <expr> ',' <expr>
 //
 // <comment> ::= '#' /.*/ '\n'
 //
-// <str> ::= '"' /[^"]/ '"'
-// <num> ::= ['-'] /0x[0-9A-Fa-f_]+|0o[0-8_]+|0b[01_]+|[0-9_](\.[0-9_])?|'[^']'/
-// <lst> ::= '{' [<atom> {',' <atom>}] '}'
+// <str> ::= /"[^"]"/
+// <num> ::= /'[^']'/ | ['-'] /0x[0-9A-Fa-f_]+|0o[0-8_]+|0b[01_]+|[0-9_](\.[0-9_])?/
+// <lst> ::= '{' [<expr> {',' <expr>}] '}'
 // <fun> ::= /[A-Z][0-9A-Za-z]+/
 // <sym> ::= ':' /[0-9A-Za-z_]+/
 // <var> ::= /[a-z_][0-9a-z_]+/
 //
 // --- syntax extensions
 //
-// <atom> ::= ... | '(=' <math> ')' | '($' <bind> ')'
+// <expr> ::= ... | '(=' <math> ')' | '($' <bind> ')'
 //
 // <math> ::
-//     = <unop> <atom>
-//     | <atom> <binop> <atom>
-//     | <atom> '?' <atom> ':' <atom>
-//     | <atom> '[' <atom> [':' [<atom>]] ']'
+//     = <unop> <expr>
+//     | <expr> <binop> <expr>
+//     | <expr> '?' <expr> ':' <expr>
+//     | <expr> '[' <expr> [':' [<expr>]] ']'
 // <unop> ::= '+' '-' '!' '~'
 // <binop> ::= '+' '-' '*' '/' '%' '//' '**' '==' '!=' '>' '<' '>=' '<=' '<=>' '&' '|' '^' '<<' '>>'
 //
-// <bind> ::= <fun> {<atom>}
+// <bind> ::= <fun> {<expr>}
 
 typedef struct Pars { char* s; sz i; Sym t; } Pars;
 
@@ -160,13 +164,128 @@ bool _escape(Pars* self, u32* res) {
     return false;
 }
 
-#define tok_is_str(__t) ('"' == (__t)->ptr[0])
-#define tok_is_num(__t) ('\'' == (__t)->ptr[0]  \
-            || ('0' <= (__t)->ptr[0] && (__t)->ptr[0] <= '9')  \
-            || ('-' == (__t)->ptr[0] && '0' <= (__t)->ptr[1] && (__t)->ptr[1] <= '9'))
-#define tok_is_fun(__t) ('A' <= (__t)->ptr[0] && (__t)->ptr[0] <= 'Z')
-#define tok_is_var(__t) ('_' == (__t)->ptr[0] || ('a' <= (__t)->ptr[0] && (__t)->ptr[0] <= 'z'))
-#define tok_is_sym(__t) (':' == (__t)->ptr[0])
+#define tok_is_str(__t) ('"' == (__t).ptr[0])
+#define tok_is_num(__t) ('\'' == (__t).ptr[0]  \
+            || ('0' <= (__t).ptr[0] && (__t).ptr[0] <= '9')  \
+            || ('-' == (__t).ptr[0] && '0' <= (__t).ptr[1] && (__t).ptr[1] <= '9'))
+#define tok_is_fun(__t) ('A' <= (__t).ptr[0] && (__t).ptr[0] <= 'Z')
+#define tok_is_sym(__t) (':' == (__t).ptr[0])
+#define tok_is_var(__t) ('_' == (__t).ptr[0] || ('a' <= (__t).ptr[0] && (__t).ptr[0] <= 'z'))
+#define tok_is(__cstr, __t) (0 == symcmp((Sym){.ptr= __cstr, .len= strlen(__cstr)}, __t))
+
+static Obj* underscore_var = NULL;
+
+Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
+    if (!_lex(self)) return NULL;
+    Obj* r = NULL;
+
+    if (tok_is_fun(self->t)) {
+        r = scope_get(&exts_scope, self->t);
+        if (!r) return NULL;
+
+        if (atomic) return r;
+
+        sz before = self->i;
+        if (!_lex(self)) return r;
+        if (tok_is(",", self->t)
+                || tok_is(")", self->t)
+                || tok_is("}", self->t)
+                || tok_is(";", self->t))
+            self->i = before;
+
+        else {
+            u8 argc = 0;
+            Obj* argv[64]; // YYY: we'll say that's enough
+
+            do {
+                Obj* arg = _parse_expr(self, scope, true);
+                if (!arg) return NULL;
+                argv[argc++] = arg;
+                if (64 < argc) return NULL; // meh
+            } while (!tok_is(",", self->t) && !tok_is(";", self->t));
+
+            r = obj_call(r, argc, argv);
+            if (!r) return NULL;
+        }
+    }
+
+    else if (tok_is("(", self->t)) {
+        r = _parse_expr(self, scope, false);
+        if (!tok_is(")", self->t)) return NULL;
+    }
+
+    else if (tok_is_str(self->t)) {
+        // TODO: parse escapes
+        // TODO: copy to allocated
+        // TODO: make obj
+        return NULL;
+    }
+
+    else if (tok_is_num(self->t)) {
+        // TODO: parse number
+        // TODO: make obj
+        return NULL;
+    }
+
+    else if (tok_is("{", self->t)) {
+        // TODO: parse list
+        // TODO: to allocated
+        r = NULL;
+
+        do {
+            Obj* item = _parse_expr(self, scope, true);
+            if (!item) return NULL;
+        } while (_lex(self) && tok_is(",", self->t));
+
+        if (!tok_is("}", self->t)) return NULL;
+        // TODO: make obj
+        return NULL;
+    }
+
+    else if (tok_is_sym(self->t)) {
+        // TODO: make obj
+        return NULL;
+    }
+
+    else if (tok_is("_", self->t)) {
+        r = underscore_var;
+        if (!r) return NULL;
+    }
+
+    else if (tok_is_var(self->t)) {
+        r = scope_get(scope, self->t);
+        if (!r) return NULL;
+    }
+
+    if (atomic) return r;
+
+    sz before = self->i;
+    if (!_lex(self)) return r;
+    if (!tok_is(",", self->t)) {
+        self->i = before;
+        return r;
+    }
+
+    underscore_var = r;
+    return _parse_expr(self, scope, false);
+}
+
+bool _parse_script(Pars* self, Scope* scope) {
+    do {
+        if (!_lex(self)) return true;
+        if (!tok_is_var(self->t)) return false;
+        Sym const key = self->t;
+
+        if (!_lex(self) || !tok_is("=", self->t)) return false;
+
+        Obj* value = _parse_expr(self, scope, false);
+        if (!value) return false;
+
+        scope_put(scope, key, value);
+    } while (_lex(self) && tok_is(";", self->t));
+
+    return true;
+}
 
 bool lang_process(char* script, Scope* scope) {
     (void)scope;
@@ -175,11 +294,11 @@ bool lang_process(char* script, Scope* scope) {
     while (_lex(&p)) {
         printf("token <<%.*s>> (a %s)\n",
                 (int)p.t.len, p.t.ptr,
-                tok_is_str(&p.t) ? "str" :
-                tok_is_num(&p.t) ? "num" :
-                tok_is_fun(&p.t) ? "fun" :
-                tok_is_var(&p.t) ? "var" :
-                tok_is_sym(&p.t) ? "sym" :
+                tok_is_str(p.t) ? "str" :
+                tok_is_num(p.t) ? "num" :
+                tok_is_fun(p.t) ? "fun" :
+                tok_is_var(p.t) ? "var" :
+                tok_is_sym(p.t) ? "sym" :
                 "punct");
         _print_location(&p, "TOKEN");
         puts("");
