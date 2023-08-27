@@ -3,6 +3,6 @@
 
 #include "scope.h"
 
-bool lang_parse(char** script, Scope* scope);
+bool lang_process(char* script, Scope* scope);
 
 #endif // __BIDOOF_LANG_H__

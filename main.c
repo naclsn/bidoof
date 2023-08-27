@@ -38,6 +38,25 @@ int main_lookup(int argc, char** argv) {
     return 0;
 }
 
+int main_tokens(int argc, char** argv) {
+    Scope scope;
+
+    if (0 == argc) {
+        char* line = NULL;
+        sz len = 0;
+        while (-1 != getline(&line, &len, stdin))
+            lang_process(line, &scope);
+        free(line);
+    }
+
+    else {
+        for (; argc--; argv++)
+            lang_process(*argv, &scope);
+    }
+
+    return 0;
+}
+
 int main(int argc, char** argv) {
     argv++;
     argc--;
@@ -48,8 +67,10 @@ int main(int argc, char** argv) {
     }
 
     if (0 == strcmp("-l", *argv)) return main_lookup(--argc, ++argv);
+    if (0 == strcmp("-t", *argv)) return main_tokens(--argc, ++argv);
 
-    return 0;
+    puts("unknown argument");
+    return 1;
 }
 
 #if 0

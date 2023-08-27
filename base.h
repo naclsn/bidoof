@@ -16,7 +16,7 @@ typedef struct Buf { u8* ptr; sz len;                                 } Buf;
 typedef struct Num { int val;                                         } Num;
 typedef struct Lst { struct Obj* ptr; sz len;                         } Lst;
 typedef struct Fun { bool (*call)(struct Obj* self, struct Obj* res); } Fun;
-typedef struct Sym { char const* ptr; sz const len;                   } Sym;
+typedef struct Sym { char const* ptr; sz len;                         } Sym;
 
 typedef struct Obj {
     bool (*update)(struct Obj* self);
