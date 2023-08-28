@@ -69,7 +69,7 @@ void obj_show_depnts(Obj const* self, int curdepth) {
 
 Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
     Obj* r = calloc(1, sizeof(Obj) + argc*sizeof(Obj*));
-    if (!r) return r;
+    if (!r) return NULL;
 
     r->argc = argc;
     memcpy(&r->argv, argv, argc*sizeof(Obj*));

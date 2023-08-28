@@ -1,7 +1,85 @@
+#include <stddef.h>
+
+#ifndef EXTS_NAMES
+#warning "no $EXTS_NAMES, there will be no function..."
+#define EXTS_NAMES
+#endif
+static char* exts_names[] = {EXTS_NAMES NULL};
+#undef EXTS_NAMES
+
 #include "base.h"
 #include "exts.h"
 #include "lang.h"
 
+int main(int argc, char** argv) {
+    argc--;
+    char* prog = *argv++;
+
+    for (char** it = exts_names; *it; it++)
+        if (!exts_load(*it))
+            printf("WARN: could not load '%s'\n", *it);
+
+    for (; argc--; argv++) {
+        char* arg = *argv;
+        if ('-' == arg[0]) switch (arg[1]) {
+            case 'h':
+                printf("Usage: %s ...\n", prog);
+                return 1;
+
+            case 'l':
+                if (0 == --argc) {
+                    printf("ERROR: expected ext name\n");
+                    return 1;
+                }
+                if (!exts_load(*++argv))
+                    printf("WARN: could not load '%s'\n", *argv);
+                break;
+
+            default:
+                printf("WARN: unknown flag '%s'\n", arg);
+                return 1;
+        }
+    }
+
+    Scope scope = {0};
+
+    char* line = NULL;
+    sz len = 0;
+
+    printf(">> ");
+    while (-1 != getline(&line, &len, stdin)) {
+        if ('?' == line[0]) {
+            switch (line[1]) {
+                case '\0':
+                case '\n':
+                    scope_show(&scope);
+                    break;
+
+                case '?':
+                    scope_show(&exts_scope);
+                    break;
+
+                default:
+                    obj_show(scope_get(&scope, (Sym){.ptr= line+1, .len= strlen(line+1)}), 0);
+            }
+        }
+
+        else if (!lang_process(strdup(line), &scope)) {
+            printf("\n");
+        }
+
+        printf(">> ");
+    }
+
+    free(line);
+
+    scope_show(&scope);
+    scope_clear(&scope);
+
+    return 0;
+}
+
+#if 0
 static char* ty_str[] = { [BUF]= "BUF", [NUM]= "NUM", [LST]= "LST", [FUN]= "FUN", [SYM]= "SYM" };
 
 int main_lookup(int argc, char** argv) {
@@ -18,12 +96,7 @@ int main_lookup(int argc, char** argv) {
     }
 
     if (0 == argc) {
-        printf("%zu name-s:\n", exts_scope.count);
-        for (sz k = 0; k < exts_scope.count; k++)
-            printf("- %p: (%s) %s\n",
-                    (void*)exts_scope.items[k].value,
-                    ty_str[exts_scope.items[k].value->ty],
-                    exts_scope.items[k].key.ptr);
+        scope_show(&exts_scope);
     }
 
     else {
@@ -42,7 +115,7 @@ int main_lookup(int argc, char** argv) {
     return 0;
 }
 
-int main_tokens(int argc, char** argv) {
+int main_script(int argc, char** argv) {
     Scope scope = {0};
 
     if (0 == argc) {
@@ -61,7 +134,9 @@ int main_tokens(int argc, char** argv) {
             lang_process(*argv, &scope);
     }
 
-    scope_clear(&scope); // USL
+    scope_show(&scope);
+
+    scope_clear(&scope);
     return 0;
 }
 
@@ -75,13 +150,13 @@ int main(int argc, char** argv) {
     }
 
     if (0 == strcmp("-l", *argv)) return main_lookup(--argc, ++argv);
-    if (0 == strcmp("-t", *argv)) return main_tokens(--argc, ++argv);
+    if (0 == strcmp("-s", *argv)) return main_script(--argc, ++argv);
 
     puts("unknown argument");
     return 1;
 }
 
-#if 0
+if 0
 
 // YYY: temporary hack
 #define DECLARE_ONLY 1

@@ -87,3 +87,13 @@ Obj* scope_put(Scope* self, Sym const key, Obj* value) {
 
     return NULL;
 }
+
+void scope_show(Scope* self) {
+    printf("%zu name-s:\n", self->count);
+    for (sz k = 0; k < self->count; k++) {
+        printf("- %.*s: ",
+                (int)self->items[k].key.len,
+                self->items[k].key.ptr);
+        obj_show(self->items[k].value, 0);
+    }
+}

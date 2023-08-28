@@ -10,13 +10,13 @@ Scope exts_scope = {0};
 bool exts_load(char const* filename) {
     void* ext = dlopen(filename, RTLD_LAZY | RTLD_LOCAL);
     if (!ext) {
-        //puts(dlerror());
+        puts(dlerror());
         return false;
     }
 
     char** names = dlsym(ext, "names");
     if (!names) {
-        //puts("no 'names' in lib");
+        puts("no 'names' in lib");
         dlclose(ext);
         return false;
     }

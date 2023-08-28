@@ -297,29 +297,38 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is_str(self->t)) {
-        // TODO: parse escapes
-        // TODO: copy to allocated
-        // TODO: make obj
-        fail("NIY: string literals");
+        // TODO: parse escapes (for realsies)
+        // TODO: to allocated
+
+        if (!(r = calloc(1, sizeof *r))) fail("OOM");
+        r->ty = BUF;
+        r->as.buf.ptr = (u8*)self->t.ptr+1;
+        r->as.buf.len = self->t.len-2;
+        //r->update = _update_free_str;
     }
 
     else if (tok_is_num(self->t)) {
         u32 val = 0;
+        bool negative = '-' == self->t.ptr[0];
+
         if ('\'' == self->t.ptr[0]) {
             val = self->t.ptr[1];
             if ('\\' == val && 0 == _escape(self->t.ptr+2, self->t.len-2, &val))
                 fail("invalid escape sequence");
         } else {
-            // TODO: parse number
+            // TODO: parse number (for realsies)
+            for (sz k = negative; k < self->t.len; k++)
+                val = val*10 + self->t.ptr[k]-'0';
         }
-        printf("======== val: %d\n", val);
-        // TODO: make obj
-        fail("NIY: number literals");
+
+        if (!(r = calloc(1, sizeof *r))) fail("OOM");
+        r->ty = NUM;
+        r->as.num.val = negative ? -val : val;
     }
 
     else if (tok_is("{", self->t)) {
         sz before = self->i;
-        // TODO: parse list
+        // TODO: parse list (for realsies)
         // TODO: to allocated
         r = NULL;
 
@@ -337,8 +346,13 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is_sym(self->t)) {
-        // TODO: make obj
-        fail("NIY: symbol literals");
+        // TODO: to allocated?
+
+        if (!(r = calloc(1, sizeof *r))) fail("OOM");
+        r->ty = SYM;
+        r->as.sym.ptr = self->t.ptr+1;
+        r->as.sym.len = self->t.len-1;
+        //r->update = _update_free_sym;
     }
 
     else if (tok_is("_", self->t)) {
