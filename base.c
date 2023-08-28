@@ -53,12 +53,17 @@ void obj_show(Obj const* self, int indent) {
 }
 
 void obj_show_depnts(Obj const* self, int curdepth) {
+    printf("(keepalive %d)", self->keepalive);
     struct Depnt* cur = self->depnts;
-    while (cur) {
+
+    if (!cur)
+        printf(" no depnts");
+    else do {
         printf("\n%*.s-> %p", (curdepth < 0 ? 1 : curdepth+1)*3, "", (void*)cur->obj);
         if (0 <= curdepth) obj_show_depnts(cur->obj, curdepth+1);
         cur = cur->next;
-    }
+    } while (cur);
+
     if (curdepth < 1) printf("\n");
 }
 
@@ -95,6 +100,8 @@ Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
             while (cur->next) cur = cur->next;
             cur->next = tail;
         }
+
+        on->keepalive++;
     }
 
     return r;
@@ -113,6 +120,8 @@ bool obj_remdep(Obj* self, Obj* dep) {
             cur->obj = NULL;
             free(cur);
 
+            dep->keepalive--;
+
             return true;
         }
     }
@@ -130,13 +139,12 @@ void obj_destroy(Obj* self) {
     // then delete dep if it has no depnts anymore
     for (sz k = 0; k < self->argc; k++) {
         Obj* dep = self->argv[k];
-        if (obj_remdep(self, self->argv[k]) && !dep->depnts) {
+        if (obj_remdep(self, self->argv[k]) && 0 == dep->keepalive)
             obj_destroy(dep);
-            free(dep);
-        }
     }
 
     memset(&self->as, 0, sizeof self->as);
+    free(self);
 }
 
 static u16 _static_curr_cycle = 0;

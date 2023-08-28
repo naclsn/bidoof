@@ -49,10 +49,21 @@
 //
 // <bind> ::= <fun> {<expr>}
 
-typedef struct Pars { char* s; sz i; Sym t; } Pars;
+typedef struct Pars {
+    char* s;
+    sz i;
+    Sym t;
+    Obj* unnamed;
+    // void (*report)(char*); // YYY: or with more complex arg (eg. line/col/...)
+} Pars;
+
+#define fail(__msg) do {  \
+    puts(__msg);          \
+    return 0;             \
+} while (1)
 
 bool _lex(Pars* self) {
-#define AT              (self->s+self->i)
+#define AT              (self->s + self->i)
 #define IN(__lo, __hi)  (__lo <= c && c <= __hi)
     char c;
     while (' ' == (c = self->s[self->i])
@@ -80,14 +91,14 @@ bool _lex(Pars* self) {
             char* end = AT;
             do end = strchr(end+1, '"');
             while (end && '\\' == end[-1]);
-            if (!end) return false;
+            if (!end) fail("missing closing double-quote");
             self->t.len = end+1 - AT;
             self->i+= self->t.len;
         } return true;
 
         case '-':
             self->i++;
-            if (!*AT) return false;
+            if (!*AT) fail("expected digits");
             // fall through
         case '0':
             self->t.len++;
@@ -99,7 +110,7 @@ bool _lex(Pars* self) {
                 case '.': case '_':
                 case '0'...'9': break;
                 case '\0': return true;
-                default: return false;
+                default: fail("expected digits");
             }
             // fall through
         case '1'...'9': {
@@ -114,17 +125,17 @@ bool _lex(Pars* self) {
                 do c = self->s[++self->t.len, ++self->i];
                 while ('_' == c || IN('0', '9'));
             }
-            if (10 != base && 2 == self->t.len) return false;
+            if (10 != base && 2 == self->t.len) fail("expected digits");
             // better report as syntax error, ~~even tho~~
             // **because** it could be valid
-            if (IN('2', '9') || IN('A', 'Z') || IN('a', 'z')) return false;
+            if (IN('2', '9') || IN('A', 'Z') || IN('a', 'z')) fail("unexpected characters");
         } return true;
 
         case '\'': {
             char* end = AT;
             do end = strchr(end+1, '\'');
             while (end && '\\' == end[-1]);
-            if (!end) return false;
+            if (!end) fail("missing closing simple-quote");
             self->t.len = end+1 - AT;
             self->i+= self->t.len;
         } return true;
@@ -137,7 +148,7 @@ bool _lex(Pars* self) {
         case ':':
             do c = self->s[++self->t.len, ++self->i];
             while ('_' == c || IN('0', '9') || IN('A', 'Z') || IN('a', 'z'));
-            if (1 == self->t.len) return false;
+            if (1 == self->t.len) fail("expected symbol name");
             return true;
 
         case '_':
@@ -145,9 +156,12 @@ bool _lex(Pars* self) {
             do c = self->s[++self->t.len, ++self->i];
             while ('_' == c || IN('0', '9') || IN('a', 'z'));
             return true;
+
+        case '\0':
+            return false;
     }
 
-    return false;
+    fail("unexpected character");
 #undef IN
 #undef AT
 }
@@ -174,36 +188,57 @@ void _print_location(Pars* self, char* reason) {
     printf("%4zu | %*s\n", lineNr+1, (int)colNr, "^");
 }
 
-bool _escape(Sym* slice, u32* res) {
-    *res = 0;
+sz _escape(char const* ptr, sz len, u32* res) {
+#define AT_IN(__off, __lo, __hi)  (__lo <= ptr[__off] && ptr[__off] <= __hi)
 
-    switch (*slice->ptr++) {
-        case 'a': *res = 0x07; return true;
-        case 'b': *res = 0x08; return true;
-        case 'e': *res = 0x1B; return true;
-        case 'f': *res = 0x0C; return true;
-        case 'n': *res = 0x0A; return true;
-        case 'r': *res = 0x0D; return true;
-        case 't': *res = 0x09; return true;
-        case 'v': *res = 0x0B; return true;
-        case '\\': *res = 0x5C; return true;
-        case '\'': *res = 0x27; return true;
-        case '"': *res = 0x22; return true;
+    switch (*ptr) {
+        case 'a': *res = 0x07; return 1;
+        case 'b': *res = 0x08; return 1;
+        case 'e': *res = 0x1B; return 1;
+        case 'f': *res = 0x0C; return 1;
+        case 'n': *res = 0x0A; return 1;
+        case 'r': *res = 0x0D; return 1;
+        case 't': *res = 0x09; return 1;
+        case 'v': *res = 0x0B; return 1;
+        case '\\': *res = 0x5C; return 1;
+        case '\'': *res = 0x27; return 1;
+        case '"': *res = 0x22; return 1;
 
         case 'x': // 2 hex digits byte
-            break;
+            if (len <3
+                || !( AT_IN(1, '0', '9') || AT_IN(0, 'A', 'F') || AT_IN(0, 'a', 'f') )
+                || !( AT_IN(2, '0', '9') || AT_IN(1, 'A', 'F') || AT_IN(1, 'a', 'f') )
+                ) return 0;
+            else {
+                u8 lo = 0b100000 | ptr[1];
+                u8 hi = 0b100000 | ptr[2];
+                *res = ((lo & 0xf) + ('9'<lo)*9) | ( ((hi & 0xf) + ('9'<hi)*9) << 4 );
+            }
+            return 3;
 
         case 'u': // 4 hex digits codepoint below 0x10000
-            break;
+            return 5;
 
         case 'U': // 8 hex digits codepoint
-            break;
+            return 9;
 
-        case '0'...'7': // 3 oct digits (idk y tho, is there this much use for it?)
-            break;
+        case '0'...'7': // 3 oct digits byte
+            if (len <3
+                || !AT_IN(0, '0', '7')
+                || !AT_IN(1, '0', '7')
+                || !AT_IN(2, '0', '7')
+                ) return 0;
+            else {
+                u8 lo = ptr[0] & 0xf;
+                u8 mi = ptr[1] & 0xf;
+                u8 hi = ptr[2] & 0xf;
+                *res = lo | (mi <<3) | (hi <<3);
+            }
+            return 3;
     }
 
-    return false;
+    return 0;
+#undef AT_IN
 }
 
 #define tok_is_str(__t) ('"' == (__t).ptr[0])
@@ -215,15 +250,13 @@ bool _escape(Sym* slice, u32* res) {
 #define tok_is_var(__t) ('_' == (__t).ptr[0] || ('a' <= (__t).ptr[0] && (__t).ptr[0] <= 'z'))
 #define tok_is(__cstr, __t) (0 == symcmp((Sym){.ptr= __cstr, .len= strlen(__cstr)}, __t))
 
-static Obj* underscore_var = NULL;
-
 Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     if (!_lex(self)) return NULL;
     Obj* r = NULL;
 
     if (tok_is_fun(self->t)) {
         r = scope_get(&exts_scope, self->t);
-        if (!r) return NULL;
+        if (!r) fail("unknown function");
 
         if (atomic) return r;
 
@@ -241,62 +274,81 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
             do {
                 Obj* arg = _parse_expr(self, scope, true);
-                if (!arg) return NULL;
+                if (!arg) fail("in function argument");
                 argv[argc++] = arg;
-                if (64 < argc) return NULL; // meh
+                if (64 < argc) fail("(we don't handle < 64 arguments for now..)"); // meh
             } while (!tok_is(",", self->t) && !tok_is(";", self->t));
 
             r = obj_call(r, argc, argv);
-            if (!r) return NULL;
+            if (!r) fail("could not call function with given arguments");
         }
     }
 
     else if (tok_is("(", self->t)) {
+        sz before = self->i;
+
         r = _parse_expr(self, scope, false);
-        if (!tok_is(")", self->t)) return NULL;
+        if (!r) fail("in parenthesised expression");
+
+        if (!tok_is(")", self->t)) {
+            self->i = before;
+            fail("missing closing parenthesis");
+        }
     }
 
     else if (tok_is_str(self->t)) {
         // TODO: parse escapes
         // TODO: copy to allocated
         // TODO: make obj
-        return NULL;
+        fail("NIY: string literals");
     }
 
     else if (tok_is_num(self->t)) {
-        // TODO: parse number
+        u32 val = 0;
+        if ('\'' == self->t.ptr[0]) {
+            val = self->t.ptr[1];
+            if ('\\' == val && 0 == _escape(self->t.ptr+2, self->t.len-2, &val))
+                fail("invalid escape sequence");
+        } else {
+            // TODO: parse number
+        }
+        printf("======== val: %d\n", val);
         // TODO: make obj
-        return NULL;
+        fail("NIY: number literals");
     }
 
     else if (tok_is("{", self->t)) {
+        sz before = self->i;
         // TODO: parse list
         // TODO: to allocated
         r = NULL;
 
         do {
             Obj* item = _parse_expr(self, scope, true);
-            if (!item) return NULL;
+            if (!item) fail("in list literal");
         } while (_lex(self) && tok_is(",", self->t));
 
-        if (!tok_is("}", self->t)) return NULL;
+        if (!tok_is("}", self->t)) {
+            self->i = before;
+            fail("missing closing brace");
+        }
         // TODO: make obj
-        return NULL;
+        fail("NIY: list literals");
     }
 
     else if (tok_is_sym(self->t)) {
         // TODO: make obj
-        return NULL;
+        fail("NIY: symbol literals");
     }
 
     else if (tok_is("_", self->t)) {
-        r = underscore_var;
-        if (!r) return NULL;
+        r = self->unnamed;
+        if (!r) fail("no unnamed variable at this point");
     }
 
     else if (tok_is_var(self->t)) {
         r = scope_get(scope, self->t);
-        if (!r) return NULL;
+        if (!r) fail("unknown variable");
     }
 
     if (atomic) return r;
@@ -308,30 +360,37 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         return r;
     }
 
-    underscore_var = r;
+    self->unnamed = r;
     return _parse_expr(self, scope, false);
-}
+} // _parse_expr
 
 bool _parse_script(Pars* self, Scope* scope) {
     do {
         if (!_lex(self)) return true;
-        if (!tok_is_var(self->t)) return false;
+        if (!tok_is_var(self->t)) fail("expected variable name");
         Sym const key = self->t;
 
-        if (!_lex(self) || !tok_is("=", self->t)) return false;
+        if (!_lex(self) || !tok_is("=", self->t)) fail("expected equal");
 
         Obj* value = _parse_expr(self, scope, false);
-        if (!value) return false;
+        if (!value) fail("in script expression");
 
-        scope_put(scope, key, value);
+        if (!tok_is("_", key)) scope_put(scope, key, value);
     } while (_lex(self) && tok_is(";", self->t));
 
     return true;
 }
 
 bool lang_process(char* script, Scope* scope) {
-    (void)scope;
+    Pars p = {.s= script, .i= 0 };
 
+    if (_parse_script(&p, scope)) return true;
+
+    _print_location(&p, "ERROR");
+    return false;
+}
+
+void lang_show_tokens(char* script) {
     Pars p = {.s= script, .i= 0 };
     while (_lex(&p)) {
         printf("token <<%.*s>> (a %s)\n",
@@ -346,11 +405,6 @@ bool lang_process(char* script, Scope* scope) {
         puts("");
     }
 
-    if (!p.t.ptr[0]) printf("end of script\n");
-    else {
-        printf("unexpected 0x%02X\n", p.s[p.i]);
-        _print_location(&p, "ERROR");
-    }
-
-    return false;
+    if (!*p.t.ptr) printf("end of script\n");
+    else _print_location(&p, "ERROR");
 }

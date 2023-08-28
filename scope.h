@@ -7,11 +7,9 @@ typedef struct Scope {
     Entry* items;
     sz count;
     sz size;
-    Obj keepalive;
 } Scope;
 
-bool scope_make(Scope* res, Sym const name);
-void scope_destroy(Scope* self);
+void scope_clear(Scope* self);
 Obj* scope_get(Scope* self, Sym const key);
 Obj* scope_put(Scope* self, Sym const key, Obj* value);
 

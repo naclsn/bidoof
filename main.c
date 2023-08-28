@@ -30,7 +30,11 @@ int main_lookup(int argc, char** argv) {
         for (; argc--; argv++) {
             Obj* it = exts_lookup(*argv);
             if (!it) printf("- %s not found\n", *argv);
-            else printf("- %p: (%s) %s\n", (void*)it, ty_str[it->ty], *argv);
+            else {
+                printf("- %p: (%s) %s\n", (void*)it, ty_str[it->ty], *argv);
+                obj_show(it, 0);
+                obj_show_depnts(it, 0);
+            }
         }
     }
 
@@ -39,13 +43,16 @@ int main_lookup(int argc, char** argv) {
 }
 
 int main_tokens(int argc, char** argv) {
-    Scope scope;
+    Scope scope = {0};
 
     if (0 == argc) {
         char* line = NULL;
         sz len = 0;
-        while (-1 != getline(&line, &len, stdin))
+        printf(">> ");
+        while (-1 != getline(&line, &len, stdin)) {
             lang_process(line, &scope);
+            printf(">> ");
+        }
         free(line);
     }
 
@@ -54,6 +61,7 @@ int main_tokens(int argc, char** argv) {
             lang_process(*argv, &scope);
     }
 
+    scope_clear(&scope); // USL
     return 0;
 }
 

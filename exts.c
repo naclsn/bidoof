@@ -5,12 +5,7 @@ struct LoadedList {
     struct LoadedList* next;
 }* loaded = NULL;
 
-Scope exts_scope = {
-    .keepalive= {
-        .ty= SYM,
-        .as.sym= {.ptr= "exts_scope", .len= strlen("exts_scope")},
-    },
-};
+Scope exts_scope = {0};
 
 bool exts_load(char const* filename) {
     void* ext = dlopen(filename, RTLD_LAZY | RTLD_LOCAL);

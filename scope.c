@@ -1,21 +1,9 @@
 #include "scope.h"
 
-bool scope_make(Scope* res, Sym const name) {
-    memset(res, 0, sizeof *res);
-
-    res->keepalive.ty = SYM;
-    memcpy(&res->keepalive.as.sym, &name, sizeof name);
-
-    return true;
-}
-
-void scope_destroy(Scope* self) {
+void scope_clear(Scope* self) {
     for (sz k = 0; k < self->count; k++) {
         Obj* it = self->items[k].value;
-        if (obj_remdep(&self->keepalive, it) && !it->depnts) {
-            obj_destroy(it);
-            free(it);
-        }
+        if (0 == --it->keepalive) obj_destroy(it);
     }
 
     free(self->items);
@@ -73,28 +61,19 @@ Obj* scope_put(Scope* self, Sym const key, Obj* value) {
         }
     }
 
-    {
-        struct Depnt* ka = malloc(sizeof *ka);
-        if (!ka) return NULL;
-
-        ka->obj = &self->keepalive;
-        ka->next = value->depnts;
-        value->depnts = ka;
-    }
+    value->keepalive++;
 
     int cmp;
     sz k = _binary_search(self, key, &cmp);
 
     if (0 == cmp) { // replace-at
         Obj* found = self->items[k].value;
-        if (obj_remdep(&self->keepalive, found) && !found->depnts) {
-            obj_destroy(found);
-            free(found);
-            found = NULL;
-        }
-
         self->items[k].value = value;
 
+        if (0 == --found->keepalive) {
+            obj_destroy(found);
+            return NULL;
+        }
         return found;
     }
 

@@ -29,6 +29,7 @@ typedef struct Obj {
         struct Depnt* next;
     }* depnts;
     u16 cycle;
+    u16 keepalive;
 
     u8 argc;
     struct Obj* argv[];
@@ -45,10 +46,12 @@ void obj_show(Obj const* self, int indent);
 void obj_show_depnts(Obj const* self, int curdepth);
 
 Obj* obj_call(Obj* self, u8 argc, Obj** argv);
-// remove self from dep's depnts; false if it was not in
+// remove self from dep's depnts and decrement its keepalive
+// false if it was not in
 bool obj_remdep(Obj* self, Obj* dep);
 // do not destroy an Obj which has other Obj depending on it
-// (ie. `self->depnts` not NULL)
+// (ie. `self->keepalive` non-zero)
+// destroying is recursive, and frees `self`
 void obj_destroy(Obj* self);
 bool obj_update(Obj* self);
 
