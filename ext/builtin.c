@@ -1,10 +1,8 @@
-#include "base.h"
+#include "../helper.h"
 
-char* names[3] = {"Delim", "Reverse", NULL};
-
-bool _updateDelim(Obj* self) {
-    Buf const* under = &self->argv[0]->as.buf;
-    Buf const* delim = &self->argv[1]->as.buf;
+simple_ctor(BUF, Delim, 2, (2, BUF, BUF), (1, BUF)) {
+    bind_arg(0, Buf, under);
+    bind_arg(1, Buf, delim);
 
     sz k;
     for (k = 0; k < under->len - delim->len; k++) {
@@ -17,21 +15,13 @@ bool _updateDelim(Obj* self) {
     return true;
 }
 
-bool _makeDelim(Obj* self, Obj* res) {
+simple_ctor(LST, Map, 1, (2, FUN, LST)) {
     (void)self;
-
-    if (2 != res->argc) return false;
-    if (BUF != res->argv[0]->ty) return false;
-    if (BUF != res->argv[1]->ty) return false;
-
-    res->update = _updateDelim;
-    res->ty = BUF;
-    return true;
+    puts("NIY: Map");
+    return false;
 }
 
-Obj Delim = {.ty= FUN, .as.fun.call= _makeDelim};
-
-bool _updateReverse(Obj* self) {
+simple_ctor(BUF, Reverse, 1, (1, BUF)) {
     if (!self->update) {
         free(self->as.buf.ptr);
         self->as.buf.ptr = NULL;
@@ -39,7 +29,7 @@ bool _updateReverse(Obj* self) {
         return true;
     }
 
-    Buf const* under = &self->argv[0]->as.buf;
+    bind_arg(0, Buf, under);
 
     self->as.buf.ptr = realloc(self->as.buf.ptr, under->len);
     if (!self->as.buf.ptr) return false;
@@ -51,15 +41,4 @@ bool _updateReverse(Obj* self) {
     return true;
 }
 
-bool _makeReverse(Obj* self, Obj* res) {
-    (void)self;
-
-    if (1 != res->argc) return false;
-    if (BUF != res->argv[0]->ty) return false;
-
-    res->update = _updateReverse;
-    res->ty = BUF;
-    return true;
-}
-
-Obj Reverse = {.ty= FUN, .as.fun.call= _makeReverse};
+export_names("Map", "Delim", "Reverse");
