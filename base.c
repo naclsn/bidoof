@@ -74,7 +74,6 @@ Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
     r->argc = argc;
     memcpy(&r->argv, argv, argc*sizeof(Obj*));
 
-    printf("coucou %p\n", (void*)self);
     if (!self->as.fun.call(self, r)) {
         free(r);
         return NULL;
@@ -102,6 +101,11 @@ Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
         }
 
         on->keepalive++;
+    }
+
+    if (!obj_update(r)) {
+        obj_destroy(r);
+        return NULL;
     }
 
     return r;

@@ -53,7 +53,7 @@ Obj* scope_put(Scope* self, Sym const key, Obj* value) {
         if (resize < self->size+1) resize*= 2;
 
         if (resize != self->size) {
-            Entry* niw = reallocarray(self->items, resize, sizeof(Entry));
+            ScopeEntry* niw = reallocarray(self->items, resize, sizeof(ScopeEntry));
             if (!niw) return NULL;
 
             self->items = niw;
@@ -80,7 +80,7 @@ Obj* scope_put(Scope* self, Sym const key, Obj* value) {
     if (0 < cmp) k++; // insert-after
     // else // insert-before
 
-    memmove(self->items+k+1, self->items+k, (self->count-k)*sizeof(Entry));
+    memmove(self->items+k+1, self->items+k, (self->count-k)*sizeof(ScopeEntry));
     memcpy(&self->items[k].key, &key, sizeof key);
     self->items[k].value = value;
     self->count++;

@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
                     break;
 
                 default:
-                    obj_show(scope_get(&scope, (Sym){.ptr= line+1, .len= strlen(line+1)}), 0);
+                    obj_show(scope_get(&scope, (Sym){.ptr= line+1, .len= strlen(line+1)-1}), 0);
             }
         }
 

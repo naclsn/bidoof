@@ -262,22 +262,28 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
         sz before = self->i;
         if (!_lex(self)) return r;
-        if (tok_is(",", self->t)
+        self->i = before;
+        if (    !( tok_is(",", self->t)
                 || tok_is(")", self->t)
                 || tok_is("}", self->t)
-                || tok_is(";", self->t))
-            self->i = before;
-
-        else {
+                || tok_is(";", self->t) )  ) {
             u8 argc = 0;
             Obj* argv[64]; // YYY: we'll say that's enough
 
             do {
                 Obj* arg = _parse_expr(self, scope, true);
                 if (!arg) fail("in function argument");
+
+                if (64 <= argc) fail("(we don't handle more then 64 arguments for now..)"); // meh
                 argv[argc++] = arg;
-                if (64 < argc) fail("(we don't handle < 64 arguments for now..)"); // meh
-            } while (!tok_is(",", self->t) && !tok_is(";", self->t));
+
+                before = self->i;
+                if (!_lex(self)) break;
+                self->i = before;
+            } while (!( tok_is(",", self->t)
+                     || tok_is(")", self->t)
+                     || tok_is("}", self->t)
+                     || tok_is(";", self->t) ));
 
             r = obj_call(r, argc, argv);
             if (!r) fail("could not call function with given arguments");

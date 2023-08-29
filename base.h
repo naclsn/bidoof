@@ -21,8 +21,8 @@ typedef struct Sym { char const* ptr; sz len;                         } Sym;
 typedef struct Obj {
     bool (*update)(struct Obj* self);
 
-    enum  { BUF,     NUM,     LST,     FUN,     SYM,     } ty;
-    union { Buf buf; Num num; Lst lst; Fun fun; Sym sym; } as;
+    enum  Ty { BUF,     NUM,     LST,     FUN,     SYM,     } ty;
+    union As { Buf buf; Num num; Lst lst; Fun fun; Sym sym; } as;
 
     struct Depnt {
         struct Obj* obj;
@@ -35,10 +35,20 @@ typedef struct Obj {
     struct Obj* argv[];
 } Obj;
 
-typedef struct Entry {
-    Sym key;
-    Obj* value;
-} Entry;
+typedef struct Meta {
+    char const* const doc;
+    char const* const name;
+
+    struct MetaOvl {
+        enum Ty const ret;
+        struct MetaOvlPrm {
+            enum Ty const ty;
+            char const* const name;
+        } const* const params;
+    } const* const overloads;
+
+    Obj* const obj;
+} const Meta;
 
 int symcmp(Sym const l, Sym const r);
 

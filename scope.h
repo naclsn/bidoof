@@ -3,8 +3,13 @@
 
 #include "base.h"
 
+typedef struct ScopeEntry {
+    Sym key;
+    Obj* value;
+} ScopeEntry;
+
 typedef struct Scope {
-    Entry* items;
+    ScopeEntry* items;
     sz count;
     sz size;
 } Scope;
