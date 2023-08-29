@@ -85,12 +85,11 @@
 
 
 #define ctor_given(__name, __doc, __make, __meta_overloads)  \
-    Obj __name = {.ty= FUN, .as.fun.call= __make};           \
-    Meta _meta_##__name = {                                  \
+    Meta const __name = {                                    \
         .doc= __doc,                                         \
         .name= #__name,                                      \
         .overloads= __meta_overloads,                        \
-        .obj= &__name,                                       \
+        .obj= &(Obj){.ty= FUN, .as.fun.call= __make},        \
     }
 
 #define ctor_w_also(__n_overloads, __name, __make_also, __doc, ...)  \
@@ -112,6 +111,5 @@
 
 
 
-// TODO: .. names_meta[] = {..} or something
 #define export_names(...)  \
     char* names[] = {__VA_ARGS__, NULL}

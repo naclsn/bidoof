@@ -18,11 +18,14 @@ typedef struct Lst { struct Obj* ptr; sz len;                         } Lst;
 typedef struct Fun { bool (*call)(struct Obj* self, struct Obj* res); } Fun;
 typedef struct Sym { char const* ptr; sz len;                         } Sym;
 
+enum  Ty { BUF,     NUM,     LST,     FUN,     SYM,     };
+union As { Buf buf; Num num; Lst lst; Fun fun; Sym sym; };
+
 typedef struct Obj {
     bool (*update)(struct Obj* self);
 
-    enum  Ty { BUF,     NUM,     LST,     FUN,     SYM,     } ty;
-    union As { Buf buf; Num num; Lst lst; Fun fun; Sym sym; } as;
+    enum  Ty ty;
+    union As as;
 
     struct Depnt {
         struct Obj* obj;
@@ -47,8 +50,8 @@ typedef struct Meta {
         } const* const params;
     } const* const overloads;
 
-    Obj* const obj;
-} const Meta;
+    Obj* obj;
+} Meta;
 
 int symcmp(Sym const l, Sym const r);
 

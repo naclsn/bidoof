@@ -109,7 +109,7 @@ bool _lex(Pars* self) {
                 case 'x': base = 16; break;
                 case '.': case '_':
                 case '0'...'9': break;
-                case '\0': return true;
+                case ' ': case '\t': case '\n': case '\r': case '\0': return true;
                 default: fail("expected digits");
             }
             // fall through

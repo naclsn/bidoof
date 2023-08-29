@@ -39,9 +39,12 @@ bool exts_load(char const* filename) {
     }
 
     for (; *names; names++) {
-        Sym const key = {*names, strlen(*names)};
-        Obj* value = dlsym(ext, *names);
-        if (value) scope_put(&exts_scope, key, value);
+        Meta* meta = dlsym(ext, *names);
+        if (meta) {
+            Sym const key = {meta->name, strlen(meta->name)};
+            Obj* value = meta->obj;
+            scope_put(&exts_scope, key, value);
+        } else printf("no meta for '%s'\n", *names);
     }
 
     return true;
