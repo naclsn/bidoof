@@ -1,7 +1,7 @@
 #include <stddef.h>
 
 #ifndef EXTS_NAMES
-#warning "no $EXTS_NAMES, there will be no function..."
+#error "no $EXTS_NAMES, there would be no function..."
 #define EXTS_NAMES
 #endif
 static char* exts_names[] = {EXTS_NAMES NULL};
@@ -15,9 +15,19 @@ int main(int argc, char** argv) {
     argc--;
     char* prog = *argv++;
 
-    for (char** it = exts_names; *it; it++)
-        if (!exts_load(*it))
-            printf("WARN: could not load '%s'\n", *it);
+    {
+        char prog_dir[256];
+        char* end = strrchr(strncpy(prog_dir, prog, 256), '/');
+
+        for (char** it = exts_names; *it; it++) {
+            sz len = strlen(*it);
+            memcpy(end+1, *it, len);
+            end[len+1] = '\0';
+
+            if (!exts_load(prog_dir))
+                printf("WARN: could not load '%s'\n", *it);
+        }
+    }
 
     for (; argc--; argv++) {
         char* arg = *argv;

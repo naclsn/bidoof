@@ -19,7 +19,7 @@ $(OUT):
 	$(MD) '$(OUT)'
 
 $(OUT)/$(call as-exe,$(NAME)): *.[ch]
-	$(CC) $^ -o '$@' -DEXTS_NAMES='$(foreach ext,$(EXTS),"./$(call as-lib,$(ext))",)' $(CFLAGS)
+	$(CC) $^ -o '$@' -DEXTS_NAMES='$(foreach ext,$(EXTS),"$(call as-lib,$(ext))",)' $(CFLAGS)
 
 $(OUT)/$(call as-lib,%): ext/%.c helper.h
 	$(CC) $^ -o '$@' -fPIC -shared $(CFLAGS)
