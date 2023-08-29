@@ -8,7 +8,7 @@
 extern Scope exts_scope;
 
 bool exts_load(char const* filename);
-Obj* exts_lookup(char const* name);
+Meta* exts_lookup(Sym const name);
 void exts_unload(void);
 
 #endif // __BIDOOF_EXTS_H__

@@ -50,7 +50,7 @@ typedef struct Meta {
         } const* const params;
     } const* const overloads;
 
-    Obj* obj;
+    Obj obj;
 } Meta;
 
 int symcmp(Sym const l, Sym const r);

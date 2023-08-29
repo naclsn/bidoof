@@ -85,11 +85,11 @@
 
 
 #define ctor_given(__name, __doc, __make, __meta_overloads)  \
-    Meta const __name = {                                    \
+    Meta __name = {                                          \
         .doc= __doc,                                         \
         .name= #__name,                                      \
         .overloads= __meta_overloads,                        \
-        .obj= &(Obj){.ty= FUN, .as.fun.call= __make},        \
+        .obj= {.ty= FUN, .as.fun.call= __make},              \
     }
 
 #define ctor_w_also(__n_overloads, __name, __make_also, __doc, ...)  \

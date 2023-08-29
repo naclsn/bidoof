@@ -71,7 +71,10 @@ void repl(void) {
                             break;
 
                         default:
-                            obj_show(scope_get(&exts_scope, (Sym){.ptr= line+2, .len= strlen(line+2)-1}), 0);
+                            {
+                                Meta* meta = exts_lookup((Sym){.ptr= line+2, .len= strlen(line+2)-1});
+                                puts(meta->doc);
+                            }
                     }
                     break;
 

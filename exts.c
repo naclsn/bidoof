@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include "exts.h"
 
 struct LoadedList {
@@ -42,7 +43,7 @@ bool exts_load(char const* filename) {
         Meta* meta = dlsym(ext, *names);
         if (meta) {
             Sym const key = {meta->name, strlen(meta->name)};
-            Obj* value = meta->obj;
+            Obj* value = &meta->obj;
             scope_put(&exts_scope, key, value);
         } else printf("no meta for '%s'\n", *names);
     }
@@ -50,9 +51,10 @@ bool exts_load(char const* filename) {
     return true;
 }
 
-Obj* exts_lookup(char const* name) {
-    Sym const key = {.ptr= name, .len= strlen(name)};
-    return scope_get(&exts_scope, key);
+Meta* exts_lookup(Sym const name) {
+    Obj* obj = scope_get(&exts_scope, name);
+    Meta* meta = (Meta*)( ((char*)obj) - offsetof(struct Meta, obj) );
+    return meta;
 }
 
 void exts_unload(void) {
