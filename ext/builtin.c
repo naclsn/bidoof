@@ -1,30 +1,32 @@
 #include "../helper.h"
 
+export_names("Delim");
+
 ctor_simple(2, Delim
         , "slice from beginning up to delimiter (exclusive), or the whole buffer if not found - default delimiter is \"\\0\" ie. C-string"
-        , (2, BUF, Delim2, BUF, under, BUF, delim)
-        , (1, BUF, Delim1, BUF, under)
+        , (2, BUF, _Delim2, BUF, under, BUF, delim)
+        , (1, BUF, _Delim1, BUF, under)
         );
 
-bool Delim2(Buf* self, Buf const* const under, Buf const* const delim) {
+bool _Delim2(Obj* self, Buf* r, Buf const* const under, Buf const* const delim) {
+    (void)self;
     sz k;
     for (k = 0; k < under->len - delim->len; k++) {
         if (0 == memcmp(under->ptr+k, delim->ptr, delim->len)) goto found;
     }
     k = under->len;
 found:
-    self->ptr = under->ptr;
-    self->len = k;
+    r->ptr = under->ptr;
+    r->len = k;
     return true;
 }
 
-bool Delim1(Buf* self, Buf const* const under) {
-    self->ptr = under->ptr;
-    self->len = strnlen((char const*)under->ptr, under->len);
+bool _Delim1(Obj* self, Buf* r, Buf const* const under) {
+    (void)self;
+    r->ptr = under->ptr;
+    r->len = strnlen((char const*)under->ptr, under->len);
     return true;
 }
-
-export_names("Delim");
 
 #if 0
 simple_ctor(LST, Map, 1, (2, FUN, LST)) {

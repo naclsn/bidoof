@@ -33,7 +33,7 @@
 
 #define _link_uf_pars(__k, __ty, __nm)  , ty_for_##__ty const* const __nm
 #define link_uf_pars(__n_par, __ret, __ufname, ...)  \
-    ty_for_##__ret* self _FOR_TYNM_##__n_par(_link_uf_pars, __VA_ARGS__)
+    Obj* self, ty_for_##__ret* r _FOR_TYNM_##__n_par(_link_uf_pars, __VA_ARGS__)
 
 #define as_for_BUF buf
 #define as_for_NUM num
@@ -43,7 +43,7 @@
 
 #define _link_uf_args(__k, __ty, __nm)  , &self->argv[__k]->as.as_for_##__ty
 #define link_uf_args(__n_par, __ret, __ufname, ...)  \
-    &self->as.as_for_##__ret _FOR_TYNM_##__n_par(_link_uf_args, __VA_ARGS__)
+    self, &self->as.as_for_##__ret _FOR_TYNM_##__n_par(_link_uf_args, __VA_ARGS__)
 
 
 
@@ -93,6 +93,7 @@
     }
 
 #define ctor_w_also(__n_overloads, __name, __make_also, __doc, ...)  \
+    inline bool __make_also(Obj* fun, Obj* res);  \
     link_overloads_##__n_overloads(__name, __VA_ARGS__)              \
     bool _make_##__name(Obj* self, Obj* res) {                       \
         (void)self;                                                  \
@@ -104,10 +105,15 @@
         document_overloads_##__n_overloads(__VA_ARGS__),             \
         {0}                                                          \
     }))
-#define _no_make_also(__self, __res)  true
 
 #define ctor_simple(__n_overloads, __name, __doc, ...)  \
     ctor_w_also(__n_overloads, __name, _no_make_also, __doc, __VA_ARGS__)
+
+bool _no_make_also(Obj* fun, Obj* res) {
+    (void)fun;
+    (void)res;
+    return true;
+}
 
 
 

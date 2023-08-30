@@ -1,6 +1,9 @@
 #ifndef __BIDOOF_BASE_H__
 #define __BIDOOF_BASE_H__
 
+// YYY: don't know where to put it for now
+#define frommember(__it, __type, __member)  (  (__type*)( ((char*)__it) - offsetof(__type, __member) )  )
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>

@@ -53,7 +53,7 @@ bool exts_load(char const* filename) {
 
 Meta* exts_lookup(Sym const name) {
     Obj* obj = scope_get(&exts_scope, name);
-    Meta* meta = (Meta*)( ((char*)obj) - offsetof(struct Meta, obj) );
+    Meta* meta = frommember(obj, Meta, obj);
     return meta;
 }
 

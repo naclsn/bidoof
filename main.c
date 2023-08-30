@@ -72,8 +72,19 @@ void repl(void) {
 
                         default:
                             {
+                                static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym"};
+
                                 Meta* meta = exts_lookup((Sym){.ptr= line+2, .len= strlen(line+2)-1});
                                 puts(meta->doc);
+
+                                for (struct MetaOvl const* ovl = meta->overloads; ovl->params; ovl++) {
+                                    printf("   %s %s(", ty_str[ovl->ret], meta->name);
+
+                                    struct MetaOvlPrm const* prm = ovl->params;
+                                    printf("%s %s", ty_str[prm->ty], prm->name);
+                                    while ((++prm)->name) printf(", %s %s", ty_str[prm->ty], prm->name);
+                                    printf(")\n");
+                                }
                             }
                     }
                     break;
