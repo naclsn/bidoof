@@ -1,7 +1,6 @@
 #ifndef __BIDOOF_EXTS_H__
 #define __BIDOOF_EXTS_H__
 
-#include "base.h"
 #include "scope.h"
 #include <dlfcn.h>
 

@@ -1,5 +1,5 @@
-#include "lang.h"
 #include "exts.h"
+#include "lang.h"
 
 // <script> ::= <var> '=' <expr> {';' <var> '=' <expr>} [';']
 // <expr> ::

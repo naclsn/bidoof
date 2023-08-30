@@ -1,14 +1,14 @@
 #ifndef __BIDOOF_BASE_H__
 #define __BIDOOF_BASE_H__
 
-// YYY: don't know where to put it for now
-#define frommember(__it, __type, __member)  (  (__type*)( ((char*)__it) - offsetof(__type, __member) )  )
-
 #include <stdbool.h>
-#include <stdlib.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#define frommember(__it, __type, __member)  (  (__type*)( ((char*)__it) - offsetof(__type, __member) )  )
 
 typedef uint8_t u8;
 typedef uint16_t u16;

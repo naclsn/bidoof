@@ -1,4 +1,3 @@
-#include <stddef.h>
 #include "exts.h"
 
 struct LoadedList {

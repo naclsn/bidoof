@@ -1,4 +1,5 @@
-#include <stddef.h>
+#include "exts.h"
+#include "lang.h"
 
 #ifndef EXTS_NAMES
 #error "no $EXTS_NAMES, there would be no function..."
@@ -6,10 +7,6 @@
 #endif
 static char* exts_names[] = {EXTS_NAMES NULL};
 #undef EXTS_NAMES
-
-#include "base.h"
-#include "exts.h"
-#include "lang.h"
 
 void load_all_exts(char const* prog) {
     char prog_dir[256];
