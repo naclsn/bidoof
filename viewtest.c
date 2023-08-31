@@ -1,5 +1,6 @@
 // on Windows it needed: -lopengl32 -lgdi32
 
+#define FRAME_IMPLEMENTATION
 #include "ext/views/frame.h"
 #include <stdio.h>
 
@@ -17,7 +18,7 @@ void render_triangle(Frame* self) {
 }
 
 void confirm_closing(Frame* self) {
-    if (IDOK == MessageBox(self->hWnd, "close?", "hey", MB_OKCANCEL))
+    //if (IDOK == MessageBox(self->hWnd, "close?", "hey", MB_OKCANCEL))
         frame_close(self);
 }
 

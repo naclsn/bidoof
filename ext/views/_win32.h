@@ -1,21 +1,23 @@
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
-#include <windowsx.h>
-#include <GL/gl.h>
 
-struct Frame { FrameBase;
+struct FrameImpl {
     HWND hWnd;
     HDC hDC;
     HGLRC hRC;
 };
 
+#ifdef FRAME_IMPLEMENTATION
+#include <windowsx.h>
+#include <GL/gl.h>
+
 LONG WINAPI _WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     Frame* self = (Frame*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
 
-    if (self && hWnd == self->hWnd) switch (uMsg) {
+    if (self && hWnd == self->_impl.hWnd) switch (uMsg) {
         case WM_PAINT: {
             _event(self, render)(self);
-            SwapBuffers(self->hDC);
+            SwapBuffers(self->_impl.hDC);
             PAINTSTRUCT ps;
             BeginPaint(hWnd, &ps);
             EndPaint(hWnd, &ps);
@@ -75,7 +77,7 @@ bool frame_create(Frame* self, char const* title) {
     }
 
     SetLastError(0);
-    self->hWnd = CreateWindow("OpenGLFrame", title,
+    self->_impl.hWnd = CreateWindow("OpenGLFrame", title,
             WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             CW_USEDEFAULT, 0, self->width, self->height,
             NULL, NULL, hInstance, NULL);
@@ -89,16 +91,16 @@ bool frame_create(Frame* self, char const* title) {
     };
     int pf;
 
-    if (self->hWnd
-            && (SetWindowLongPtr(self->hWnd, GWLP_USERDATA, (LONG_PTR)self), !GetLastError())
-            && (self->hDC = GetDC(self->hWnd))
-            && (pf = ChoosePixelFormat(self->hDC, &pfd))
-            && DescribePixelFormat(self->hDC, pf, sizeof pfd, &pfd)
-            && SetPixelFormat(self->hDC, pf, &pfd)
-            && (self->hRC = wglCreateContext(self->hDC))
-            && wglMakeCurrent(self->hDC, self->hRC)
+    if (self->_impl.hWnd
+            && (SetWindowLongPtr(self->_impl.hWnd, GWLP_USERDATA, (LONG_PTR)self), !GetLastError())
+            && (self->_impl.hDC = GetDC(self->hWnd))
+            && (pf = ChoosePixelFormat(self->_impl.hDC, &pfd))
+            && DescribePixelFormat(self->_impl.hDC, pf, sizeof pfd, &pfd)
+            && SetPixelFormat(self->_impl.hDC, pf, &pfd)
+            && (self->_impl.hRC = wglCreateContext(self->hDC))
+            && wglMakeCurrent(self->_impl.hDC, self->hRC)
        ) {
-        ShowWindow(self->hWnd, SW_SHOW);
+        ShowWindow(self->_impl.hWnd, SW_SHOW);
         return true;
     }
 
@@ -108,25 +110,27 @@ bool frame_create(Frame* self, char const* title) {
 
 void frame_loop(Frame* self) {
     MSG msg;
-    while (0 < GetMessage(&msg, self->hWnd, 0, 0)) {
+    while (0 < GetMessage(&msg, self->_impl.hWnd, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 }
 
 void frame_close(Frame* self) {
-    DestroyWindow(self->hWnd);
+    DestroyWindow(self->_impl.hWnd);
 }
 
 void frame_destroy(Frame* self) {
-    if (self->hRC) {
+    if (self->_impl.hRC) {
         wglMakeCurrent(NULL, NULL);
-        wglDeleteContext(self->hRC);
+        wglDeleteContext(self->_impl.hRC);
     }
-    if (self->hDC) ReleaseDC(self->hWnd, self->hDC);
-    DestroyWindow(self->hWnd);
+    if (self->_impl.hDC) ReleaseDC(self->hWnd, self->hDC);
+    DestroyWindow(self->_impl.hWnd);
 
-    self->hWnd = NULL;
-    self->hDC = NULL;
-    self->hRC = NULL;
+    self->_impl.hWnd = NULL;
+    self->_impl.hDC = NULL;
+    self->_impl.hRC = NULL;
 }
+
+#endif // FRAME_IMPLEMENTATION
