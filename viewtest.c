@@ -33,7 +33,7 @@ int main(void) {
         .events= {
             .render= render_triangle,
             .closing= confirm_closing,
-            .key_pressed= close_on_escape,
+            .keychar= close_on_escape,
         },
     };
     if (!frame_create(&frame, "window title")) return 1;
