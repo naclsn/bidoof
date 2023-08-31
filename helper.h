@@ -93,7 +93,7 @@
     }
 
 #define ctor_w_also(__n_overloads, __name, __make_also, __doc, ...)  \
-    inline bool __make_also(Obj* fun, Obj* res);  \
+    inline bool __make_also(Obj* fun, Obj* res);                     \
     link_overloads_##__n_overloads(__name, __VA_ARGS__)              \
     bool _make_##__name(Obj* self, Obj* res) {                       \
         (void)self;                                                  \
