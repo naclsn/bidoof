@@ -12,7 +12,7 @@ else
   as-exe = $(1)
   as-lib = lib$(1).so
   MD ?= mkdir -p
-  views-LDFLAGS = -lgl
+  views-LDFLAGS = -lGL -lX11
 endif
 
 all: $(OUT) $(foreach ext,$(EXTS),$(OUT)/$(call as-lib,$(ext))) $(OUT)/$(call as-exe,$(NAME))

@@ -1,5 +1,3 @@
-// on Windows it needed: -lopengl32 -lgdi32
-
 #define FRAME_IMPLEMENTATION
 #include "ext/views/frame.h"
 #include <stdio.h>
@@ -36,7 +34,7 @@ void* myframe_main(Frame* frame) {
     return NULL;
 }
 
-int main(void) {
+int main_thr(void) {
     Frame frame = {
         .width= 256,
         .height= 256,
@@ -62,5 +60,21 @@ int main(void) {
         frame_redraw(&frame); // force a cancelation point (win32 event loop isn't one :/)
 
     sleep(1); // need to give time to reach the cancelation point
+    return 0;
+}
+
+int main(void) {
+    Frame frame = {
+        .width= 256,
+        .height= 256,
+        .events= {
+            .render= render_triangle,
+            .closing= frame_close,
+            .keyup= close_on_escape,
+        },
+    };
+    if (!frame_create(&frame, "title")) return 1;
+    frame_loop(&frame);
+    frame_destroy(&frame);
     return 0;
 }

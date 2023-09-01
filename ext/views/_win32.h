@@ -125,12 +125,12 @@ void frame_close(Frame* self) {
 }
 
 void frame_destroy(Frame* self) {
-    if (self->hRC) {
+    if (self->hWnd) {
         wglMakeCurrent(NULL, NULL);
-        wglDeleteContext(self->hRC);
+        if (self->hRC) wglDeleteContext(self->hRC);
+        if (self->hDC) ReleaseDC(self->hWnd, self->hDC);
+        DestroyWindow(self->hWnd);
     }
-    if (self->hDC) ReleaseDC(self->hWnd, self->hDC);
-    DestroyWindow(self->hWnd);
 
     self->hWnd = NULL;
     self->hDC = NULL;
