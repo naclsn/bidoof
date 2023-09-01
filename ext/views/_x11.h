@@ -1,4 +1,6 @@
-struct FrameImpl {
+//
+
+struct Frame { extends_FrameBase;
     int a;
 };
 
@@ -12,6 +14,10 @@ bool frame_create(Frame* self, char const* title) {
 }
 
 void frame_loop(Frame* self) {
+    (void)self;
+}
+
+void frame_redraw(Frame* self) {
     (void)self;
 }
 

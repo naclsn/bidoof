@@ -1,5 +1,8 @@
 #include "../helper.h"
 
+#define FRAME_IMPLEMENTATION
+#include "views/frame.h"
+
 export_names("ViewTxt");
 
 ctor_w_also(1, ViewTxt, _ViewTxt_once
