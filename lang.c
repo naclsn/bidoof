@@ -257,7 +257,7 @@ sz _escape(char const* ptr, sz len, u32* res) {
 bool _update_free_str(Obj* self) {
     if (!self->update) {
         free(self->as.buf.ptr);
-        self->as.buf.ptr = 0;
+        self->as.buf.ptr = NULL;
         self->as.buf.len = 0;
     }
     return true;
@@ -266,8 +266,17 @@ bool _update_free_str(Obj* self) {
 bool _update_free_sym(Obj* self) {
     if (!self->update) {
         free((void*)self->as.sym.ptr);
-        self->as.sym.ptr = 0;
+        self->as.sym.ptr = NULL;
         self->as.sym.len = 0;
+    }
+    return true;
+}
+
+bool _update_free_lst(Obj* self) {
+    if (!self->update) {
+        free(self->as.lst.ptr);
+        self->as.lst.ptr = NULL;
+        self->as.lst.len = 0;
     }
     return true;
 }
@@ -303,9 +312,12 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
             do {
                 Obj* arg = _parse_expr(self, scope, true);
+                // XXX(cleanup): r, argv[..argc]
                 if (!arg) fail("in function argument");
 
-                if (64 <= argc) fail("(we don't handle more then 64 arguments for now..)"); // meh
+                // meh
+                if (sizeof argv / sizeof argv[0] == argc)
+                    fail("(we don't handle more than so many arguments for now..)");
                 argv[argc++] = arg;
 
                 before = self->i;
@@ -316,8 +328,10 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                      || tok_is("}", self->t)
                      || tok_is(";", self->t) ));
 
-            r = obj_call(r, argc, argv);
-            if (!r) fail("could not call function with given arguments");
+            Obj* rr = obj_call(r, argc, argv);
+            // XXX(cleanup): r, argv[..]
+            if (!rr) fail("could not call function with given arguments");
+            r = rr;
         }
     }
 
@@ -329,6 +343,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
         if (!tok_is(")", self->t)) {
             self->i = before;
+            // XXX(cleanup): r
             fail("missing closing parenthesis");
         }
     }
@@ -346,6 +361,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
             else {
                 u32 val = 0;
                 sz sk = _escape(self->t.ptr+2, self->t.len-1, &val);
+                // XXX(cleanup): bufptr
                 if (0 == sk) fail("invalid escape sequence");
                 k+= sk;
 
@@ -375,6 +391,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
             } // if '\\'
         } // for chars in literal
 
+        // XXX(cleanup): bufptr
         if (!(r = calloc(1, sizeof *r))) fail("OOM");
         r->ty = BUF;
         r->as.buf.ptr = bufptr;
@@ -403,21 +420,41 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
     else if (tok_is("{", self->t)) {
         sz before = self->i;
-        // TODO: parse list (for realsies)
-        // TODO: to allocated
-        r = NULL;
+
+        sz cap = 16;
+        Obj** lstptr = malloc(sizeof(Obj*) * cap);
+        sz lstlen = 0;
+        if (!lstptr) fail("OOM");
 
         do {
             Obj* item = _parse_expr(self, scope, true);
+            // XXX(cleanup): lstptr[..], lstptr
             if (!item) fail("in list literal");
+
+            if (cap == lstlen) {
+                cap*= 2;
+                Obj** niw = realloc(lstptr, sizeof(Obj*) * cap);
+                // XXX(cleanup): lstptr[..], lstptr
+                if (!niw) fail("OOM");
+                lstptr = niw;
+            }
+
+            lstptr[lstlen++] = item;
+            item->keepalive++;
         } while (_lex(self) && tok_is(",", self->t));
 
         if (!tok_is("}", self->t)) {
             self->i = before;
+            // XXX(cleanup): lstptr[..], lstptr
             fail("missing closing brace");
         }
-        // TODO: make obj
-        fail("NIY: list literals");
+
+        // XXX(cleanup): lstptr[..], lstptr
+        if (!(r = calloc(1, sizeof *r))) fail("OOM");
+        r->ty = LST;
+        r->as.lst.ptr = lstptr;
+        r->as.lst.len = lstlen;
+        r->update = _update_free_lst;
     }
 
     else if (tok_is_sym(self->t)) {
@@ -459,12 +496,15 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 bool _parse_script(Pars* self, Scope* scope) {
     do {
         if (!_lex(self)) return true;
+        // XXX(cleanup): unnamed
         if (!tok_is_var(self->t)) fail("expected variable name");
         Sym const key = self->t;
 
+        // XXX(cleanup): unnamed
         if (!_lex(self) || !tok_is("=", self->t)) fail("expected equal");
 
         Obj* value = _parse_expr(self, scope, false);
+        // XXX(cleanup): unnamed
         if (!value) fail("in script expression");
 
         if (!tok_is("_", key)) scope_put(scope, key, value);
