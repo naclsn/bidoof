@@ -91,7 +91,7 @@ void repl(void) {
             }
         }
 
-        else if (!lang_process(strdup(line), &scope)) {
+        else if (!lang_process(line, &scope)) {
             printf("\n");
         }
     }

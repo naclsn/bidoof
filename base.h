@@ -58,6 +58,13 @@ typedef struct Meta {
 
 int symcmp(Sym const l, Sym const r);
 
+#define _symcvt_cmp_1(__sym, __l, __v) 0 == symcmp(__sym, {.ptr= #__l, .len= strlen(#__l)) ? (__v)
+#define _symcvt_cmp_2(__sym, __l, __v, ...) _symcvt_cmp_1(__sym, __l, __v) : _symcvt_cmp_1(__sym, __VA_ARGS__)
+#define _symcvt_cmp_3(__sym, __l, __v, ...) _symcvt_cmp_1(__sym, __l, __v) : _symcvt_cmp_2(__sym, __VA_ARGS__)
+#define _symcvt_cmp_4(__sym, __l, __v, ...) _symcvt_cmp_1(__sym, __l, __v) : _symcvt_cmp_3(__sym, __VA_ARGS__)
+#define _symcvt_cmp_5(__sym, __l, __v, ...) _symcvt_cmp_1(__sym, __l, __v) : _symcvt_cmp_4(__sym, __VA_ARGS__)
+#define symcvt(__n, __sym, ...) (_symcvt_cmp_##__n(__sym, __VA_ARGS__) : -1)
+
 void obj_show(Obj const* self, int indent);
 void obj_show_depnts(Obj const* self, int curdepth);
 

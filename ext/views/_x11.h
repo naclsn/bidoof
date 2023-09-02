@@ -11,6 +11,7 @@ struct Frame { extends_FrameBase;
 
 static volatile unsigned char _errreceived = 0;
 int _errhandler(Display* dpy, XErrorEvent* err) {
+    (void)dpy;
     _errreceived = err->error_code;
     return 0;
 }

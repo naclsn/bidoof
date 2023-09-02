@@ -190,6 +190,7 @@ void _print_location(Pars* self, char* reason) {
 
 sz _escape(char const* ptr, sz len, u32* res) {
 #define AT_IN(__off, __lo, __hi)  (__lo <= ptr[__off] && ptr[__off] <= __hi)
+    *res = 0;
 
     switch (*ptr) {
         case 'a': *res = 0x07; return 1;
@@ -206,20 +207,32 @@ sz _escape(char const* ptr, sz len, u32* res) {
 
         case 'x': // 2 hex digits byte
             if (len <3
-                || !( AT_IN(1, '0', '9') || AT_IN(0, 'A', 'F') || AT_IN(0, 'a', 'f') )
-                || !( AT_IN(2, '0', '9') || AT_IN(1, 'A', 'F') || AT_IN(1, 'a', 'f') )
+                || !( AT_IN(1, '0', '9') || AT_IN(1, 'A', 'F') || AT_IN(1, 'a', 'f') )
+                || !( AT_IN(2, '0', '9') || AT_IN(2, 'A', 'F') || AT_IN(2, 'a', 'f') )
                 ) return 0;
             else {
-                u8 lo = 0b100000 | ptr[1];
-                u8 hi = 0b100000 | ptr[2];
+                u8 hi = 0b100000 | ptr[1];
+                u8 lo = 0b100000 | ptr[2];
                 *res = ((lo & 0xf) + ('9'<lo)*9) | ( ((hi & 0xf) + ('9'<hi)*9) << 4 );
             }
             return 3;
 
         case 'u': // 4 hex digits codepoint below 0x10000
+            if (len < 5) return 0;
+            for (sz k = 1; k < 5; k++) {
+                if (!( AT_IN(k, '0', '9') || AT_IN(k, 'A', 'F') || AT_IN(k, 'a', 'f') )) return 0;
+                u8 it = 0b100000 | ptr[k];
+                *res = (*res << 4) | ((it & 0xf) + ('9'<it)*9);
+            }
             return 5;
 
         case 'U': // 8 hex digits codepoint
+            if (len < 9) return 0;
+            for (sz k = 1; k < 9; k++) {
+                if (!( AT_IN(k, '0', '9') || AT_IN(k, 'A', 'F') || AT_IN(k, 'a', 'f') )) return 0;
+                u8 it = 0b100000 | ptr[k];
+                *res = (*res << 4) | ((it & 0xf) + ('9'<it)*9);
+            }
             return 9;
 
         case '0'...'7': // 3 oct digits byte
@@ -229,9 +242,9 @@ sz _escape(char const* ptr, sz len, u32* res) {
                 || !AT_IN(2, '0', '7')
                 ) return 0;
             else {
-                u8 lo = ptr[0] & 0xf;
+                u8 hi = ptr[0] & 0xf;
                 u8 mi = ptr[1] & 0xf;
-                u8 hi = ptr[2] & 0xf;
+                u8 lo = ptr[2] & 0xf;
                 *res = lo | (mi <<3) | (hi <<3);
             }
             return 3;
@@ -239,6 +252,24 @@ sz _escape(char const* ptr, sz len, u32* res) {
 
     return 0;
 #undef AT_IN
+}
+
+bool _update_free_str(Obj* self) {
+    if (!self->update) {
+        free(self->as.buf.ptr);
+        self->as.buf.ptr = 0;
+        self->as.buf.len = 0;
+    }
+    return true;
+}
+
+bool _update_free_sym(Obj* self) {
+    if (!self->update) {
+        free((void*)self->as.sym.ptr);
+        self->as.sym.ptr = 0;
+        self->as.sym.len = 0;
+    }
+    return true;
 }
 
 #define tok_is_str(__t) ('"' == (__t).ptr[0])
@@ -303,14 +334,52 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is_str(self->t)) {
-        // TODO: parse escapes (for realsies)
-        // TODO: to allocated
+        // we don't try to be tight..
+        // (ie. this will waste the space of any escape sequence)
+        u8* bufptr = malloc(self->t.len-2);
+        sz buflen = 0;
+        if (!bufptr) fail("OOM");
+
+        for (sz k = 0; k < self->t.len; k++) {
+            if ('\\' != self->t.ptr[k])
+                bufptr[buflen++] = self->t.ptr[k];
+            else {
+                u32 val = 0;
+                sz sk = _escape(self->t.ptr+2, self->t.len-1, &val);
+                if (0 == sk) fail("invalid escape sequence");
+                k+= sk;
+
+                if (1 == sk || 3 == sk)
+                    bufptr[buflen++] = val & 0xff;
+                else {
+                    // unicode to utf8
+                    if (val < 0b10000000) bufptr[buflen++] = val;
+                    else {
+                      u8 x = val & 0b00111111;
+                      val>>= 6;
+                      if (val < 0b00100000) bufptr[buflen++] = 0b11000000 | val;
+                      else {
+                        u8 y = val & 0b00111111;
+                        val>>= 6;
+                        if (val < 0b00010000) bufptr[buflen++] = 0b11100000 | val;
+                        else {
+                          u8 z = val & 0b00111111;
+                          bufptr[buflen++] = 0b11110000 | (val >> 6);
+                          bufptr[buflen++] = 0b10000000 | z;
+                        }
+                        bufptr[buflen++] = 0b10000000 | y;
+                      }
+                      bufptr[buflen++] = 0b10000000 | x;
+                    }
+                } // if unicode
+            } // if '\\'
+        } // for chars in literal
 
         if (!(r = calloc(1, sizeof *r))) fail("OOM");
         r->ty = BUF;
-        r->as.buf.ptr = (u8*)self->t.ptr+1;
-        r->as.buf.len = self->t.len-2;
-        //r->update = _update_free_str;
+        r->as.buf.ptr = bufptr;
+        r->as.buf.len = buflen;
+        r->update = _update_free_str;
     }
 
     else if (tok_is_num(self->t)) {
@@ -352,13 +421,16 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is_sym(self->t)) {
-        // TODO: to allocated?
+        sz symlen = self->t.len-1;
+        char* symptr = malloc(symlen);
+        if (!symptr) fail("OOM");
+        memcpy(symptr, self->t.ptr+1, symlen);
 
         if (!(r = calloc(1, sizeof *r))) fail("OOM");
         r->ty = SYM;
-        r->as.sym.ptr = self->t.ptr+1;
-        r->as.sym.len = self->t.len-1;
-        //r->update = _update_free_sym;
+        r->as.sym.ptr = symptr;
+        r->as.sym.len = symlen;
+        r->update = _update_free_sym;
     }
 
     else if (tok_is("_", self->t)) {
