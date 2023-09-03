@@ -51,10 +51,9 @@ int parse_args(char* prog, int argc, char** argv) {
 void repl(void) {
     Scope scope = {0};
 
-    char* line = NULL;
-    sz len = 0;
+    char line[256];
 
-    while (printf(">> "), -1 != getline(&line, &len, stdin)) {
+    while (printf(">> "), fgets(line, 256, stdin)) {
         if ('?' == line[0]) {
             switch (line[1]) {
                 case '\n':
@@ -95,8 +94,6 @@ void repl(void) {
             printf("\n");
         }
     }
-
-    free(line);
 
     scope_show(&scope);
     scope_clear(&scope);

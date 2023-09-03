@@ -47,14 +47,16 @@ Obj* scope_get(Scope* self, Sym const key) {
     return 0 == cmp ? self->items[k].value : NULL;
 }
 
-Obj* scope_put(Scope* self, Sym const key, Obj* value) {
+bool scope_put(Scope* self, Sym const key, Obj* value) {
     {
         sz resize = 0 == self->size ? 16 : self->size;
         if (resize < self->size+1) resize*= 2;
 
         if (resize != self->size) {
-            ScopeEntry* niw = reallocarray(self->items, resize, sizeof(ScopeEntry));
-            if (!niw) return NULL;
+            ScopeEntry* niw = calloc(resize, sizeof(ScopeEntry));
+            if (!niw) return false;
+            memcpy(niw, self->items, self->size);
+            free(self->items);
 
             self->items = niw;
             self->size = resize;
@@ -70,11 +72,8 @@ Obj* scope_put(Scope* self, Sym const key, Obj* value) {
         Obj* found = self->items[k].value;
         self->items[k].value = value;
 
-        if (0 == --found->keepalive) {
-            obj_destroy(found);
-            return NULL;
-        }
-        return found;
+        if (0 == --found->keepalive) obj_destroy(found);
+        return true;
     }
 
     if (0 < cmp) k++; // insert-after
@@ -85,7 +84,7 @@ Obj* scope_put(Scope* self, Sym const key, Obj* value) {
     self->items[k].value = value;
     self->count++;
 
-    return NULL;
+    return true;
 }
 
 void scope_show(Scope* self) {

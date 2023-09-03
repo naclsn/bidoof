@@ -27,11 +27,11 @@ bool _ViewTxt_once(Obj* fun, Obj* res) {
     return true;
 }
 
-bool _ViewTxt(Obj* self, Buf* r, Buf const* const txt) {
-    ViewTxtState* st = frommember(r->ptr, ViewTxtState, ptr);
+bool _ViewTxt(Buf* self, Buf const* const txt) {
+    ViewTxtState* st = frommember(self->ptr, ViewTxtState, ptr);
     printf("== retrieved the thingy: '%s'\n", st->things);
 
-    if (!self->update) {
+    if (destroyed(self)) {
         puts("== destroy the thingy");
         free(st);
         return true;
@@ -39,7 +39,7 @@ bool _ViewTxt(Obj* self, Buf* r, Buf const* const txt) {
 
     printf("== update the thingy <<%.*s>>\n", (int)txt->len, txt->ptr);
 
-    if (r->len < txt->len) {
+    if (self->len < txt->len) {
         ViewTxtState tmp = *st;
 
         free(st);
@@ -47,10 +47,10 @@ bool _ViewTxt(Obj* self, Buf* r, Buf const* const txt) {
         if (!st) return false;
         memcpy(st, &tmp, sizeof *st);
 
-        r->ptr = st->ptr;
+        self->ptr = st->ptr;
     }
 
-    memcpy(r->ptr, txt->ptr, r->len = txt->len);
+    memcpy(self->ptr, txt->ptr, self->len = txt->len);
 
     return true;
 }

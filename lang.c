@@ -422,7 +422,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         sz before = self->i;
 
         sz cap = 16;
-        Obj** lstptr = malloc(sizeof(Obj*) * cap);
+        Obj** lstptr = malloc(cap * sizeof(Obj*));
         sz lstlen = 0;
         if (!lstptr) fail("OOM");
 
@@ -433,9 +433,10 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
             if (cap == lstlen) {
                 cap*= 2;
-                Obj** niw = realloc(lstptr, sizeof(Obj*) * cap);
+                Obj** niw = calloc(cap, sizeof(Obj*));
                 // XXX(cleanup): lstptr[..], lstptr
                 if (!niw) fail("OOM");
+                memcpy(niw, lstptr, lstlen);
                 lstptr = niw;
             }
 
@@ -507,7 +508,7 @@ bool _parse_script(Pars* self, Scope* scope) {
         // XXX(cleanup): unnamed
         if (!value) fail("in script expression");
 
-        if (!tok_is("_", key)) scope_put(scope, key, value);
+        if (!tok_is("_", key) && !scope_put(scope, key, value)) fail("OOM");
     } while (_lex(self) && tok_is(";", self->t));
 
     return true;

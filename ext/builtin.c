@@ -8,23 +8,21 @@ ctor_simple(2, Delim
         , (1, BUF, _Delim1, BUF, under)
         );
 
-bool _Delim2(Obj* self, Buf* r, Buf const* const under, Buf const* const delim) {
-    (void)self;
+bool _Delim2(Buf* self, Buf const* const under, Buf const* const delim) {
     sz k;
     for (k = 0; k < under->len - delim->len; k++) {
         if (0 == memcmp(under->ptr+k, delim->ptr, delim->len)) goto found;
     }
     k = under->len;
 found:
-    r->ptr = under->ptr;
-    r->len = k;
+    self->ptr = under->ptr;
+    self->len = k;
     return true;
 }
 
-bool _Delim1(Obj* self, Buf* r, Buf const* const under) {
-    (void)self;
-    r->ptr = under->ptr;
-    r->len = strnlen((char const*)under->ptr, under->len);
+bool _Delim1(Buf* self, Buf const* const under) {
+    self->ptr = under->ptr;
+    self->len = strnlen((char const*)under->ptr, under->len);
     return true;
 }
 

@@ -2,7 +2,6 @@
 #define __BIDOOF_EXTS_H__
 
 #include "scope.h"
-#include <dlfcn.h>
 
 extern Scope exts_scope;
 

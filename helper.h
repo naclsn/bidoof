@@ -33,7 +33,7 @@
 
 #define _link_uf_pars(__k, __ty, __nm)  , ty_for_##__ty const* const __nm
 #define link_uf_pars(__n_par, __ret, __ufname, ...)  \
-    Obj* self, ty_for_##__ret* r _FOR_TYNM_##__n_par(_link_uf_pars, __VA_ARGS__)
+    ty_for_##__ret* self _FOR_TYNM_##__n_par(_link_uf_pars, __VA_ARGS__)
 
 #define as_for_BUF buf
 #define as_for_NUM num
@@ -43,16 +43,16 @@
 
 #define _link_uf_args(__k, __ty, __nm)  , &self->argv[__k]->as.as_for_##__ty
 #define link_uf_args(__n_par, __ret, __ufname, ...)  \
-    self, &self->as.as_for_##__ret _FOR_TYNM_##__n_par(_link_uf_args, __VA_ARGS__)
+    &self->as.as_for_##__ret _FOR_TYNM_##__n_par(_link_uf_args, __VA_ARGS__)
 
 
 
 #define _ufname(__n_par, __ret, __ufname, ...)  __ufname
 
-#define link_overloads_1(__name, __par1)  \
-    inline bool _ufname __par1 (link_uf_pars __par1);  \
-    bool _CALL(link_name, __name, _UNPACK __par1) (Obj* self) {  \
-        return _ufname __par1 (link_uf_args __par1);  \
+#define link_overloads_1(__name, __par1)                                \
+    static bool _ufname __par1 (link_uf_pars __par1);                   \
+    static bool _CALL(link_name, __name, _UNPACK __par1) (Obj* self) {  \
+        return _ufname __par1 (link_uf_args __par1);                    \
     }
 #define link_overloads_2(__name, __par1, __par2)          link_overloads_1(__name, __par1) link_overloads_1(__name, __par2)
 #define link_overloads_3(__name, __par1, __par2, __par3)  link_overloads_1(__name, __par1) link_overloads_2(__name, __par2, __par3)
@@ -70,6 +70,8 @@
 #define typecheck_overloads_2(__name, __par1, __par2)          typecheck_overloads_1(__name, __par1) else _CALL(typecheck_args, __name, _UNPACK __par2)
 #define typecheck_overloads_3(__name, __par1, __par2, __par3)  typecheck_overloads_2(__name, __par1, __par2) else _CALL(typecheck_args, __name, _UNPACK __par3)
 
+
+
 #define _document_pars(__k, __ty, __nm)  {.ty= __ty, .name= #__nm},
 #define document_pars(__n_par, __ret, __ufname, ...) {        \
         .ret= __ret,                                          \
@@ -84,6 +86,15 @@
 #define document_overloads_3(__par1, __par2, __par3)  document_overloads_2(__par1, __par2), _CALL(document_pars, _UNPACK __par3)
 
 
+
+static bool _no_make_also(Obj* fun, Obj* res) {
+    (void)fun;
+    (void)res;
+    return true;
+}
+
+
+
 #define ctor_given(__name, __doc, __make, __meta_overloads)  \
     Meta __name = {                                          \
         .doc= __doc,                                         \
@@ -93,10 +104,11 @@
     }
 
 #define ctor_w_also(__n_overloads, __name, __make_also, __doc, ...)  \
-    inline bool __make_also(Obj* fun, Obj* res);                     \
+    static bool __make_also(Obj* fun, Obj* res);                     \
     link_overloads_##__n_overloads(__name, __VA_ARGS__)              \
-    bool _make_##__name(Obj* self, Obj* res) {                       \
+    static bool _make_##__name(Obj* self, Obj* res) {                \
         (void)self;                                                  \
+        (void)_no_make_also;                                         \
         typecheck_overloads_##__n_overloads(__name, __VA_ARGS__)     \
         else return false;                                           \
         return __make_also(self, res);                               \
@@ -109,13 +121,8 @@
 #define ctor_simple(__n_overloads, __name, __doc, ...)  \
     ctor_w_also(__n_overloads, __name, _no_make_also, __doc, __VA_ARGS__)
 
-bool _no_make_also(Obj* fun, Obj* res) {
-    (void)fun;
-    (void)res;
-    return true;
-}
+#define destroyed(__self) (!frommember(__self, Obj, as)->update)
 
-
-
+// XXX: does it need the `__declspec(dllexport)`, here and at the `Meta`s?
 #define export_names(...)  \
-    char* names[] = {__VA_ARGS__, NULL}
+    char const* names[] = {__VA_ARGS__, NULL}

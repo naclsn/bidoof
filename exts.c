@@ -1,5 +1,32 @@
 #include "exts.h"
 
+#if (defined(__MINGW32__) || defined(__MINGW64__)) && !defined(__CYGWIN__)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#define RTLD_LOCAL 0
+#define RTLD_LAZY 1
+void* dlopen(char const* file, int _) {
+    // << be sure to use backslashes (\), not forward slashes (/) >>
+    sz len = strlen(file)+1;
+    char* bs = alloca(len);
+    for (sz k = 0; k < len; k++)
+        bs[k] = '/' == file[k] ? '\\' : file[k];
+    return LoadLibrary(bs);
+}
+#define dlsym (void*)(sz)GetProcAddress
+#define dlclose (void*)(sz)FreeLibrary
+char const* dlerror(void) {
+    static char buf[256];
+    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, GetLastError(),
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            buf, sizeof buf / sizeof buf[0], NULL);
+    return buf;
+}
+#else
+#include <dlfcn.h>
+#endif
+
 struct LoadedList {
     void* ext;
     struct LoadedList* next;
@@ -43,7 +70,10 @@ bool exts_load(char const* filename) {
         if (meta) {
             Sym const key = {meta->name, strlen(meta->name)};
             Obj* value = &meta->obj;
-            scope_put(&exts_scope, key, value);
+            if (!scope_put(&exts_scope, key, value)) {
+                puts("OOM");
+                return false;
+            }
         } else printf("no meta for '%s'\n", *names);
     }
 
