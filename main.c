@@ -70,7 +70,8 @@ void repl(void) {
                             {
                                 static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym"};
 
-                                Meta* meta = exts_lookup((Sym){.ptr= line+2, .len= strlen(line+2)-1});
+                                line[strlen(line+2)-1] = '\0';
+                                Meta* meta = exts_lookup(mksym(line+2));
                                 puts(meta->doc);
 
                                 for (struct MetaOvl const* ovl = meta->overloads; ovl->params; ovl++) {
@@ -86,7 +87,8 @@ void repl(void) {
                     break;
 
                 default:
-                    obj_show(scope_get(&scope, (Sym){.ptr= line+1, .len= strlen(line+1)-1}), 0);
+                    line[strlen(line+1)-1] = '\0';
+                    obj_show(scope_get(&scope, mksym(line+1)), 0);
             }
         }
 

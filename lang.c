@@ -49,10 +49,21 @@
 //
 // <bind> ::= <fun> {<expr>}
 
+typedef struct Slice {
+    char const* ptr;
+    sz len;
+} Slice;
+
+Sym slice2sym(Slice const s) {
+    Sym r = {0};
+    memcpy(r.txt, s.ptr, s.len < 15 ? s.len : 15);
+    return r;
+}
+
 typedef struct Pars {
     char* s;
     sz i;
-    Sym t;
+    Slice t;
     Obj* unnamed;
     // void (*report)(char*); // YYY: or with more complex arg (eg. line/col/...)
 } Pars;
@@ -263,15 +274,6 @@ bool _update_free_str(Obj* self) {
     return true;
 }
 
-bool _update_free_sym(Obj* self) {
-    if (!self->update) {
-        free((void*)self->as.sym.ptr);
-        self->as.sym.ptr = NULL;
-        self->as.sym.len = 0;
-    }
-    return true;
-}
-
 bool _update_free_lst(Obj* self) {
     if (!self->update) {
         free(self->as.lst.ptr);
@@ -288,14 +290,14 @@ bool _update_free_lst(Obj* self) {
 #define tok_is_fun(__t) ('A' <= (__t).ptr[0] && (__t).ptr[0] <= 'Z')
 #define tok_is_sym(__t) (':' == (__t).ptr[0])
 #define tok_is_var(__t) ('_' == (__t).ptr[0] || ('a' <= (__t).ptr[0] && (__t).ptr[0] <= 'z'))
-#define tok_is(__cstr, __t) (0 == symcmp((Sym){.ptr= __cstr, .len= strlen(__cstr)}, __t))
+#define tok_is(__cstr, __t) (0 == strncmp(__cstr, (__t).ptr, (__t).len))
 
 Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     if (!_lex(self)) return NULL;
     Obj* r = NULL;
 
     if (tok_is_fun(self->t)) {
-        r = scope_get(&exts_scope, self->t);
+        r = scope_get(&exts_scope, slice2sym(self->t));
         if (!r) fail("unknown function");
 
         if (atomic) return r;
@@ -459,16 +461,9 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is_sym(self->t)) {
-        sz symlen = self->t.len-1;
-        char* symptr = malloc(symlen);
-        if (!symptr) fail("OOM");
-        memcpy(symptr, self->t.ptr+1, symlen);
-
         if (!(r = calloc(1, sizeof *r))) fail("OOM");
         r->ty = SYM;
-        r->as.sym.ptr = symptr;
-        r->as.sym.len = symlen;
-        r->update = _update_free_sym;
+        r->as.sym = slice2sym((++self->t.ptr, self->t));
     }
 
     else if (tok_is("_", self->t)) {
@@ -477,7 +472,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is_var(self->t)) {
-        r = scope_get(scope, self->t);
+        r = scope_get(scope, slice2sym(self->t));
         if (!r) fail("unknown variable");
     }
 
@@ -499,7 +494,7 @@ bool _parse_script(Pars* self, Scope* scope) {
         if (!_lex(self)) return true;
         // XXX(cleanup): unnamed
         if (!tok_is_var(self->t)) fail("expected variable name");
-        Sym const key = self->t;
+        Slice const name = self->t;
 
         // XXX(cleanup): unnamed
         if (!_lex(self) || !tok_is("=", self->t)) fail("expected equal");
@@ -508,7 +503,10 @@ bool _parse_script(Pars* self, Scope* scope) {
         // XXX(cleanup): unnamed
         if (!value) fail("in script expression");
 
-        if (!tok_is("_", key) && !scope_put(scope, key, value)) fail("OOM");
+        if (!tok_is("_", name)) {
+            Sym const key = slice2sym(name);
+            if (!scope_put(scope, key, value)) fail("OOM");
+        }
     } while (_lex(self) && tok_is(";", self->t));
 
     return true;

@@ -1,7 +1,13 @@
 #include "base.h"
 
 int symcmp(Sym const l, Sym const r) {
-    return memcmp(l.ptr, r.ptr, l.len < r.len ? l.len : r.len);
+    return memcmp(l.txt, r.txt, 16);
+}
+
+Sym mksym(char const* s) {
+    Sym r = {0};
+    strncpy(r.txt, s, 15);
+    return r;
 }
 
 void obj_show(Obj const* self, int indent) {
@@ -38,7 +44,7 @@ void obj_show(Obj const* self, int indent) {
             break;
 
         case SYM:
-            printf(":%.*s", (int)self->as.sym.len, self->as.sym.ptr);
+            printf(":%s", self->as.sym.txt);
             break;
 
         case FUN:

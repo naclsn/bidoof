@@ -13,13 +13,15 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+typedef int64_t i64;
 typedef size_t sz;
 
 typedef struct Buf { u8* ptr; sz len;                                 } Buf;
+// TODO: Int { i128 (would be cool, but we'll settle with i64 for now.. val; } and Flt { long double val; }
 typedef struct Num { int val;                                         } Num;
 typedef struct Lst { struct Obj** ptr; sz len;                        } Lst;
 typedef struct Fun { bool (*call)(struct Obj* self, struct Obj* res); } Fun;
-typedef struct Sym { char const* ptr; sz len;                         } Sym;
+typedef struct Sym { char txt[16];                                    } Sym;
 
 enum  Ty { BUF,     NUM,     LST,     FUN,     SYM,     };
 union As { Buf buf; Num num; Lst lst; Fun fun; Sym sym; };
@@ -57,6 +59,7 @@ typedef struct Meta {
 } Meta;
 
 int symcmp(Sym const l, Sym const r);
+Sym mksym(char const* s);
 
 #define _symcvt_cmp_1(__sym, __l, __v) 0 == symcmp(__sym, {.ptr= #__l, .len= strlen(#__l)) ? (__v)
 #define _symcvt_cmp_2(__sym, __l, __v, ...) _symcvt_cmp_1(__sym, __l, __v) : _symcvt_cmp_1(__sym, __VA_ARGS__)

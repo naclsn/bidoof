@@ -26,7 +26,6 @@ sz _binary_search(Scope* self, Sym const name, int* cmp) {
         Sym const key = self->items[cur = nxt].key;
 
         *cmp = symcmp(name, key);
-        if (0 == *cmp) *cmp = name.len - key.len;
 
         if (0 == *cmp) return cur;
 
@@ -90,9 +89,7 @@ bool scope_put(Scope* self, Sym const key, Obj* value) {
 void scope_show(Scope* self) {
     printf("%zu name-s:\n", self->count);
     for (sz k = 0; k < self->count; k++) {
-        printf("- %.*s: ",
-                (int)self->items[k].key.len,
-                self->items[k].key.ptr);
+        printf("- %s: ", self->items[k].key.txt);
         obj_show(self->items[k].value, 0);
     }
 }
