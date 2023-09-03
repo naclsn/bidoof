@@ -70,8 +70,13 @@ void repl(void) {
                             {
                                 static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym"};
 
-                                line[strlen(line+2)-1] = '\0';
+                                line[strlen(line+2)+1] = '\0';
                                 Meta* meta = exts_lookup(mksym(line+2));
+                                if (!meta) {
+                                    puts("(null)");
+                                    break;
+                                }
+
                                 puts(meta->doc);
 
                                 for (struct MetaOvl const* ovl = meta->overloads; ovl->params; ovl++) {
@@ -80,14 +85,26 @@ void repl(void) {
                                     struct MetaOvlPrm const* prm = ovl->params;
                                     printf("%s %s", ty_str[prm->ty], prm->name);
                                     while ((++prm)->name) printf(", %s %s", ty_str[prm->ty], prm->name);
+
                                     printf(")\n");
                                 }
                             }
                     }
                     break;
 
+                case '%': {
+                    line[strlen(line+2)+1] = '\0';
+                    Obj const* it = scope_get(&scope, mksym(line+2));
+                    if (it) switch (it->ty) {
+                        case BUF: printf("\"%.*s\"\n", (int)it->as.buf.len, it->as.buf.ptr); break;
+                        case NUM: printf("%d\n", it->as.num.val); break;
+                        case SYM: printf(":%s\n", it->as.sym.txt); break;
+                        default: printf("%p\n", it->as.lst.ptr);
+                    } else puts("(null)");
+                } break;
+
                 default:
-                    line[strlen(line+1)-1] = '\0';
+                    line[strlen(line+1)] = '\0';
                     obj_show(scope_get(&scope, mksym(line+1)), 0);
             }
         }

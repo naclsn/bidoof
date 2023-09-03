@@ -11,7 +11,7 @@ Sym mksym(char const* s) {
 }
 
 void obj_show(Obj const* self, int indent) {
-    printf("(%p) ", (void*)self);
+    if (self) printf("(%p) ", (void*)self);
 
     if (!self) printf("(null)");
 

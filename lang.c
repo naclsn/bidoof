@@ -357,7 +357,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         sz buflen = 0;
         if (!bufptr) fail("OOM");
 
-        for (sz k = 0; k < self->t.len; k++) {
+        for (sz k = 1; k < self->t.len-1; k++) {
             if ('\\' != self->t.ptr[k])
                 bufptr[buflen++] = self->t.ptr[k];
             else {
@@ -438,7 +438,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                 Obj** niw = calloc(cap, sizeof(Obj*));
                 // XXX(cleanup): lstptr[..], lstptr
                 if (!niw) fail("OOM");
-                memcpy(niw, lstptr, lstlen);
+                memcpy(niw, lstptr, lstlen * sizeof(Obj*));
                 lstptr = niw;
             }
 

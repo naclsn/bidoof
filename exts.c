@@ -67,13 +67,16 @@ bool exts_load(char const* filename) {
 
     for (; *names; names++) {
         Meta* meta = dlsym(ext, *names);
+
         if (meta) {
             Sym const key = mksym(meta->name);
             Obj* value = &meta->obj;
+
             if (!scope_put(&exts_scope, key, value)) {
                 puts("OOM");
                 return false;
             }
+
         } else printf("no meta for '%s'\n", *names);
     }
 
@@ -82,8 +85,7 @@ bool exts_load(char const* filename) {
 
 Meta* exts_lookup(Sym const name) {
     Obj* obj = scope_get(&exts_scope, name);
-    Meta* meta = frommember(obj, Meta, obj);
-    return meta;
+    return obj ? frommember(obj, Meta, obj) : NULL;
 }
 
 void exts_unload(void) {
