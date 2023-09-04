@@ -1,5 +1,9 @@
 #include "base.h"
 
+void notify_default(char const* s) { printf("INFO: %s\n", s); }
+void notify_null(char const* s) { (void)s; }
+void (*notify)(char const* s) = notify_default;
+
 int symcmp(Sym const l, Sym const r) {
     return memcmp(l.txt, r.txt, 16);
 }

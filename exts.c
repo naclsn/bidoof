@@ -37,13 +37,13 @@ Scope exts_scope = {0};
 bool exts_load(char const* filename) {
     void* ext = dlopen(filename, RTLD_LAZY | RTLD_LOCAL);
     if (!ext) {
-        puts(dlerror());
+        notify(dlerror());
         return false;
     }
 
     char** names = dlsym(ext, "names");
     if (!names) {
-        puts("no 'names' in lib");
+        notify("no 'names' in lib");
         dlclose(ext);
         return false;
     }
@@ -73,11 +73,15 @@ bool exts_load(char const* filename) {
             Obj* value = &meta->obj;
 
             if (!scope_put(&exts_scope, key, value)) {
-                puts("OOM");
+                notify("OOM");
                 return false;
             }
 
-        } else printf("no meta for '%s'\n", *names);
+        } else {
+            char m[32];
+            sprintf(m, "no meta for '%s'\n", *names);
+            notify(m);
+        }
     }
 
     return true;

@@ -17,8 +17,11 @@ void load_all_exts(char const* prog) {
         memcpy(end+1, *it, len);
         end[len+1] = '\0';
 
-        if (!exts_load(prog_dir))
-            printf("WARN: could not load '%s'\n", *it);
+        if (!exts_load(prog_dir)) {
+            char* m = alloca(25 + len);
+            sprintf(m, "WARN: could not load '%s'\n", *it);
+            notify(m);
+        }
     }
 }
 
@@ -32,16 +35,21 @@ int parse_args(char* prog, int argc, char** argv) {
 
             case 'l':
                 if (0 == --argc) {
-                    printf("ERROR: expected ext name\n");
+                    notify("ERROR: expected ext name");
                     return 1;
                 }
-                if (!exts_load(*++argv))
-                    printf("WARN: could not load '%s'\n", *argv);
+                if (!exts_load(*++argv)) {
+                    char* m = alloca(25 + strlen(*argv));
+                    sprintf(m, "WARN: could not load '%s'\n", *argv);
+                    notify(m);
+                }
                 break;
 
-            default:
-                printf("WARN: unknown flag '%s'\n", arg);
-                return 1;
+            default: {
+                char* m = alloca(23 + strlen(arg));
+                sprintf("WARN: unknown flag '%s'\n", arg);
+                notify(m);
+            } return 1;
         }
     }
 
@@ -107,12 +115,27 @@ void repl(void) {
                     line[strlen(line+1)] = '\0';
                     obj_show(scope_get(&scope, mksym(line+1)), 0);
             }
+        } // if '?'
+
+        else if ('.' == line[0]) {
+            if (0 == strcmp(".exit\n", line) || 0 == strcmp(".quit\n", line))
+                break;
+            if (0 == strcmp(".help\n", line))
+                puts(
+                    "cli commands:\n"
+                    "  ?[name]\n"
+                    "  ?%[name]\n"
+                    "  ??[name]\n"
+                    "  .exit\n"
+                    "  .quit\n"
+                    "  .help\n"
+                );
         }
 
         else if (!lang_process(line, &scope)) {
             printf("\n");
         }
-    }
+    } // while ">> " fgets
 
     scope_show(&scope);
     scope_clear(&scope);

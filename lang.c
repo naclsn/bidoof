@@ -61,15 +61,14 @@ Sym slice2sym(Slice const s) {
 }
 
 typedef struct Pars {
-    char* s;
+    char const* s;
     sz i;
     Slice t;
     Obj* unnamed;
-    // void (*report)(char*); // YYY: or with more complex arg (eg. line/col/...)
 } Pars;
 
 #define fail(__msg) do {  \
-    puts(__msg);          \
+    notify(__msg);        \
     return 0;             \
 } while (1)
 
@@ -99,7 +98,7 @@ bool _lex(Pars* self) {
             return true;
 
         case '"': {
-            char* end = AT;
+            char const* end = AT;
             do end = strchr(end+1, '"');
             while (end && '\\' == end[-1]);
             if (!end) fail("missing closing double-quote");
@@ -143,7 +142,7 @@ bool _lex(Pars* self) {
         } return true;
 
         case '\'': {
-            char* end = AT;
+            char const* end = AT;
             do end = strchr(end+1, '\'');
             while (end && '\\' == end[-1]);
             if (!end) fail("missing closing simple-quote");
@@ -193,10 +192,18 @@ void _print_location(Pars* self, char* reason) {
     char* nl = strchr(self->s+self->i, '\n');
     if (nl) lineEnd = nl - self->s;
 
-    printf("%s %s:%zu:%zu\n", reason, "<script>", lineNr, colNr);
-    if (lineEnd <= lineStart) printf("%4zu | %s\n", lineNr, self->s+lineStart);
-    else printf("%4zu | %.*s\n", lineNr, (int)(lineEnd-lineStart), self->s+lineStart);
-    printf("%4zu | %*s\n", lineNr+1, (int)colNr, "^");
+    char location_errmsg[256];
+    {
+        char* head = location_errmsg;
+        // XXX: buffer overrun when:
+        // - filename too long (TODO: no filename yet tho)
+        // - line too long (TODO: should cut to intersting part anyways)
+        head+= sprintf(head, "%s %s:%zu:%zu\n", reason, "<script>", lineNr, colNr);
+        if (lineEnd <= lineStart) sprintf(head, "%4zu | %s\n", lineNr, self->s+lineStart);
+        else head+= sprintf(head, "%4zu | %.*s\n", lineNr, (int)(lineEnd-lineStart), self->s+lineStart);
+        head+= sprintf(head, "%4zu | %*s", lineNr+1, (int)colNr, "^");
+    }
+    notify(location_errmsg);
 }
 
 sz _escape(char const* ptr, sz len, u32* res) {
@@ -512,8 +519,8 @@ bool _parse_script(Pars* self, Scope* scope) {
     return true;
 }
 
-bool lang_process(char* script, Scope* scope) {
-    Pars p = {.s= script, .i= 0 };
+bool lang_process(char const* script, Scope* scope) {
+    Pars p = {.s= script, .i= 0};
 
     if (_parse_script(&p, scope)) return true;
 
@@ -521,8 +528,8 @@ bool lang_process(char* script, Scope* scope) {
     return false;
 }
 
-void lang_show_tokens(char* script) {
-    Pars p = {.s= script, .i= 0 };
+void lang_show_tokens(char const* script) {
+    Pars p = {.s= script, .i= 0};
     while (_lex(&p)) {
         printf("token <<%.*s>> (a %s)\n",
                 (int)p.t.len, p.t.ptr,

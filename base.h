@@ -10,6 +10,10 @@
 
 #define frommember(__it, __type, __member)  (  (__type*)( ((char*)__it) - offsetof(__type, __member) )  )
 
+void notify_default(char const* s);
+void notify_null(char const* s);
+void (*notify)(char const* s);
+
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
