@@ -125,4 +125,4 @@ static bool _no_make_also(Obj* fun, Obj* res) {
 
 // XXX: does it need the `__declspec(dllexport)`, here and at the `Meta`s?
 #define export_names(...)  \
-    char const* names[] = {__VA_ARGS__, NULL}
+    char const* const names[] = {__VA_ARGS__, NULL}

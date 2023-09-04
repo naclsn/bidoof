@@ -5,16 +5,21 @@
 #include <windows.h>
 #define RTLD_LOCAL 0
 #define RTLD_LAZY 1
-void* dlopen(char const* file, int _) {
+void* dlopen(char const* file, int flags) {
+    (void)flags;
     // << be sure to use backslashes (\), not forward slashes (/) >>
     sz len = strlen(file)+1;
     char* bs = alloca(len);
-    for (sz k = 0; k < len; k++)
+    for (sz k = 0; k < len+1; k++)
         bs[k] = '/' == file[k] ? '\\' : file[k];
     return LoadLibrary(bs);
 }
-#define dlsym (void*)(sz)GetProcAddress
-#define dlclose (void*)(sz)FreeLibrary
+void* dlsym(void* handle, char const* name) {
+    return GetProcAddress(handle, name);
+}
+void dlclose(void* handle) {
+    FreeLibrary(handle);
+}
 char const* dlerror(void) {
     static char buf[256];
     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
