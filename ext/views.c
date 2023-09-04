@@ -1,6 +1,6 @@
-// XXX: XXXXXXXXXXXXX: this works out of luck! at least on this Windows+Cygwin,
-// changing anything in the `Frame` structure (which impacts its size) just
-// doesn't work and passes garbage around
+// XXX/FIXME: this only works out of luck!
+// changing anything in the `Frame` structure (with impact on its size) just
+// doesn't work and passes garbage around or segfaults
 #include "../helper.h"
 
 #define FRAME_IMPLEMENTATION

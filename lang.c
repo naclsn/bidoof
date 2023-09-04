@@ -54,7 +54,7 @@ typedef struct Slice {
     sz len;
 } Slice;
 
-Sym slice2sym(Slice const s) {
+static inline Sym slice2sym(Slice const s) {
     Sym r = {0};
     memcpy(r.txt, s.ptr, s.len < 15 ? s.len : 15);
     return r;

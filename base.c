@@ -4,16 +4,6 @@ void notify_default(char const* s) { printf("INFO: %s\n", s); }
 void notify_null(char const* s) { (void)s; }
 void (*notify)(char const* s) = notify_default;
 
-int symcmp(Sym const l, Sym const r) {
-    return memcmp(l.txt, r.txt, 16);
-}
-
-Sym mksym(char const* s) {
-    Sym r = {0};
-    strncpy(r.txt, s, 15);
-    return r;
-}
-
 void obj_show(Obj const* self, int indent) {
     if (self) printf("(%p) ", (void*)self);
 

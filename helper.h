@@ -87,7 +87,7 @@
 
 
 
-static bool _no_make_also(Obj* fun, Obj* res) {
+static inline bool _no_make_also(Obj* fun, Obj* res) {
     (void)fun;
     (void)res;
     return true;
