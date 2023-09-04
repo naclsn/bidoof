@@ -1,13 +1,52 @@
 #include "../helper.h"
 
-export_names("Delim");
+export_names
+    ( "Count"
+    , "Delim"
+    );
+
+ctor_simple(2, Count
+        , "count elements of a list or bytes of a buffer that verify a predicate"
+        , (2, NUM, _CountB, BUF, from, FUN, pred)
+        , (2, NUM, _CountL, LST, from, FUN, pred)
+        );
+bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
+    Obj* fun = frommember(pred, Obj, as);
+    self->val = 0;
+    for (sz k = 0; k < from->len; k++) {
+        Obj* r = alloca(sizeof *r + 1*sizeof(Obj*));
+        memset(r, 0, sizeof *r);
+        r->argc = 1;
+        r->argv[0] = &(Obj){.ty= NUM, .as.num.val= from->ptr[k]};
+
+        if (!fun->as.fun.call(fun, r)) return false;
+        bool (*up)(Obj*) = r->update;
+        if (NUM != r->ty || (up && !up(r))) {
+            r->update = NULL;
+            if (up) up(r);
+            return false;
+        }
+
+        if (0 != r->as.num.val) self->val++;
+
+        r->update = NULL;
+        if (up) up(r);
+    }
+    return true;
+}
+bool _CountL(Num* self, Lst const* const from, Fun const* const pred) {
+    (void)from;
+    (void)pred;
+    self->val = 0;
+    notify("NIY: streamline inline call process");
+    return false;
+}
 
 ctor_simple(2, Delim
         , "slice from beginning up to delimiter (exclusive), or the whole buffer if not found - default delimiter is \"\\0\" ie. C-string"
         , (2, BUF, _Delim2, BUF, under, BUF, delim)
         , (1, BUF, _Delim1, BUF, under)
         );
-
 bool _Delim2(Buf* self, Buf const* const under, Buf const* const delim) {
     sz k;
     for (k = 0; k < under->len - delim->len; k++) {
@@ -19,7 +58,6 @@ found:
     self->len = k;
     return true;
 }
-
 bool _Delim1(Buf* self, Buf const* const under) {
     self->ptr = under->ptr;
     self->len = strnlen((char const*)under->ptr, under->len);
