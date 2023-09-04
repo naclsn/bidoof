@@ -16,7 +16,7 @@ int _errhandler(Display* dpy, XErrorEvent* err) {
     return 0;
 }
 
-bool frame_create(Frame* self, char const* title) {
+bool frame_create(Frame* self) {
     // only registers the error handler once
     static bool handling = false;
     if (!handling) {
@@ -48,7 +48,7 @@ bool frame_create(Frame* self, char const* title) {
                     CWColormap | CWEventMask, &swa),
                 !_errreceived)
             && (XMapWindow(self->dpy, self->win),
-                XStoreName(self->dpy, self->win, title),
+                XStoreName(self->dpy, self->win, self->title),
                 !_errreceived)
             && (self->glc = glXCreateContext(self->dpy, vi, NULL, GL_TRUE))
             && (glXMakeCurrent(self->dpy, self->win, self->glc),

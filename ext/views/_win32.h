@@ -35,7 +35,6 @@ LRESULT CALLBACK _WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         case WM_CLOSE:          _event(closing,     self); return 0;
         case WM_KEYDOWN:        _event(keydown,     self, wParam); return 0;
         case WM_KEYUP:          _event(keyup,       self, wParam); return 0;
-        case WM_CHAR:           _event(keychar,     self, wParam); return 0;
         case WM_LBUTTONDOWN:    _event(mousedown,   self, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_LBUTTONUP:      _event(mouseup,     self, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_LBUTTONDBLCLK:  _event(mousedouble, self, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
@@ -52,7 +51,7 @@ LRESULT CALLBACK _WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
-bool frame_create(Frame* self, char const* title) {
+bool frame_create(Frame* self) {
     // only registers the window class once
     static HINSTANCE hInstance = NULL;
     if (!hInstance) {
@@ -77,7 +76,7 @@ bool frame_create(Frame* self, char const* title) {
     }
 
     SetLastError(0);
-    self->hWnd = CreateWindow("OpenGLFrame", title,
+    self->hWnd = CreateWindow("OpenGLFrame", self->title,
             WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             CW_USEDEFAULT, 0, self->width, self->height,
             NULL, NULL, hInstance, NULL);
