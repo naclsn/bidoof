@@ -7,7 +7,6 @@ struct Frame { extends_FrameBase;
 };
 
 #ifdef FRAME_IMPLEMENTATION
-#include <stdio.h>
 
 static volatile unsigned char _errreceived = 0;
 int _errhandler(Display* dpy, XErrorEvent* err) {

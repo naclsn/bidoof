@@ -61,6 +61,7 @@ static inline Sym slice2sym(Slice const s) {
 }
 
 typedef struct Pars {
+    char const* n;
     char const* s;
     sz i;
     Slice t;
@@ -192,18 +193,10 @@ void _print_location(Pars* self, char* reason) {
     char* nl = strchr(self->s+self->i, '\n');
     if (nl) lineEnd = nl - self->s;
 
-    char location_errmsg[256];
-    {
-        char* head = location_errmsg;
-        // XXX: buffer overrun when:
-        // - filename too long (TODO: no filename yet tho)
-        // - line too long (TODO: should cut to intersting part anyways)
-        head+= sprintf(head, "%s %s:%zu:%zu\n", reason, "<script>", lineNr, colNr);
-        if (lineEnd <= lineStart) sprintf(head, "%4zu | %s\n", lineNr, self->s+lineStart);
-        else head+= sprintf(head, "%4zu | %.*s\n", lineNr, (int)(lineEnd-lineStart), self->s+lineStart);
-        head+= sprintf(head, "%4zu | %*s", lineNr+1, (int)colNr, "^");
-    }
-    notify(location_errmsg);
+    notify_printf(28+strlen(reason)+strlen(self->n), "%s %s:%zu:%zu", reason, self->n, lineNr, colNr);
+    if (lineEnd <= lineStart) notify_printf(16+strlen(self->s+lineStart), "%4zu | %s", lineNr, self->s+lineStart);
+    else notify_printf(16+lineEnd-lineStart, "%4zu | %.*s", lineNr, (int)(lineEnd-lineStart), self->s+lineStart);
+    notify_printf(16+colNr, "%4zu | %*s", lineNr+1, (int)colNr, "^");
 }
 
 sz _escape(char const* ptr, sz len, u32* res) {
@@ -519,8 +512,8 @@ bool _parse_script(Pars* self, Scope* scope) {
     return true;
 }
 
-bool lang_process(char const* script, Scope* scope) {
-    Pars p = {.s= script, .i= 0};
+bool lang_process(char const* name, char const* script, Scope* scope) {
+    Pars p = {.n= name, .s= script, .i= 0};
 
     if (_parse_script(&p, scope)) return true;
 
@@ -528,10 +521,10 @@ bool lang_process(char const* script, Scope* scope) {
     return false;
 }
 
-void lang_show_tokens(char const* script) {
-    Pars p = {.s= script, .i= 0};
+void lang_show_tokens(char const* name, char const* script) {
+    Pars p = {.n= name, .s= script, .i= 0};
     while (_lex(&p)) {
-        printf("token <<%.*s>> (a %s)\n",
+        notify_printf(21+p.t.len, "token <<%.*s>> (a %s)",
                 (int)p.t.len, p.t.ptr,
                 tok_is_str(p.t) ? "str" :
                 tok_is_num(p.t) ? "num" :
@@ -540,9 +533,9 @@ void lang_show_tokens(char const* script) {
                 tok_is_sym(p.t) ? "sym" :
                 "punct");
         _print_location(&p, "TOKEN");
-        puts("");
+        notify("");
     }
 
-    if (!*p.t.ptr) printf("end of script\n");
+    if (!*p.t.ptr) notify("end of script");
     else _print_location(&p, "ERROR");
 }

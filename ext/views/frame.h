@@ -9,6 +9,7 @@
 /// I have no clue as for the thread-safety of anything.
 ///
 /// Make sure to only use FRAME_IMPLEMENTATION once.
+/// (TODO: make it possible to select the impl with the macro.)
 /// If any of _WIN32, _WIN64 or __CYGWIN__ is present, uses Win32 API.
 /// Otherwise, only X11 is supported for now.
 

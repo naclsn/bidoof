@@ -3,7 +3,7 @@
 
 #include "scope.h"
 
-bool lang_process(char const* script, Scope* scope);
-void lang_show_tokens(char const* script);
+bool lang_process(char const* name, char const* script, Scope* scope);
+void lang_show_tokens(char const* name, char const* script);
 
 #endif // __BIDOOF_LANG_H__

@@ -1,4 +1,4 @@
-CFLAGS += -Wall -Wextra -Werror
+CFLAGS += -Wall -Wextra -Werror -std=c99
 OUT ?= build
 NAME ?= bidoof
 EXTS ?= builtin views
@@ -16,6 +16,7 @@ else
 endif
 
 all: $(OUT) $(foreach ext,$(EXTS),$(OUT)/$(call as-lib,$(ext))) $(OUT)/$(call as-exe,$(NAME))
+test: all
 
 $(OUT):
 	$(MD) '$(OUT)'

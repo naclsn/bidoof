@@ -13,6 +13,12 @@
 void notify_default(char const* s);
 void notify_null(char const* s);
 extern void (*notify)(char const* s);
+#define notify_printf(__sz, __fmt, ...) do {  \
+        char* m = malloc(__sz);               \
+        sprintf(m, __fmt, __VA_ARGS__);       \
+        notify(m);                            \
+        free(m);                              \
+    } while (false)                           \
 
 typedef uint8_t u8;
 typedef uint16_t u16;

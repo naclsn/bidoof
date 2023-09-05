@@ -12,9 +12,12 @@ ctor_simple(2, Count
         );
 bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
     Obj* fun = frommember(pred, Obj, as);
+
+    union { u8 _buf[sizeof(Obj) + 1*sizeof(Obj*)]; Obj _obj; } _r;
+    Obj* r = &_r._obj;
+
     self->val = 0;
     for (sz k = 0; k < from->len; k++) {
-        Obj* r = alloca(sizeof *r + 1*sizeof(Obj*));
         memset(r, 0, sizeof *r);
         r->argc = 1;
         r->argv[0] = &(Obj){.ty= NUM, .as.num.val= from->ptr[k]};
@@ -60,7 +63,7 @@ found:
 }
 bool _Delim1(Buf* self, Buf const* const under) {
     self->ptr = under->ptr;
-    self->len = strnlen((char const*)under->ptr, under->len);
+    for (self->len = 0; self->len < under->len && under->ptr[self->len]; self->len++);
     return true;
 }
 

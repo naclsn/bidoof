@@ -17,11 +17,8 @@ void load_all_exts(char const* prog) {
         memcpy(end+1, *it, len);
         end[len+1] = '\0';
 
-        if (!exts_load(prog_dir)) {
-            char* m = alloca(25 + len);
-            sprintf(m, "WARN: could not load '%s'\n", *it);
-            notify(m);
-        }
+        if (!exts_load(prog_dir))
+            notify_printf(24+len, "WARN: could not load '%s'", *it);
     }
 }
 
@@ -38,18 +35,13 @@ int parse_args(char* prog, int argc, char** argv) {
                     notify("ERROR: expected ext name");
                     return 1;
                 }
-                if (!exts_load(*++argv)) {
-                    char* m = alloca(25 + strlen(*argv));
-                    sprintf(m, "WARN: could not load '%s'\n", *argv);
-                    notify(m);
-                }
+                if (!exts_load(*++argv))
+                    notify_printf(24+strlen(*argv), "WARN: could not load '%s'", *argv);
                 break;
 
-            default: {
-                char* m = alloca(23 + strlen(arg));
-                sprintf("WARN: unknown flag '%s'\n", arg);
-                notify(m);
-            } return 1;
+            default:
+                notify_printf(22+strlen(arg), "WARN: unknown flag '%s'", arg);
+                return 1;
         }
     }
 
@@ -132,7 +124,7 @@ void repl(void) {
                 );
         }
 
-        else if (!lang_process(line, &scope)) {
+        else if (!lang_process("<repl_line>", line, &scope)) {
             printf("\n");
         }
     } // while ">> " fgets
