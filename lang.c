@@ -77,7 +77,7 @@ bool _lex(Pars* self) {
 #define AT              (self->s + self->i)
 #define IN(__lo, __hi)  (__lo <= c && c <= __hi)
     char c;
-    while (' ' == (c = self->s[self->i])
+    while (' ' == (c = *AT)
             || '\t' == c
             || '\n' == c
             || '\r' == c
@@ -88,6 +88,7 @@ bool _lex(Pars* self) {
 
     // (when parsing a number)
     unsigned base = 10;
+    unsigned digits = 0;
 
     switch (c) {
         case '(': case ')':
@@ -108,35 +109,48 @@ bool _lex(Pars* self) {
         } return true;
 
         case '-':
-            self->i++;
-            if (!*AT) fail("expected digits");
-            // fall through
-        case '0':
             self->t.len++;
             self->i++;
-            switch (*AT) {
-                case 'b': base =  2; break;
-                case 'o': base =  8; break;
-                case 'x': base = 16; break;
-                case '.': case '_':
-                case '0'...'9': break;
-                case ' ': case '\t': case '\n': case '\r': case '\0': return true;
-                default: fail("expected digits");
+            c = *AT;
+            if (!c || '.' == c) fail("expected digits");
+            // fall through
+        case '0':
+            if ('0' == c) {
+                self->t.len++;
+                self->i++;
+                switch (c = *AT) {
+                    case 'b': base =  2; c = self->s[++self->t.len, ++self->i]; break;
+                    case 'o': base =  8; c = self->s[++self->t.len, ++self->i]; break;
+                    case 'x': base = 16; c = self->s[++self->t.len, ++self->i]; break;
+                    case '.': case '_':
+                    case '0'...'9': digits++; break;
+                    default:
+                        if (IN('A', 'Z') || IN('a', 'z')) fail("expected digits or spacing");
+                        return true;
+                }
             }
             // fall through
         case '1'...'9': {
-            do c = self->s[++self->t.len, ++self->i];
+            bool is_digit;
             while ('_' == c
-                    || (  2 == base && (IN('0', '1')) )
-                    || (  8 == base && (IN('0', '7')) )
-                    || ( 10 == base && (IN('0', '9')) )
-                    || ( 16 == base && (IN('0', '9') || IN('A', 'F') || IN('a', 'f')) )
-                    );
-            if (10 == base && '.' == c) {
-                do c = self->s[++self->t.len, ++self->i];
-                while ('_' == c || IN('0', '9'));
+                || (is_digit = (  2 == base && (IN('0', '1')) )
+                            || (  8 == base && (IN('0', '7')) )
+                            || ( 10 == base && (IN('0', '9')) )
+                            || ( 16 == base && (IN('0', '9') || IN('A', 'F') || IN('a', 'f')) )
+                    )) {
+                c = self->s[++self->t.len, ++self->i];
+                digits+= is_digit;
             }
-            if (10 != base && 2 == self->t.len) fail("expected digits");
+            if (10 == base && '.' == c) {
+                unsigned ddigits = 0;
+                do {
+                    c = self->s[++self->t.len, ++self->i];
+                    is_digit = IN('0', '9');
+                    ddigits+= is_digit;
+                } while ('_' == c || is_digit);
+                if (!ddigits) fail("expected decimal digits");
+            }
+            if (!digits) fail("expected digits");
             // better report as syntax error, ~~even tho~~
             // **because** it could be valid
             if (IN('2', '9') || IN('A', 'Z') || IN('a', 'z')) fail("unexpected characters");
@@ -402,22 +416,62 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is_num(self->t)) {
-        u32 val = 0;
+        i64 ival;
+        f64 fval;
         bool negative = '-' == self->t.ptr[0];
+        bool floating = false;
 
         if ('\'' == self->t.ptr[0]) {
-            val = self->t.ptr[1];
+            u32 val = self->t.ptr[1];
             if ('\\' == val && 0 == _escape(self->t.ptr+2, self->t.len-2, &val))
                 fail("invalid escape sequence");
+            ival = val;
         } else {
-            // TODO: parse number (for realsies)
-            for (sz k = negative; k < self->t.len; k++)
-                val = val*10 + self->t.ptr[k]-'0';
-        }
+            sz k = 0;
+            ival = 0;
+            if ('0' == self->t.ptr[k]) switch (self->t.ptr[k+1]) {
+                case 'b':
+                    for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
+                        ival = (ival << 1) | (self->t.ptr[k] & 0xf);
+                    break;
+
+                case 'o':
+                    for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
+                        ival = (ival <<3 ) | (self->t.ptr[k] & 0xf);
+                    break;
+
+                case 'x':
+                    for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k]) {
+                        u8 it = 0b100000 | self->t.ptr[k];
+                        ival = (ival << 4) | ((it & 0xf) + ('9'<it)*9);
+                    }
+                    break;
+
+                default: goto decimal;
+            } else {
+            decimal:
+
+                for (; k < self->t.len && '.' != self->t.ptr[k]; k++) if ('_' != self->t.ptr[k])
+                    ival = ival*10 + (self->t.ptr[k] & 0xf);
+
+                if ('.' == self->t.ptr[k]) {
+                    floating = true;
+                    fval = 0;
+                    for (sz f = self->t.len-1; f > k; f--) if ('_' != self->t.ptr[f])
+                        fval = fval/10 + (self->t.ptr[f] & 0xf);
+                    fval = ival + fval/10;
+                }
+            } // if (not) 0[box..]
+        } // if (not) '\''
 
         if (!(r = calloc(1, sizeof *r))) fail("OOM");
-        r->ty = NUM;
-        r->as.num.val = negative ? -val : val;
+        if (floating) {
+            r->ty = FLT;
+            r->as.flt.val = negative ? -fval : fval;
+        } else {
+            r->ty = NUM;
+            r->as.num.val = negative ? -ival : ival;
+        }
     }
 
     else if (tok_is("{", self->t)) {

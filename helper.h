@@ -27,6 +27,7 @@
 
 #define ty_for_BUF Buf
 #define ty_for_NUM Num
+#define ty_for_FLT Flt
 #define ty_for_LST Lst
 #define ty_for_FUN Fun
 #define ty_for_SYM Sym
@@ -37,6 +38,7 @@
 
 #define as_for_BUF buf
 #define as_for_NUM num
+#define as_for_FLT flt
 #define as_for_LST lst
 #define as_for_FUN fun
 #define as_for_SYM sym
@@ -121,8 +123,35 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
 #define ctor_simple(__n_overloads, __name, __doc, ...)  \
     ctor_w_also(__n_overloads, __name, _no_make_also, __doc, __VA_ARGS__)
 
-#define destroyed(__self) (!frommember(__self, Obj, as)->update)
-
 // XXX: does it need the `__declspec(dllexport)`, here and at the `Meta`s?
 #define export_names(...)  \
     char const* const names[] = {__VA_ARGS__, NULL}
+
+#define destroyed(__self) (!frommember(__self, Obj, as)->update)
+
+// NOTE: this is comptime, eg. `Bind` cannot use it..
+#define inline_call_assign(__ty, __name, __f, __count, ...)           \
+    {                                                                 \
+        union {                                                       \
+            char _b[sizeof(Obj) + __count*sizeof(Obj*)];              \
+            Obj _o;                                                   \
+        } _alpaca = {0};                                              \
+                                                                      \
+        Obj* __name = &_alpaca._o;                                    \
+        __name->argc = __count;                                       \
+        Obj* _args[] = {__VA_ARGS__};                                 \
+        memcpy(&__name->argv, _args, __count*sizeof(Obj*));           \
+                                                                      \
+        if (!(__f)->as.fun.call(__f, __name)) return false;           \
+        bool (*_res_up)(Obj*) = __name->update;                       \
+                                                                      \
+        if ((__ty) != __name->ty || (_res_up && !_res_up(__name))) {  \
+            __name->update = NULL;                                    \
+            if (_res_up) _res_up(__name);                             \
+            return false;                                             \
+        }
+
+#define inline_call_cleanup(__name)                                   \
+        __name->update = NULL;                                        \
+        if (_res_up) _res_up(__name);                                 \
+    }

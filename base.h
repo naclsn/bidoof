@@ -24,17 +24,18 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int64_t i64;
+typedef long double f64;
 typedef size_t sz;
 
 typedef struct Buf { u8* ptr; sz len;                                 } Buf;
-// TODO: Int { i128 (would be cool, but we'll settle with i64 for now.. val; } and Flt { long double val; }
-typedef struct Num { int val;                                         } Num;
+typedef struct Num { i64 val;                                         } Num;
+typedef struct Flt { f64 val;                                         } Flt;
 typedef struct Lst { struct Obj** ptr; sz len;                        } Lst;
 typedef struct Fun { bool (*call)(struct Obj* self, struct Obj* res); } Fun;
 typedef struct Sym { char txt[16];                                    } Sym;
 
-enum  Ty { BUF,     NUM,     LST,     FUN,     SYM,     };
-union As { Buf buf; Num num; Lst lst; Fun fun; Sym sym; };
+enum  Ty { BUF,     NUM,     FLT,     LST,     FUN,     SYM,     };
+union As { Buf buf; Num num; Flt flt; Lst lst; Fun fun; Sym sym; };
 
 typedef struct Obj {
     bool (*update)(struct Obj* self);

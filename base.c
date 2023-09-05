@@ -20,7 +20,11 @@ void obj_show(Obj const* self, int indent) {
             break;
 
         case NUM:
-            printf("%d", self->as.num.val);
+            printf("%ld", self->as.num.val);
+            break;
+
+        case FLT:
+            printf("%Lf", self->as.flt.val);
             break;
 
         case LST:

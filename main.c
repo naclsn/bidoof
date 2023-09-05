@@ -68,7 +68,7 @@ void repl(void) {
 
                         default:
                             {
-                                static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym"};
+                                static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [FLT]= "Flt", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym"};
 
                                 line[strlen(line+2)+1] = '\0';
                                 Meta* meta = exts_lookup(mksym(line+2));
@@ -97,7 +97,8 @@ void repl(void) {
                     Obj const* it = scope_get(&scope, mksym(line+2));
                     if (it) switch (it->ty) {
                         case BUF: printf("\"%.*s\"\n", (int)it->as.buf.len, it->as.buf.ptr); break;
-                        case NUM: printf("%d\n", it->as.num.val); break;
+                        case NUM: printf("%ld\n", it->as.num.val); break;
+                        case FLT: printf("%Lf\n", it->as.flt.val); break;
                         case SYM: printf(":%s\n", it->as.sym.txt); break;
                         default: printf("%p\n", it->as.lst.ptr);
                     } else puts("(null)");

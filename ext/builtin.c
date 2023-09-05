@@ -11,37 +11,24 @@ ctor_simple(2, Count
         , (2, NUM, _CountL, LST, from, FUN, pred)
         );
 bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
-    Obj* fun = frommember(pred, Obj, as);
-
-    union { u8 _buf[sizeof(Obj) + 1*sizeof(Obj*)]; Obj _obj; } _r;
-    Obj* r = &_r._obj;
-
+    Obj* predf = frommember(pred, Obj, as);
     self->val = 0;
     for (sz k = 0; k < from->len; k++) {
-        memset(r, 0, sizeof *r);
-        r->argc = 1;
-        r->argv[0] = &(Obj){.ty= NUM, .as.num.val= from->ptr[k]};
-
-        if (!fun->as.fun.call(fun, r)) return false;
-        bool (*up)(Obj*) = r->update;
-        if (NUM != r->ty || (up && !up(r))) {
-            r->update = NULL;
-            if (up) up(r);
-            return false;
-        }
-
-        if (0 != r->as.num.val) self->val++;
-
-        r->update = NULL;
-        if (up) up(r);
+        Obj num = {.ty= NUM, .as.num.val= from->ptr[k]};
+        inline_call_assign(NUM, res, predf, 1, &num);
+            if (0 != res->as.num.val) self->val++;
+        inline_call_cleanup(res);
     }
     return true;
 }
 bool _CountL(Num* self, Lst const* const from, Fun const* const pred) {
-    (void)from;
-    (void)pred;
+    Obj* predf = frommember(pred, Obj, as);
     self->val = 0;
-    notify("NIY: streamline inline call process");
+    for (sz k = 0; k < from->len; k++) {
+        inline_call_assign(NUM, res, predf, 1, from->ptr[k]);
+            if (0 != res->as.num.val) self->val++;
+        inline_call_cleanup(res);
+    }
     return false;
 }
 
