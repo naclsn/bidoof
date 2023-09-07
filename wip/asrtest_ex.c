@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "asrtest.h"
+#include "../asrtest.h"
 
 bool odd(int c) {
     if (c & 1) {

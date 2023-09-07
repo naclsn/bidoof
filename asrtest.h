@@ -77,8 +77,8 @@ static inline bool _asr_parseargs(int argc, char** argv) {
         asr_printf(#__tag "(" __FILE__ ":%d)\t%s\n", __LINE__, __cdt  \
             ? "pass"                                                  \
             : (_asr_fails++, "condition not verified: " #__cdt));     \
-    } while (0)
-#define ASSERT_REACH(__tag) ASSERT_REACH_AND(__tag, 1)
+    } while (false)
+#define ASSERT_REACH(__tag) ASSERT_REACH_AND(__tag, true)
 #define ASSERT_NOREACH(__tag) ASSERT_REACH_AND(__tag, !"should not reach")
 
 #define ASR_TEST(__tag) do                                         \
@@ -92,14 +92,14 @@ static inline bool _asr_parseargs(int argc, char** argv) {
         }                                                          \
     } else if (_asr_list(#__tag)) {                                \
         asr_printf(#__tag "\n");                                   \
-    } while (0)
+    } while (false)
 
 #define ASR_MAIN                                              \
     int main(int argc, char** argv) {                         \
         if (!_asr_parseargs(argc, argv)) return 1;            \
         do
 #define ASR_MAIN_RETURN                                       \
-        } while (0);                                          \
+        } while (false);                                      \
         if (_asr_summary)                                     \
             asr_printf("\n--------\n%d fail%s\n%d miss%s\n",  \
                 _asr_fails, 1 < _asr_fails ? "s" : "",        \

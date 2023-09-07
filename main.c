@@ -1,6 +1,8 @@
 #include "exts.h"
 #include "lang.h"
 
+#include <unistd.h> // YYY(temp): sleep
+
 #ifndef EXTS_NAMES
 #error "no $EXTS_NAMES, there would be no function..."
 #define EXTS_NAMES
@@ -122,8 +124,16 @@ void repl(void) {
                     "  .exit\n"
                     "  .quit\n"
                     "  .help\n"
+                    "  .sleep[sec]\n"
                 );
-        }
+            if (0 == memcmp(".sleep", line, 6)) {
+                unsigned int sec = 0;
+                char const* a = line+6;
+                for (; ' ' == *a || '\t' == *a; ++a);
+                for (; '0' <= *a && *a <= '9'; ++a) sec = sec*10 + (*a & 0xf);
+                sleep(sec);
+            }
+        } // if '.'
 
         else if (!lang_process("<repl_line>", line, &scope)) {
             printf("\n");

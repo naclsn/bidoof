@@ -14,9 +14,10 @@ else
   MD ?= mkdir -p
   views-LDFLAGS = -lGL -lX11
 endif
+as-test = $(call as-exe,$(OUT)/test-$(1))
 
 all: $(OUT) $(foreach ext,$(EXTS),$(OUT)/$(call as-lib,$(ext))) $(OUT)/$(call as-exe,$(NAME))
-test: all
+test: $(call as-test,lang)
 
 $(OUT):
 	$(MD) '$(OUT)'
@@ -26,3 +27,12 @@ $(OUT)/$(call as-exe,$(NAME)): *.[ch]
 
 $(OUT)/$(call as-lib,%): ext/%.c helper.h base.[ch]
 	$(CC) $^ -o '$@' -fPIC -shared $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
+
+$(OUT)/$(call as-exe,test-%): %.c
+	$(CC) $^ -o '$@' -DASR_TEST_BUILD
+	'$@'
+
+wip/%: wip/%.c
+	$(MD) '$(OUT)/wip'
+	$(CC) $^ -o '$(OUT)/$@' $(CFLAGS) $(LDFLAGS)
+	'$(OUT)/$@' $(ARGS)

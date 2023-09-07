@@ -290,6 +290,10 @@ bool _update_free_str(Obj* self) {
 
 bool _update_free_lst(Obj* self) {
     if (!self->update) {
+        for (sz k = 0; k < self->as.lst.len; k++) {
+            self->as.lst.ptr[k]->keepalive--;
+            obj_destroy(self->as.lst.ptr[k]);
+        }
         free(self->as.lst.ptr);
         self->as.lst.ptr = NULL;
         self->as.lst.len = 0;
@@ -475,6 +479,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     }
 
     else if (tok_is("{", self->t)) {
+        // XXX/FIXME: ok parsing lists is completely broken
         sz before = self->i;
 
         sz cap = 16;
@@ -557,10 +562,12 @@ bool _parse_script(Pars* self, Scope* scope) {
         // XXX(cleanup): unnamed
         if (!value) fail("in script expression");
 
-        if (!tok_is("_", name)) {
+        // it still needs to be stored, so it is destroyed properly but it
+        // indeed is syntactically unreachable (always shadowed by unnamed)
+        //if (!tok_is("_", name)) {
             Sym const key = slice2sym(name);
             if (!scope_put(scope, key, value)) fail("OOM");
-        }
+        //}
     } while (_lex(self) && tok_is(";", self->t));
 
     return true;
@@ -593,3 +600,17 @@ void lang_show_tokens(char const* name, char const* script) {
     if (!*p.t.ptr) notify("end of script");
     else _print_location(&p, "ERROR");
 }
+
+/*
+#ifdef ASR_TEST_BUILD
+Obj* scope_get(Scope* self, Sym const key) { return NULL; }
+Obj* obj_call(Obj* self, u8 argc, Obj** argv) { return NULL; }
+bool scope_put(Scope* self, Sym const key, Obj* value) { return false; }
+Scope exts_scope = {0};
+void notify_default(char const* s) { }
+void (*notify)(char const* s) = notify_default;
+ASR_MAIN {
+    ASR_MAIN_RETURN;
+}
+#endif // ASR_TEST_BUILD
+*/
