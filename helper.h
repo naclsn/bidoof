@@ -112,7 +112,10 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
         (void)self;                                                  \
         (void)_no_make_also;                                         \
         typecheck_overloads_##__n_overloads(__name, __VA_ARGS__)     \
-        else return false;                                           \
+        else {                                                       \
+            notify("no such overload for function " #__name);        \
+            return false;                                            \
+        }                                                            \
         return __make_also(self, res);                               \
     }                                                                \
     ctor_given(__name, __doc, _make_##__name, ((struct MetaOvl[]){   \

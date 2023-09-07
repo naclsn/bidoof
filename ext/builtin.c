@@ -6,6 +6,7 @@ export_names
     , "Join"
     , "Len"
     , "Range"
+    , "Rect"
     );
 
 ctor_simple(2, Count
@@ -75,7 +76,7 @@ bool _Join2(Buf* self, Lst const* const list, Buf const* const sep) {
         if (k) total+= sep->len;
         total+= list->ptr[k]->as.buf.len;
     }
-    u8* ptr = malloc(total);
+    u8* ptr = realloc(self->ptr, total);
     if (!ptr) return false;
     sz offset = 0;
     for (sz k = 0; k < list->len; k++) {
@@ -122,16 +123,19 @@ bool _Range3(Lst* self, Num const* const start, Num const* const end, Num const*
         self->len = 0;
         return true;
     }
-    self->len = (end->val - start->val) / step->val;
-    Obj* arr = calloc(self->len, sizeof(Obj));
-    self->ptr = calloc(self->len, sizeof(Obj*));
-    if (!arr || !self->ptr) return false;
-    for (sz k = 0, n = start->val; k < self->len; n+= step->val) {
+    sz len = (end->val - start->val) / step->val;
+    Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
+    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
+    if (!arr || !ptr) return free(arr), free(ptr), false;
+    for (sz k = 0, n = start->val; k < len; n+= step->val, k++) {
+        memset(arr+k, 0, sizeof(Obj));
         arr[k].ty = NUM;
         arr[k].as.num.val = n;
-        self->ptr[k] = arr+k;
-        k++;
+        arr[k].keepalive++;
+        ptr[k] = arr+k;
     }
+    self->ptr = ptr;
+    self->len = len;
     return true;
 }
 bool _Range2(Lst* self, Num const* const start, Num const* const end) {
@@ -139,6 +143,39 @@ bool _Range2(Lst* self, Num const* const start, Num const* const end) {
 }
 bool _Range1(Lst* self, Num const* const end) {
     return _Range2(self, &(Num){0}, end);
+}
+
+ctor_simple(2, Rect
+        , "slices at regular interval into a list of same-size buffers with optional padding"
+        , (3, LST, _Rect3, BUF, under, NUM, item_len, NUM, item_pad)
+        , (2, LST, _Rect2, BUF, under, NUM, item_len)
+        );
+bool _Rect3(Lst* self, Buf const* const under, Num const* const item_len, Num const* const item_pad) {
+    if (destroyed(self)) {
+        free(self->ptr[0]);
+        free(self->ptr);
+        self->ptr = NULL;
+        self->len = 0;
+        return true;
+    }
+    sz w = item_len->val + item_pad->val;
+    sz len = under->len / w;
+    Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
+    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
+    if (!arr || !ptr) return free(arr), free(ptr), false;
+    for (sz k = 0; k < len; k++) {
+        memset(arr+k, 0, sizeof(Obj));
+        arr[k].ty = BUF;
+        arr[k].as.buf.ptr = under->ptr + (w*k);
+        arr[k].as.buf.len = item_len->val;
+        ptr[k] = arr+k;
+    }
+    self->ptr = ptr;
+    self->len = len;
+    return true;
+}
+bool _Rect2(Lst* self, Buf const* const under, Num const* const item_len) {
+    return _Rect3(self, under, item_len, &(Num){0});
 }
 
 #if 0

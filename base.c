@@ -34,7 +34,7 @@ void obj_show(Obj const* self, int indent) {
             }
             printf("{\n");
             for (sz k = 0; k < self->as.lst.len; k++) {
-                printf("%*.s", indent*3, "");
+                printf("%*.s", (indent+1)*3, "");
                 obj_show(self->as.lst.ptr[k], indent+1);
                 printf(", \n");
             }
