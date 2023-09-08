@@ -85,7 +85,7 @@ void resize(Frame* f, int w, int h) {
     glMatrixMode(GL_MODELVIEW);
 }
 
-void keyup(Frame* f, char key) {
+void keydown(Frame* f, char key) {
     if (27 == key) frame_close(f);
 }
 
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
             .render= render,
             .resize= resize,
             .closing= frame_close,
-            .keyup= keyup,
+            .keydown= keydown,
         },
     };
 
