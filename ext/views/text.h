@@ -1,0 +1,151 @@
+void text_init(void);
+void text_draw(char const* c, size_t l, int x, int y, float s);
+//void text_draw_u32(uint32_t const* c, size_t l, int x, int y, float s);
+void text_free(void);
+
+#ifdef TEXT_IMPLEMENTATION
+#include <stdbool.h>
+#include <stdint.h>
+#include <GL/gl.h>
+
+#include "font8x8/font8x8.h"
+
+static struct _f8x8 {
+    char const* const* const* const data;
+    uint32_t const cp_from;
+    uint32_t const cp_to;
+} const _text_allf8x8[] = {
+    {(void*)&font8x8_basic,        0x0,   0x7f},
+    {(void*)&font8x8_control,     0x80,   0x9f},
+    {(void*)&font8x8_ext_latin,   0xa0,   0xff},
+    {(void*)&font8x8_greek,      0x390,  0x3c9},
+    {(void*)&font8x8_box,       0x2500, 0x257f},
+    {(void*)&font8x8_block,     0x2580, 0x259f},
+    {(void*)&font8x8_hiragana,  0x3040, 0x309f},
+};
+#define _text_allf8x8_count (sizeof(_text_allf8x8) / sizeof(_text_allf8x8[0]))
+static GLuint _text_gl_tex;
+
+void text_init(void) {
+    glEnable(GL_TEXTURE_2D);
+    glGenTextures(1, &_text_gl_tex);
+    glBindTexture(GL_TEXTURE_2D, _text_gl_tex);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    float index[2] = {0.f, 1.f};
+    glPixelMapfv(GL_PIXEL_MAP_I_TO_R, 2, index);
+    glPixelMapfv(GL_PIXEL_MAP_I_TO_G, 2, index);
+    glPixelMapfv(GL_PIXEL_MAP_I_TO_B, 2, index);
+    glPixelMapfv(GL_PIXEL_MAP_I_TO_A, 2, index);
+
+    glTexImage2D(GL_TEXTURE_2D,
+            0, GL_RGBA,
+            128*8, _text_allf8x8_count*8,
+            0,
+            GL_COLOR_INDEX,
+            GL_BITMAP,
+            0);
+
+    for (size_t k = 0; k < _text_allf8x8_count; k++) {
+        struct _f8x8 const it = _text_allf8x8[k];
+        glTexSubImage2D(GL_TEXTURE_2D,
+                0,
+                0, k*8,
+                (it.cp_to - it.cp_from)*8, 8,
+                GL_COLOR_INDEX,
+                GL_BITMAP,
+                it.data);
+    }
+}
+
+void text_allf8x8(void) {
+    glMatrixMode(GL_TEXTURE);
+    glLoadIdentity();
+    glScalef(1.f/128, 1.f/_text_allf8x8_count, 1.f);
+    glMatrixMode(GL_MODELVIEW);
+
+    glBegin(GL_QUADS);
+    {
+        glTexCoord2f(0, 0); glVertex2f(0, 0);
+        glTexCoord2f(0, _text_allf8x8_count); glVertex2f(0, _text_allf8x8_count);
+        glTexCoord2f(128, _text_allf8x8_count); glVertex2f(128, _text_allf8x8_count);
+        glTexCoord2f(128, 0); glVertex2f(128, 0);
+    }
+    glEnd();
+}
+
+void text_draw(char const* c, size_t l, int x, int y, float s) {
+    (void)s;
+
+    glMatrixMode(GL_TEXTURE);
+    glLoadIdentity();
+    glScalef(1.f/128, 1.f/_text_allf8x8_count, 1.f);
+    glMatrixMode(GL_MODELVIEW);
+
+    glBegin(GL_QUADS);
+    int cx = 0, cy = 0;
+    for (size_t k = 0; k < l; k++) {
+        uint32_t u = c[k];
+
+        if (0 == (0b10000000 & u))
+            ;
+        else if (0 == (0b00100000 & u) && k+1 < l) {
+            char x = c[++k];
+            u = ((u & 0b00011111) << 6) | (x & 0b00111111);
+        }
+        else if (0 == (0b00010000 & u) && k+2 < l) {
+            char x = c[++k], y = c[++k];
+            u = ((u & 0b00001111) << 12) | ((x & 0b00111111) << 6) | (y & 0b00111111);
+        }
+        else if (0 == (0b00001000 & u) && k+3 < l) {
+            char x = c[++k], y = c[++k], z = c[++k];
+            u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
+        }
+        else u = '?';
+
+        size_t k;
+        uint32_t off = 0;
+        bool found = false;
+        for (k = 0; k < _text_allf8x8_count; k++) {
+            struct _f8x8 const it = _text_allf8x8[k];
+            if (it.cp_from <= u && u <= it.cp_to) {
+                off = u - _text_allf8x8[k].cp_from;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            u = '?';
+            k = 0;
+            off = u;
+        }
+
+        glTexCoord2f(off+0, k+0); glVertex2f(x + cx*s + 0, y + cy*s + 0);
+        glTexCoord2f(off+0, k+1); glVertex2f(x + cx*s + 0, y + cy*s + s);
+        glTexCoord2f(off+1, k+1); glVertex2f(x + cx*s + s, y + cy*s + s);
+        glTexCoord2f(off+1, k+0); glVertex2f(x + cx*s + s, y + cy*s + 0);
+
+        printf("%d, %d, '%c' in %zu at %d\n", x + cx*8, y + cy*8, u, k, off);
+
+        switch (u) {
+            case '\t': cx = ((cx/4) + 1)*4; break;
+            case '\n': cy++; break;
+            case '\r': cx = 0; break;
+            default: cx++;
+        }
+    }
+    glEnd();
+}
+
+void text_free(void) {
+    glDeleteTextures(1, &_text_gl_tex);
+    glDisable(GL_TEXTURE_2D);
+    _text_gl_tex = 0;
+}
+
+#undef _text_allf8x8_count
+#endif
