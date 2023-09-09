@@ -51,18 +51,18 @@ void text_init(void) {
         uint32_t count = it.cp_to - it.cp_from;
 
         uint8_t bata[128*8*8*4] = {0};
-        //for (size_t ch = 0; ch < count; ch++) {
+        for (size_t ch = 0; ch < count; ch++) {
             for (size_t j = 0; j < 8; j++) {
                 for (size_t i = 0; i < 8; i++) {
-                    size_t at = i + 127*j*8;
-                    uint8_t v = ((it.data['a'*8+7-j] >> i) & 1) * 255;
+                    size_t at = ch*8 + i + count*j*8;
+                    uint8_t v = ((it.data[ch*8 + 7-j] >> i) & 1) * 255;
                     bata[at*4+0] = 255;
                     bata[at*4+1] = 255;
                     bata[at*4+2] = 255;
                     bata[at*4+3] = v;
                 }
             }
-        //}
+        }
 
         glTexSubImage2D(GL_TEXTURE_2D,
                 0,
@@ -152,8 +152,6 @@ void text_draw(char const* c, size_t l, int x, int y, float s) {
         glTexCoord2f(off+0, k+1); glVertex2f(x + cx*s + 0, y + cy*s + s);
         glTexCoord2f(off+1, k+1); glVertex2f(x + cx*s + s, y + cy*s + s);
         glTexCoord2f(off+1, k+0); glVertex2f(x + cx*s + s, y + cy*s + 0);
-
-        printf("%d, %d, '%c' in %zu at %d\n", x + cx*8, y + cy*8, u, k, off);
 
         switch (u) {
             case '\t': cx = ((cx/4) + 1)*4; break;

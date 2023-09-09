@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #define FRAME_IMPLEMENTATION
 #include "../ext/views/frame.h"
@@ -70,10 +71,10 @@ void render(Frame* f) {
     glClearColor(.12f, .13f, .14f, 1);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    text_allf8x8();
+    //text_allf8x8();
 
-    //char const* const txt = "hi :<";
-    //text_draw(txt, strlen(txt), 0, 0, 3.f);
+    char const* const txt = "hi :>\r\nhow you?";
+    text_draw(txt, strlen(txt), 0, 0, 1.f);
 }
 
 void resize(Frame* f, int w, int h) {
@@ -86,7 +87,7 @@ void resize(Frame* f, int w, int h) {
 }
 
 void keydown(Frame* f, char key) {
-    if (27 == key) frame_close(f);
+    if (27 == key || 9 == key) frame_close(f);
 }
 
 int main(int argc, char** argv) {
