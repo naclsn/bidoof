@@ -90,7 +90,7 @@ void keydown(Frame* f, char key) {
 }
 
 int main(int argc, char** argv) {
-    argc--, *argv++;
+    argc--, argv++;
 
     Frame f = {
         .width= 640,

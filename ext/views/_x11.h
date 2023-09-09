@@ -36,7 +36,14 @@ bool frame_create(Frame* self) {
     _errreceived = 0;
     Colormap cmap = XCreateColormap(self->dpy, root, vi->visual, AllocNone);
     XSetWindowAttributes swa = {
-        .event_mask= ExposureMask | KeyPressMask,
+        .event_mask= ExposureMask
+                   | KeyPressMask
+                   //| ResizeRedirectMask
+                   | KeyPressMask
+                   | KeyReleaseMask
+                   | ButtonPressMask
+                   | ButtonReleaseMask
+                   | PointerMotionMask,
         .colormap= cmap,
     };
 
@@ -60,28 +67,56 @@ bool frame_create(Frame* self) {
 
 void frame_loop(Frame* self) {
     XEvent xev;
-    XWindowAttributes xwa;
     while (true) {
         XNextEvent(self->dpy, &xev);
 
         switch (xev.type) {
-            case Expose:
-                XGetWindowAttributes(self->dpy, self->win, &xwa);
-                glViewport(0, 0, xwa.width, xwa.height);
+            case Expose: {
+                int ww = xev.xexpose.width;
+                int hh = xev.xexpose.height;
+                _event(resize, self, ww, hh);
+                self->width = ww;
+                self->height = hh;
                 _event(render, self);
                 glXSwapBuffers(self->dpy, self->win);
-                break;
+             } break;
 
-            case KeyPress:
-                if (9 == xev.xkey.keycode) // escape
-                    frame_close(self);
+            //case ResizeRequest: {
+            //    int ww = xev.xresizerequest.width;
+            //    int hh = xev.xresizerequest.height;
+            //    _event(resize, self, ww, hh);
+            //    self->width = ww;
+            //    self->height = hh;
+            //    glViewport(0, 0, ww, hh);
+            //    _event(render, self);
+            //    glXSwapBuffers(self->dpy, self->win);
+            //} break;
+
+            //case TODO: _event(closing, self); break;
+
+            case KeyPress:      _event(keydown, self, xev.xkey.keycode); break;
+            case KeyRelease:    _event(keyup,   self, xev.xkey.keycode); break;
+
+            case ButtonPress:
+                if (4 == xev.xbutton.button || 5 == xev.xbutton.button)
+                    _event(mousewheel, self, 1-(xev.xbutton.button-4)*2, xev.xbutton.x, xev.xbutton.y);
+                else
+                    _event(mousedown, self, xev.xbutton.button, xev.xbutton.x, xev.xbutton.y);
                 break;
+            case ButtonRelease: _event(mouseup,   self, xev.xbutton.button, xev.xbutton.x, xev.xbutton.y); break;
+            case MotionNotify:  _event(mousemove, self, xev.xmotion.x, xev.xmotion.y); break;
 
             case ClientMessage:
-                //if (..)
-                    return;
+                if (XInternAtom(self->dpy, "WM_PROTOCOLS", true) ==  xev.xclient.message_type) {
+                    if (XInternAtom(self->dpy, "WM_REDRAW_WINDOW", false) == (unsigned long)xev.xclient.data.l[0]) {
+                        _event(render, self);
+                        glXSwapBuffers(self->dpy, self->win);
+                        break;
+                    }
+                    if (XInternAtom(self->dpy, "WM_DELETE_WINDOW", false) == (unsigned long)xev.xclient.data.l[0]) return;
+                }
         }
-    }
+    } // while true
 }
 
 void frame_redraw(Frame* self) {

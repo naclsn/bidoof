@@ -38,17 +38,16 @@ void frame_destroy(Frame* self);
                                                                      \
         void (*mousedown)(Frame* self, int button, int x, int y);    \
         void (*mouseup)(Frame* self, int button, int x, int y);      \
-        void (*mousedouble)(Frame* self, int button, int x, int y);  \
                                                                      \
         void (*mousewheel)(Frame* self, int delta, int x, int y);    \
         void (*mousemove)(Frame* self, int x, int y);                \
     } events;                                                        \
 }
 
-#define _HEAD(__frame, ...) __frame
+#define _event_frame(__frame, ...) __frame
 #define _event(__name, ...) do                            \
-    if (_HEAD(__VA_ARGS__,)->events.__name)               \
-        _HEAD(__VA_ARGS__,)->events.__name(__VA_ARGS__);  \
+    if (_event_frame(__VA_ARGS__,)->events.__name)               \
+        _event_frame(__VA_ARGS__,)->events.__name(__VA_ARGS__);  \
     while (false)
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)

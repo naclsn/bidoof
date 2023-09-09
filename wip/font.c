@@ -48,6 +48,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 /*#include "aux.h"*/
+#include <string.h>
 #define FRAME_IMPLEMENTATION
 #include "../ext/views/frame.h"
 

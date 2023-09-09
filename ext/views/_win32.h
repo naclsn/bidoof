@@ -37,14 +37,11 @@ LRESULT CALLBACK _WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         case WM_KEYUP:          _event(keyup,       self, wParam); return 0;
         case WM_LBUTTONDOWN:    _event(mousedown,   self, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_LBUTTONUP:      _event(mouseup,     self, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
-        case WM_LBUTTONDBLCLK:  _event(mousedouble, self, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_RBUTTONDOWN:    _event(mousedown,   self, 1, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_RBUTTONUP:      _event(mouseup,     self, 1, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
-        case WM_RBUTTONDBLCLK:  _event(mousedouble, self, 1, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_MBUTTONDOWN:    _event(mousedown,   self, 2, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_MBUTTONUP:      _event(mouseup,     self, 2, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
-        case WM_MBUTTONDBLCLK:  _event(mousedouble, self, 2, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
-        case WM_MOUSEWHEEL:     _event(mousewheel,  self, GET_WHEEL_DELTA_WPARAM(wParam), GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
+        case WM_MOUSEWHEEL:     _event(mousewheel,  self, GET_WHEEL_DELTA_WPARAM(wParam)/WHEEL_DELTA, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
         case WM_MOUSEMOVE:      _event(mousemove,   self, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)); return 0;
     }
 

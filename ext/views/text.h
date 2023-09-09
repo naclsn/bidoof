@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 void text_init(void);
 void text_draw(char const* c, size_t l, int x, int y, float s);
 //void text_draw_u32(uint32_t const* c, size_t l, int x, int y, float s);
@@ -84,10 +86,11 @@ void text_allf8x8(void) {
 
     glBegin(GL_QUADS);
     {
+        float s = 2;
         glTexCoord2f(0, 0); glVertex2f(0, 0);
-        glTexCoord2f(0, _text_allf8x8_count); glVertex2f(0, _text_allf8x8_count*2);
-        glTexCoord2f(128, _text_allf8x8_count); glVertex2f(128*2, _text_allf8x8_count*2);
-        glTexCoord2f(128, 0); glVertex2f(128*2, 0);
+        glTexCoord2f(0, _text_allf8x8_count); glVertex2f(0, _text_allf8x8_count*s);
+        glTexCoord2f(128, _text_allf8x8_count); glVertex2f(128*s, _text_allf8x8_count*s);
+        glTexCoord2f(128, 0); glVertex2f(128*s, 0);
     }
     glEnd();
 
