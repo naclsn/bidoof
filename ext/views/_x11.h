@@ -74,6 +74,7 @@ void frame_loop(Frame* self) {
             case Expose: {
                 int ww = xev.xexpose.width;
                 int hh = xev.xexpose.height;
+                glViewport(0, 0, ww, hh);
                 _event(resize, self, ww, hh);
                 self->width = ww;
                 self->height = hh;

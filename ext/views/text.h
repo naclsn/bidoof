@@ -99,8 +99,6 @@ void text_allf8x8(void) {
 }
 
 void text_draw(char const* c, size_t l, int x, int y, float s) {
-    (void)s;
-
     glMatrixMode(GL_TEXTURE);
     glLoadIdentity();
     glScalef(1.f/128, 1.f/_text_allf8x8_count, 1.f);
@@ -148,14 +146,14 @@ void text_draw(char const* c, size_t l, int x, int y, float s) {
             off = u;
         }
 
-        glTexCoord2f(off+0, k+0); glVertex2f(x + cx*s + 0, y + cy*s + 0);
-        glTexCoord2f(off+0, k+1); glVertex2f(x + cx*s + 0, y + cy*s + s);
-        glTexCoord2f(off+1, k+1); glVertex2f(x + cx*s + s, y + cy*s + s);
-        glTexCoord2f(off+1, k+0); glVertex2f(x + cx*s + s, y + cy*s + 0);
+        glTexCoord2f(off+0, k+0); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 0*s);
+        glTexCoord2f(off+0, k+1); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 8*s);
+        glTexCoord2f(off+1, k+1); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 8*s);
+        glTexCoord2f(off+1, k+0); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 0*s);
 
         switch (u) {
             case '\t': cx = ((cx/4) + 1)*4; break;
-            case '\n': cy++; break;
+            case '\n': cy--; break;
             case '\r': cx = 0; break;
             default: cx++;
         }
