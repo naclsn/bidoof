@@ -12,7 +12,7 @@ void render(Frame* f) {
     glClear(GL_COLOR_BUFFER_BIT);
 
     char const* const txt = "hi :>\r\nhow you?";
-    text_draw(txt, strlen(txt), 0, f->height-8*5.f, 5.f);
+    text_draw(txt, strlen(txt), 0, f->height-8*2.f, 2.f);
 }
 
 void resize(Frame* f, int w, int h) {

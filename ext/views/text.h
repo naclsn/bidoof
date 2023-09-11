@@ -170,4 +170,4 @@ void text_free(void) {
 }
 
 #undef _text_allf8x8_count
-#endif
+#endif // TEXT_IMPLEMENTATION

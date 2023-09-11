@@ -184,9 +184,19 @@ bool _lex(Pars* self) {
 
         case '\0':
             return false;
-    }
+    } // switch c
 
-    fail("unexpected character");
+    {
+        char msg[30];
+        memcpy(msg, "unexpected character 0x.. (.)", 30);
+        unsigned hi = (c & 0xf0) >> 4;
+        unsigned lo = (c & 0x0f) >> 0;
+        msg[23] = (9 < hi ? 'A'-10 : '0') + hi;
+        msg[24] = (9 < lo ? 'A'-10 : '0') + lo;
+        if (' ' < c && c <= '~') msg[27] = c;
+        else msg[25] = '\0';
+        fail(msg);
+    }
 #undef IN
 #undef AT
 }
