@@ -1,3 +1,22 @@
+/// A small `readline`-like with only '\b', in the most unhinged free-form C.
+/// ```c
+/// char* line;
+/// while (printf(">> "), line = line_read()) {
+///     printf("echo: '%s'\n", line);
+/// }
+/// line_free();
+/// ```
+/// To access the history use `line_hist`. For completion see `line_compgen`.
+///
+/// Make sure to only use LINE_IMPLEMENTATION once.
+///
+/// Maybe-interesting-note: as it only use `getchar` and `putchar` these can be
+/// re-`#defined` to another target; in that case you will also need to have
+/// ```c
+/// #define tcsetattr(...) 0
+/// #define tcgetattr(...) 0
+/// ```
+
 #include <stdlib.h>
 
 char* line_read(void);
@@ -6,7 +25,7 @@ void line_free(void);
 
 // `words` should return a NULL-terminated list of completions insertable as-is
 // `clean` can be NULL, otherwise it is called with the result afterward
-void line_compgen(char const* const* (*words)(char const* line, size_t point), void (*clean)(char const* const* words));
+void line_compgen(char const* const* (*words)(char* line, size_t point), void (*clean)(char const* const* words));
 
 #ifdef LINE_IMPLEMENTATION
 #include <stdbool.h>
@@ -15,7 +34,7 @@ void line_compgen(char const* const* (*words)(char const* line, size_t point), v
 #include <termios.h>
 #include <unistd.h>
 
-static char const* const* (*_compgen_words)(char const* line, size_t point) = NULL;
+static char const* const* (*_compgen_words)(char* line, size_t point) = NULL;
 static void (*_compgen_clean)(char const* const* words) = NULL;
 
 static char* _hist_ls[128] = {0};
@@ -66,15 +85,15 @@ char* line_read(void) {
 
     struct termios term;
     if (tcgetattr(STDIN_FILENO, &term)) {
-        // TODO(whole block): untested
         static size_t const n = 64-12;
         s = calloc(n, 1);
         if (!s) return NULL;
         s[n-1] = ESC;
 
-        char c;
+        char c = getchar();
+        if (EOF == c) return NULL;
+
         while (true) {
-            c = getchar();
             if (EOF == c || '\n' == c) {
                 s['\r' == s[i-1] ? i-1 : i] = '\0';
                 break;
@@ -90,6 +109,7 @@ char* line_read(void) {
             }
 
             s[i++] = c;
+            c = getchar();
         } // while true - breaks on eof/eol and alloc fails
 
         return free(_hist_ls[0]), _hist_ls[0] = s;
@@ -397,7 +417,7 @@ void line_free(void) {
     for (size_t k = 0; k < _hist_ln; k++) _hist_ls[k] = (free(_hist_ls[k]), NULL);
 }
 
-void line_compgen(char const* const* (*words)(char const* line, size_t point), void (*clean)(char const* const* words)) {
+void line_compgen(char const* const* (*words)(char* line, size_t point), void (*clean)(char const* const* words)) {
     _compgen_words = words;
     _compgen_clean = clean;
 }
