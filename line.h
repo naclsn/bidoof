@@ -15,21 +15,6 @@ void line_compgen(char const* const* (*words)(char const* line, size_t point), v
 #include <termios.h>
 #include <unistd.h>
 
-static inline bool setraw(struct termios* pst) {
-    if (tcgetattr(STDIN_FILENO, pst)) return false;
-    struct termios raw = *pst;
-    raw.c_iflag&=~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
-    raw.c_oflag&=~(OPOST);
-    raw.c_lflag&=~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-    raw.c_cflag&=~(CSIZE | PARENB);
-    raw.c_cflag|= (CS8);
-    return 0 == tcsetattr(STDIN_FILENO, TCSANOW, &raw);
-}
-
-static inline void rstraw(struct termios* pst) {
-    tcsetattr(STDIN_FILENO, TCSANOW, pst);
-}
-
 static char const* const* (*_compgen_words)(char const* line, size_t point) = NULL;
 static void (*_compgen_clean)(char const* const* words) = NULL;
 
@@ -76,20 +61,57 @@ static size_t _hist_at = 0;
     } while (false)
 
 char* line_read(void) {
-    struct termios t;
-    if (!setraw(&t)) {
-        puts("NIY: pipe input not handled");
-        return NULL;
-    }
-
     char* s;
     size_t i = 0;
+
+    struct termios term;
+    if (tcgetattr(STDIN_FILENO, &term)) {
+        // TODO(whole block): untested
+        static size_t const n = 64-12;
+        s = calloc(n, 1);
+        if (!s) return NULL;
+        s[n-1] = ESC;
+
+        char c;
+        while (true) {
+            c = getchar();
+            if (EOF == c || '\n' == c) {
+                s['\r' == s[i-1] ? i-1 : i] = '\0';
+                break;
+            }
+
+            if (ESC == s[i]) {
+                size_t n = (i+1)*2+12;
+                char* w = realloc(s, n);
+                if (!w) break;
+                s = w;
+                memset(s+i+1, '\0', n-i-2);
+                s[n-1] = ESC;
+            }
+
+            s[i++] = c;
+        } // while true - breaks on eof/eol and alloc fails
+
+        return free(_hist_ls[0]), _hist_ls[0] = s;
+    } // if not tty
+
+    {
+        struct termios raw = term;
+        raw.c_iflag&=~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+        raw.c_oflag&=~(OPOST);
+        raw.c_lflag&=~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+        raw.c_cflag&=~(CSIZE | PARENB);
+        raw.c_cflag|= (CS8);
+        tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    }
 
     if (_hist_at) for (s = _hist_ls[_hist_at]; s[i]; i++) putchar(s[i]);
     else if (!_hist_ls[0] || _hist_ls[0][0]) {
         memmove(_hist_ls+1, _hist_ls, (_hist_ln-1)*sizeof(char*));
-        _hist_ls[0] = s = calloc(64, 1);
-        s[63] = ESC;
+        static size_t const n = 64-12;
+        _hist_ls[0] = s = calloc(n, 1);
+        if (!s) goto done;
+        s[n-1] = ESC;
     } else s = _hist_ls[0];
 
     bool reprocess = false;
@@ -212,7 +234,7 @@ char* line_read(void) {
                         size_t k = 0, j = 0;
                         reprocess = true;
                         while (true) {
-                            // TODO: remove previous (from i to i+j), insert words[k] at i
+                            // TODO: remove previous (from i to i+j), insert words[k] at i, realloc as needed
                             for (j = 0; words[k][j]; j++) putchar(words[k][j]);
                             if (CTRL('I') != (c = getchar())) break;
                             if (!words[++k]) k = 0;
@@ -340,7 +362,6 @@ char* line_read(void) {
 
             default:
                 if (' ' <= c && c <= '~') {
-                    // TODO: realloc and such
                     char p = s[i];
                     putchar(s[i++] = c);
                     size_t k = i;
@@ -349,6 +370,13 @@ char* line_read(void) {
                         putchar(s[k++] = p);
                         p = w;
                     }
+                    if (ESC == s[k]) {
+                        size_t n = (k+1)*2+12;
+                        if (!(s = realloc(s, n))) goto done;
+                        _hist_ls[_hist_at] = s;
+                        memset(s+k+1, '\0', n-k-2);
+                        s[n-1] = ESC;
+                    }
                     s[k] = p;
                     for (; k != i; k--) putchar('\b');
                 }
@@ -356,7 +384,7 @@ char* line_read(void) {
     } // while true
 
 done:
-    rstraw(&t);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);
     return s;
 }
 
