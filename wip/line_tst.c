@@ -5,18 +5,19 @@
 #include "../line.h"
 
 char const* const words[] = {
-    "history",
-    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-    "ten",
-    "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
-    "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
-    "hundred",
+    "history ",
+    "one ", "two ", "three ", "four ", "five ", "six ", "seven ", "eight ", "nine ",
+    "ten ",
+    "eleven ", "twelve ", "thirteen ", "fourteen ", "fifteen ", "sixteen ", "seventeen ", "eighteen ", "nineteen ",
+    "twenty ", "thirty ", "forty ", "fifty ", "sixty ", "seventy ", "eighty ", "ninety ",
+    "hundred ",
 };
 #define words_count  (sizeof(words)/sizeof(words[0]))
 
 char const* const* my_compgen(char* line, size_t point) {
     char* pfx = line+point-1;
     while ('a' <= *pfx && *pfx <= 'z' && line < pfx) pfx--;
+    if (*pfx < 'a' || 'z' < *pfx) pfx++;
     size_t pfx_len = *pfx ? line+point-pfx : 0;
 
     static char const* ret[words_count+1];

@@ -11,13 +11,15 @@
 /// Make sure to only use LINE_IMPLEMENTATION once.
 ///
 /// Maybe-interesting-note: as it only use `getchar` and `putchar` these can be
-/// re-`#defined` to another target; in that case you will also need to have
+/// (re-)`#defined` to another target; in that case you will also need to have
 /// ```c
-/// #define tcsetattr(...) 0
 /// #define tcgetattr(...) 0
+/// #define tcsetattr(...) 0
 /// ```
 
+#if !defined(getchar) || !defined(putchar)
 #include <stdlib.h>
+#endif
 
 char* line_read(void);
 char** line_hist(size_t* count);
@@ -146,6 +148,15 @@ char* line_read(void) {
                         WORD_BKW(putchar('\b'));
                         break;
 
+                    case 'c':
+                        if (s[i]) {
+                            bool done = false;
+                            WORD_FWD(putchar(IS_LETTER(s[i])
+                                ? s[i] = (!done ? done = true, s[i]&~32 : s[i]|32)
+                                : s[i]));
+                        }
+                        break;
+
                     case 'd':
                         if (s[i]) {
                             size_t j = i, k;
@@ -175,6 +186,40 @@ char* line_read(void) {
 
                     case 'l':
                         WORD_FWD(putchar(IS_LETTER(s[i]) ? s[i]|= 32 : s[i]));
+                        break;
+
+                    case 't':
+                        if (i) {
+                            size_t j = i, bst, ben, fst, fen;
+                            bool found = false;
+                            WORD_BKW(if (!found && IS_LETTER(s[i])) { found = true; ben = i+1; });
+                            bst = i;
+                            i = j;
+                            if (!found) break;
+                            found = false;
+                            WORD_FWD(if (!found && IS_LETTER(s[i])) { found = true; fst = i; });
+                            fen = i;
+                            if (!found) {
+                                fst = bst;
+                                fen = ben;
+                                i = bst;
+                                found = false;
+                                WORD_BKW(if (!found && IS_LETTER(s[i])) { found = true; ben = i+1; });
+                                bst = i;
+                                i = j;
+                                if (!found) break;
+                            }
+                            i = j;
+                            size_t len = strlen(s);
+                            char* cpy = malloc(len);
+                            if (!cpy) break;
+                            memcpy(cpy, s, len);
+                            for (; i != bst; i--) putchar('\b');
+                            for (size_t k = fst; k != fen; k++, i++) putchar(s[i] = cpy[k]);
+                            for (size_t k = ben; k != fst; k++, i++) putchar(s[i] = cpy[k]);
+                            for (size_t k = bst; k != ben; k++, i++) putchar(s[i] = cpy[k]);
+                            free(cpy);
+                        }
                         break;
 
                     case 'u':
@@ -250,16 +295,41 @@ char* line_read(void) {
             case CTRL('I'):
                 if (_compgen_words) {
                     char const* const* words = _compgen_words(s, i);
-                    if (words && words[0]) {
-                        size_t k = 0, j = 0;
+                    while (words && words[0]) {
+                        size_t k, j = 0;
+                        for (k = 0; words[k]; k++) {
+                            size_t l = strlen(words[k]);
+                            if (j < l) j = l;
+                        }
+                        for (k = i; ESC != s[k]; k++);
+                        size_t n = (k+1)+12;
+                        while (n < k+j) n*= 2;
+                        n-= 12;
+                        char* cpy = malloc(n);
+                        if (!cpy) break;
+                        memcpy(cpy, s, k);
+                        if (n-k-1) memset(cpy+k+1, '\0', n-k-2);
+                        cpy[n-1] = ESC;
+                        s = cpy;
+                        cpy = _hist_ls[_hist_at];
+                        _hist_ls[_hist_at] = s;
                         reprocess = true;
+                        k = 0;
+                        j = i;
                         while (true) {
-                            // TODO: remove previous (from i to i+j), insert words[k] at i, realloc as needed
-                            for (j = 0; words[k][j]; j++) putchar(words[k][j]);
+                            for (; j != i; i--) putchar('\b');
+                            for (; words[k][i-j]; i++) putchar(s[i] = words[k][i-j]);
+                            for (size_t l = 0; cpy[j+l]; l++, i++) putchar(s[i] = cpy[j+l]);
+                            size_t l = 0;
+                            for (; s[i+l]; l++) putchar(' ');
+                            for (; l; l--) putchar('\b');
+                            s[i] = '\0';
                             if (CTRL('I') != (c = getchar())) break;
                             if (!words[++k]) k = 0;
                         }
-                    }
+                        free(cpy);
+                        break;
+                    } // if words (while, so that it can break)
                     if (_compgen_clean) _compgen_clean(words);
                 }
                 break;
@@ -357,6 +427,16 @@ char* line_read(void) {
                     for (; k != i; k--) putchar('\b');
                 }
                 break; // case ^R/^S
+
+            case CTRL('T'):
+                if (i) {
+                    if (!s[i]) i--, putchar('\b');
+                    putchar('\b');
+                    char p = s[i-1];
+                    putchar(s[i-1] = s[i]);
+                    putchar(s[i++] = p);
+                }
+                break;
 
             case CTRL('U'):
                 if (i) {
