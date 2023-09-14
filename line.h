@@ -335,8 +335,8 @@ char* line_read(void) {
                                 z = z || !s[i+l];
                                 putchar(s[i+l] = cpy[j+l]);
                             }
+                            if (!z) for (; s[i+l]; l++) putchar(' ');
                             s[i+l] = '\0';
-                            if (z) for (; s[i+l]; l++) putchar(' ');
                             for (; l; l--) putchar('\b');
                             if (CTRL('I') != (c = getchar())) break;
                             if (!words[++k]) k = 0;
