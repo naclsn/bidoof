@@ -1,12 +1,26 @@
 #include "../helper.h"
 
 export_names
+    //( "At"
+    //, "Bind"
     ( "Count"
+    //, "Decode"
     , "Delim"
+    //, "Encode"
+    //, "Fold"
+    //, "Id"
     , "Join"
     , "Len"
+    //, "Map"
     , "Range"
+    , "Read"
     , "Rect"
+    //, "Repeat"
+    , "Reverse"
+    , "Slice"
+    , "Split"
+    , "Write"
+    //, "Zip"
     );
 
 ctor_simple(2, Count
@@ -145,6 +159,35 @@ bool _Range1(Lst* self, Num const* const end) {
     return _Range2(self, &(Num){0}, end);
 }
 
+ctor_simple(1, Read
+        , "read a file into a buffer"
+        , (1, BUF, _Read, BUF, file)
+        );
+bool _Read(Buf* self, Buf const* const file) {
+    if (destroyed(self)) {
+        free(self->ptr);
+        self->ptr = NULL;
+        self->len = 0;
+        return true;
+    }
+    char filez[256] = {0};
+    memcpy(filez, file->ptr, file->len < 255 ? file->len : 255);
+    FILE *f = fopen(filez, "rb");
+    if (!f) return false;
+    fseek(f, 0, SEEK_END);
+    self->len = ftell(f);
+    if (!self->len) {
+        fclose(f);
+        return true;
+    }
+    fseek(f, 0, SEEK_SET);
+    self->ptr = malloc(self->len);
+    if (!self->ptr) self->len = 0;
+    else fread(self->ptr, self->len, 1, f);
+    fclose(f);
+    return !!self->ptr;
+}
+
 ctor_simple(2, Rect
         , "slices at regular interval into a list of same-size buffers with optional padding"
         , (3, LST, _Rect3, BUF, under, NUM, item_len, NUM, item_pad)
@@ -178,32 +221,83 @@ bool _Rect2(Lst* self, Buf const* const under, Num const* const item_len) {
     return _Rect3(self, under, item_len, &(Num){0});
 }
 
-#if 0
-simple_ctor(LST, Map, 1, (2, FUN, LST)) {
-    (void)self;
-    puts("NIY: Map");
+//ctor_simple(1, Repeat
+//        , "repeat its argument"
+//        , (2, LST, _Repeat, ANY, one, NUM, count)
+//        );
+//bool _Repeat(Lst* self, Obj const* const one, Num const* const count) {
+//    return false;
+//}
+
+ctor_simple(2, Reverse,
+        , "reverse a list or a buffer"
+        , (2, BUF, _ReverseB, BUF, under)
+        , (2, LST, _ReverseL, LST, under)
+        );
+bool _ReverseB(Buf* self, Buf const* const under) {
+    if (destroyed(self)) {
+        free(self->ptr);
+        self->ptr = NULL;
+        self->len = 0;
+        return true;
+    }
+    u8* ptr = realloc(self->ptr, under->len);
+    if (!ptr) return false;
+    for (sz k = 0; k < under->len; k++) self->ptr[k] = under->ptr[under->len-1 - k];
+    self->ptr = ptr;
+    self->len = under->len;
+    return true;
+}
+bool _ReverseL(Lst* self, Lst const* const under) {
     return false;
 }
 
-simple_ctor(BUF, Reverse, 1, (1, BUF)) {
-    if (!self->update) {
-        free(self->as.buf.ptr);
-        self->as.buf.ptr = NULL;
-        self->as.buf.len = 0;
-        return true;
-    }
-
-    bind_arg(0, Buf, under);
-
-    self->as.buf.ptr = realloc(self->as.buf.ptr, under->len);
-    if (!self->as.buf.ptr) return false;
-
-    for (sz k = 0; k < under->len; k++)
-        self->as.buf.ptr[k] = under->ptr[under->len-1 - k];
-
-    self->as.buf.len = under->len;
+ctor_simple(3, Slice
+        , "[begin:end], defaults are begin=0 and end=length; either can be negative"
+        , (3, BUF, _Slice3, BUF, under, NUM, begin, NUM, end)
+        , (2, BUF, _Slice2, BUF, under, NUM, begin)
+        , (1, BUF, _Slice1, BUF, under)
+        );
+bool _Slice3(Buf* self, Buf const* const under, Num const* const begin, Num const* const end) {
+    sz pbegin = (begin->val < 0 ? under->len : 0) + begin->val;
+    sz pend = (end->val < 0 ? under->len : 0) + end->val;
+    if (pbegin < 0 || under->len <= pbegin) return false;
+    if (pend < 0 || under->len <= pend) return false;
+    self->ptr = under->ptr + pbegin;
+    self->len = pend - pbegin;
     return true;
 }
+bool _Slice2(Buf* self, Buf const* const under, Num const* const begin) {
+    return _Slice3(self, under, begin, &(Num){.val= under->len-1});
+}
+bool _Slice1(Buf* self, Buf const* const under) {
+    return _Slice2(self, under, &(Num){0});
+}
 
-export_names("Map", "Delim", "Reverse");
-#endif
+ctor_simple(2, Slice,
+        , "split on separator (exclusive) - default delimiter is \"\" (empty)"
+        , (2, BUF, _Slice2, BUF, buffer, BUF sep)
+        , (1, BUF, _Slice1, BUF, buffer)
+        );
+bool _Slice2(Buf* self, Buf const* const buffer, Buf const* const sep) {
+    // TODO
+    notify("NIY: Buf Slice(Buf, Buf)");
+    return false;
+}
+bool _Slice1(Buf* self, Buf const* const buffer) {
+    return _Slice2(self, buffer, &(Buf){0});
+}
+
+ctor_simple(1, Write
+        , "write a buffer into a file (function is transparent)"
+        , (2, BUF, _Write, BUF, file, BUF, content)
+        );
+bool _Write(Buf* self, Buf const* const file, Buf const* const content) {
+    char filez[256] = {0};
+    memcpy(filez, file->ptr, file->len < 255 ? file->len : 255);
+    FILE *f = fopen(filez, "wb");
+    if (!f) return false;
+    fwrite(self->ptr = content->ptr, self->len = content->len, 1, f);
+    fclose(f);
+    return true;
+}
