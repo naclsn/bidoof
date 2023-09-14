@@ -30,12 +30,12 @@ char* line_read(void);
 // this is a direct access to the history (careful with editing it)
 char** line_histget(size_t* count);
 // `lines` is NULL terminated; these are copied using the default allocator
-void line_histset(char const* const* lines, size_t count);
+void line_histset(char** lines, size_t count);
 // always call this after at least one `line_read`
 void line_free(void);
 // `words` should return a NULL-terminated list of completions insertable as-is
 // `clean` can be NULL, otherwise it is called with the result afterward
-void line_compgen(char const* const* (*words)(char* line, size_t point), void (*clean)(char const* const* words));
+void line_compgen(char** (*words)(char* line, size_t point), void (*clean)(char** words));
 
 #ifdef LINE_IMPLEMENTATION
 #include <stdbool.h>
@@ -44,8 +44,8 @@ void line_compgen(char const* const* (*words)(char* line, size_t point), void (*
 #include <termios.h>
 #include <unistd.h>
 
-static char const* const* (*_compgen_words)(char* line, size_t point) = NULL;
-static void (*_compgen_clean)(char const* const* words) = NULL;
+static char** (*_compgen_words)(char* line, size_t point) = NULL;
+static void (*_compgen_clean)(char** words) = NULL;
 
 #ifndef _hist_ln
 #define _hist_ln (128)
@@ -304,7 +304,7 @@ char* line_read(void) {
 
             case CTRL('I'):
                 if (_compgen_words) {
-                    char const* const* words = _compgen_words(s, i);
+                    char** words = _compgen_words(s, i);
                     while (words && words[0]) {
                         size_t k, j = 0;
                         for (k = 0; words[k]; k++) {
@@ -507,7 +507,7 @@ char** line_histget(size_t* count) {
     return _hist_ls[0] && !_hist_ls[0][0] ? (*count)--, _hist_ls+1 : _hist_ls;
 }
 
-void line_histset(char const* const* lines, size_t count) {
+void line_histset(char** lines, size_t count) {
     line_free();
     if (lines && count) for (size_t k = 0; count && k < _hist_ln; count--, k++) {
         size_t l = strlen(lines[k]), n = 64;
@@ -523,7 +523,7 @@ void line_free(void) {
     for (size_t k = _hist_at = 0; k < _hist_ln; k++) _hist_ls[k] = (free(_hist_ls[k]), NULL);
 }
 
-void line_compgen(char const* const* (*words)(char* line, size_t point), void (*clean)(char const* const* words)) {
+void line_compgen(char** (*words)(char* line, size_t point), void (*clean)(char** words)) {
     _compgen_words = words;
     _compgen_clean = clean;
 }

@@ -1,6 +1,9 @@
 #include "exts.h"
 #include "lang.h"
 
+#define LINE_IMPLEMENTATION
+#include "line.h"
+
 #include <unistd.h> // YYY(temp): sleep
 
 #ifndef EXTS_NAMES
@@ -50,21 +53,54 @@ int parse_args(char* prog, int argc, char** argv) {
     return 0;
 }
 
+static Scope repl_scope = {0};
+
+char** compgen_words(char* line, size_t point) {
+    size_t len = 0;
+    char c;
+    while (point && ( '_' == (c = line[point-1-len])
+            || ('0' <= c && c <= '9')
+            || ('A' <= c && c <= 'Z')
+            || ('a' <= c && c <= 'z')
+            )) len++;
+    char* ptr = line+point-len;
+    while (len && '0' <= *ptr && *ptr <= '9') len--, ptr++;
+
+    Scope* search_in = !len || ('A' <= *ptr && *ptr <= 'Z')
+        ? &exts_scope
+        : &repl_scope
+        ;
+
+    char** r = calloc(search_in->count, sizeof(char*) + 1);
+    if (r) {
+        sz head = 0;
+        for (sz k = 0; k < search_in->count; k++) {
+            Sym* it = &search_in->items[k].key;
+            if (0 == memcmp(it->txt, ptr, len)) r[head++] = it->txt+len;
+        }
+        r[head] = NULL;
+    }
+    return r;
+}
+
+void compgen_clean(char** words) {
+    free(words);
+}
+
 void repl(void) {
-    Scope scope = {0};
+    line_compgen(compgen_words, compgen_clean);
 
-    char line[256];
-
-    while (printf(">> "), fgets(line, 256, stdin)) {
+    char* line;
+    while (printf(">> "), line = line_read()) {
         if ('?' == line[0]) {
             switch (line[1]) {
-                case '\n':
-                    scope_show(&scope);
+                case '\0':
+                    scope_show(&repl_scope);
                     break;
 
                 case '?':
                     switch (line[2]) {
-                        case '\n':
+                        case '\0':
                             scope_show(&exts_scope);
                             break;
 
@@ -72,7 +108,6 @@ void repl(void) {
                             {
                                 static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [FLT]= "Flt", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym"};
 
-                                line[strlen(line+2)+1] = '\0';
                                 Meta* meta = exts_lookup(mksym(line+2));
                                 if (!meta) {
                                     puts("(null)");
@@ -95,8 +130,7 @@ void repl(void) {
                     break;
 
                 case '%': {
-                    line[strlen(line+2)+1] = '\0';
-                    Obj const* it = scope_get(&scope, mksym(line+2));
+                    Obj const* it = scope_get(&repl_scope, mksym(line+2));
                     if (it) switch (it->ty) {
                         case BUF: printf("\"%.*s\"\n", (int)it->as.buf.len, it->as.buf.ptr); break;
                         case NUM: printf("%ld\n", it->as.num.val); break;
@@ -107,15 +141,14 @@ void repl(void) {
                 } break;
 
                 default:
-                    line[strlen(line+1)] = '\0';
-                    obj_show(scope_get(&scope, mksym(line+1)), 0);
+                    obj_show(scope_get(&repl_scope, mksym(line+1)), 0);
             }
         } // if '?'
 
         else if ('.' == line[0]) {
-            if (0 == strcmp(".exit\n", line) || 0 == strcmp(".quit\n", line))
+            if (0 == strcmp(".exit", line) || 0 == strcmp(".quit", line))
                 break;
-            if (0 == strcmp(".help\n", line))
+            if (0 == strcmp(".help", line))
                 puts(
                     "cli commands:\n"
                     "  ?[name]\n"
@@ -135,13 +168,14 @@ void repl(void) {
             }
         } // if '.'
 
-        else if (!lang_process("<repl_line>", line, &scope)) {
+        else if (!lang_process("<repl_line>", line, &repl_scope)) {
             printf("\n");
         }
-    } // while ">> " fgets
+    } // while ">> " line_read
 
-    scope_show(&scope);
-    scope_clear(&scope);
+    line_free();
+    scope_show(&repl_scope);
+    scope_clear(&repl_scope);
 }
 
 int main(int argc, char** argv) {
