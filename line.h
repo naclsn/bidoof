@@ -319,11 +319,15 @@ char* line_read(void) {
                         while (true) {
                             for (; j != i; i--) putchar('\b');
                             for (; words[k][i-j]; i++) putchar(s[i] = words[k][i-j]);
-                            for (size_t l = 0; cpy[j+l]; l++, i++) putchar(s[i] = cpy[j+l]);
                             size_t l = 0;
-                            for (; s[i+l]; l++) putchar(' ');
+                            bool z = false;
+                            for (; cpy[j+l]; l++) {
+                                z = z || !s[i+l];
+                                putchar(s[i+l] = cpy[j+l]);
+                            }
+                            s[i+l] = '\0';
+                            if (z) for (; s[i+l]; l++) putchar(' ');
                             for (; l; l--) putchar('\b');
-                            s[i] = '\0';
                             if (CTRL('I') != (c = getchar())) break;
                             if (!words[++k]) k = 0;
                         }
