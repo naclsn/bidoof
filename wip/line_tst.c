@@ -32,16 +32,18 @@ char const* const* my_compgen(char* line, size_t point) {
     return ret;
 }
 
-int main(void) {
+int main(int argc, char const* const* argv) {
+    argc--, argv++;
     puts("hi :3");
 
+    line_histset(argv, argc);
     line_compgen(my_compgen, NULL);
     char* line;
     while (printf(">> "), line = line_read()) {
-        if (0 == strcmp("history", line)) {
+        if (0 == memcmp("history", line, 7)) {
             size_t o;
-            char** h = line_hist(&o);
-            for (o-- ;o; --o)
+            char** h = line_histget(&o);
+            if (o) for (o-- ;o; --o)
                 printf(" %3zu %s\n", o, h[o]);
         } else printf("echo: '%s'\n", line);
     }
