@@ -153,6 +153,7 @@ void repl(void) {
         else if ('.' == line[0]) {
             if (0 == strcmp(".exit", line) || 0 == strcmp(".quit", line))
                 break;
+
             if (0 == strcmp(".help", line))
                 puts(
                     "cli commands:\n"
@@ -163,19 +164,36 @@ void repl(void) {
                     "  .quit\n"
                     "  .help\n"
                     "  .sleep[sec]\n"
+                    "  .source <file>\n"
                 );
-            if (0 == memcmp(".sleep", line, 6)) {
+
+            else if (0 == memcmp(".sleep", line, 6)) {
                 unsigned int sec = 0;
                 char const* a = line+6;
                 for (; ' ' == *a || '\t' == *a; ++a);
                 for (; '0' <= *a && *a <= '9'; ++a) sec = sec*10 + (*a & 0xf);
                 sleep(sec);
             }
+
+            else if (0 == memcmp(".source ", line, 8)) {
+                char* filename = line+8;
+                FILE *f = fopen(filename, "rb");
+                if (!f) continue;
+                fseek(f, 0, SEEK_END);
+                size_t len = ftell(f);
+                char* script = NULL;
+                if (len) {
+                    fseek(f, 0, SEEK_SET);
+                    script = malloc(len);
+                    if (script) fread(script, len, 1, f);
+                }
+                fclose(f);
+                if (script) lang_process(filename, script, &repl_scope);
+                else printf("could not read file '%s'\n", filename);
+            }
         } // if '.'
 
-        else if (!lang_process("<repl_line>", line, &repl_scope)) {
-            printf("\n");
-        }
+        else lang_process("<repl_line>", line, &repl_scope);
     } // while ">> " line_read
 
     line_free();

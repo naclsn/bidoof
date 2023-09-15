@@ -1,0 +1,19 @@
+a = "coucou"
+b = "u"
+
+# this fails with notice "NIY"
+c = Split a b # expected: no c in scope
+
+c = Delim a b # expected: c is "co"
+
+# -end-
+
+# observed when typed out at the repl:
+#    b is an invalid object likely
+#    to cause a segv or show unknown
+# observed when `.source`d:
+#    only a exists afterward
+#    (because the second `c =` isn't reached)
+# so maybe b is freed early when Split fails
+# when the declaration order for a and b are
+# swapped a becomes invalid
