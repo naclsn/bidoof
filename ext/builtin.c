@@ -229,10 +229,10 @@ bool _Rect2(Lst* self, Buf const* const under, Num const* const item_len) {
 //    return false;
 //}
 
-ctor_simple(2, Reverse,
+ctor_simple(2, Reverse
         , "reverse a list or a buffer"
-        , (2, BUF, _ReverseB, BUF, under)
-        , (2, LST, _ReverseL, LST, under)
+        , (1, BUF, _ReverseB, BUF, under)
+        , (1, LST, _ReverseL, LST, under)
         );
 bool _ReverseB(Buf* self, Buf const* const under) {
     if (destroyed(self)) {
@@ -249,6 +249,10 @@ bool _ReverseB(Buf* self, Buf const* const under) {
     return true;
 }
 bool _ReverseL(Lst* self, Lst const* const under) {
+    (void)self;
+    (void)under;
+    // TODO
+    notify("NIY: Lst Reverse(Lst)");
     return false;
 }
 
@@ -259,10 +263,22 @@ ctor_simple(3, Slice
         , (1, BUF, _Slice1, BUF, under)
         );
 bool _Slice3(Buf* self, Buf const* const under, Num const* const begin, Num const* const end) {
-    sz pbegin = (begin->val < 0 ? under->len : 0) + begin->val;
-    sz pend = (end->val < 0 ? under->len : 0) + end->val;
-    if (pbegin < 0 || under->len <= pbegin) return false;
-    if (pend < 0 || under->len <= pend) return false;
+    sz pbegin, pend;
+    if (begin->val < 0) {
+        if (under->len < (sz)-begin->val) return false;
+        pbegin = under->len + begin->val;
+    } else {
+        if (under->len <= (sz)begin->val) return false;
+        pbegin = begin->val;
+    }
+    if (end->val < 0) {
+        if (under->len < (sz)-end->val) return false;
+        pend = under->len + end->val;
+    } else {
+        if (under->len <= (sz)end->val) return false;
+        pend = end->val;
+    }
+    if (pend < pbegin) return false;
     self->ptr = under->ptr + pbegin;
     self->len = pend - pbegin;
     return true;
@@ -274,18 +290,21 @@ bool _Slice1(Buf* self, Buf const* const under) {
     return _Slice2(self, under, &(Num){0});
 }
 
-ctor_simple(2, Slice,
+ctor_simple(2, Split
         , "split on separator (exclusive) - default delimiter is \"\" (empty)"
-        , (2, BUF, _Slice2, BUF, buffer, BUF sep)
-        , (1, BUF, _Slice1, BUF, buffer)
+        , (2, BUF, _Split2, BUF, buffer, BUF, sep)
+        , (1, BUF, _Split1, BUF, buffer)
         );
-bool _Slice2(Buf* self, Buf const* const buffer, Buf const* const sep) {
+bool _Split2(Buf* self, Buf const* const buffer, Buf const* const sep) {
+    (void)self;
+    (void)buffer;
+    (void)sep;
     // TODO
-    notify("NIY: Buf Slice(Buf, Buf)");
+    notify("NIY: Buf Split(Buf, Buf)");
     return false;
 }
-bool _Slice1(Buf* self, Buf const* const buffer) {
-    return _Slice2(self, buffer, &(Buf){0});
+bool _Split1(Buf* self, Buf const* const buffer) {
+    return _Split2(self, buffer, &(Buf){0});
 }
 
 ctor_simple(1, Write

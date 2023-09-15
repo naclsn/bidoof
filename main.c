@@ -76,10 +76,15 @@ char** compgen_words(char* line, size_t point) {
         sz head = 0;
         for (sz k = 0; k < search_in->count; k++) {
             Sym* it = &search_in->items[k].key;
-            if (0 == memcmp(it->txt, ptr, len)) r[head++] = it->txt+len;
-        }
-        r[head] = NULL;
-    }
+            if (0 == memcmp(it->txt, ptr, len)) {
+                char* word = malloc(20);
+                if (!word) return r;
+                memcpy(word, it->txt+len, 16);
+                strcat(word, " ");
+                r[head++] = word;
+            } // if matches
+        } // for names is scope
+    } // if r
     return r;
 }
 
