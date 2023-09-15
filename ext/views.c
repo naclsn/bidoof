@@ -10,6 +10,11 @@
 
 export_names("ViewTxt");
 
+static bool _frame_ok_st;
+static bool _frame_ok_ok;
+static pthread_mutex_t _frame_ok_mx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t _frame_ok_cv = PTHREAD_COND_INITIALIZER;
+
 ctor_w_also(1, ViewTxt, _ViewTxt_once
         , "view and edit buffer as text"
         , (1, BUF, _ViewTxt, BUF, txt)
@@ -46,8 +51,18 @@ void myframe_destroy(Frame* self) {
 
 void* _ViewTxt_thread(Frame* frame) {
     pthread_cleanup_push((void(*)(void*))myframe_destroy, frame);
-    if (frame_create(frame)) frame_loop(frame);
+        _frame_ok_st = frame_create(frame);
+        if (_frame_ok_st) {
+            _frame_ok_ok = true;
+            pthread_cond_signal(&_frame_ok_cv);
+            frame_loop(frame);
+        } else goto failed;
     pthread_cleanup_pop(true);
+    return NULL;
+
+failed:
+    _frame_ok_ok = true;
+    pthread_cond_signal(&_frame_ok_cv);
     return NULL;
 }
 
@@ -65,9 +80,15 @@ bool _ViewTxt_once(Obj* fun, Obj* res) {
 
     puts("== creating frame in background thread");
 
-    // TODO: should also listen for any failure from `frame_create`
-    return 0 == pthread_create(&st->thread, NULL, (void*(*)(void*))_ViewTxt_thread, &st->frame)
-        || 0 == pthread_detach(st->thread);
+    if (pthread_create(&st->thread, NULL, (void*(*)(void*))_ViewTxt_thread, &st->frame)
+            || pthread_detach(st->thread)) return false;
+
+    _frame_ok_ok = false;
+    pthread_mutex_lock(&_frame_ok_mx);
+    while (!_frame_ok_ok) pthread_cond_wait(&_frame_ok_cv, &_frame_ok_mx);
+    pthread_mutex_unlock(&_frame_ok_mx);
+
+    return _frame_ok_st;
 }
 
 bool _ViewTxt(Buf* self, Buf const* const txt) {
