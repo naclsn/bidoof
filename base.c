@@ -119,17 +119,13 @@ bool obj_remdep(Obj* self, Obj* dep) {
     struct Depnt* prev = dep->depnts;
     for (struct Depnt* cur = prev; cur; prev = cur, cur = cur->next) {
         if (self == cur->obj) {
-            if (prev != cur)
+            if (prev == cur)
                 dep->depnts = cur->next;
             else
                 prev->next = cur->next;
-
-            cur->next = NULL;
-            cur->obj = NULL;
             free(cur);
 
             dep->keepalive--;
-
             return true;
         }
     }
@@ -147,7 +143,7 @@ void obj_destroy(Obj* self) {
     // then delete dep if it has no depnts anymore
     for (sz k = 0; k < self->argc; k++) {
         Obj* dep = self->argv[k];
-        if (obj_remdep(self, self->argv[k]) && 0 == dep->keepalive)
+        if (obj_remdep(self, dep) && 0 == dep->keepalive)
             obj_destroy(dep);
     }
 

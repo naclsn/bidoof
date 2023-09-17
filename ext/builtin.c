@@ -86,12 +86,12 @@ bool _Join2(Buf* self, Lst const* const list, Buf const* const sep) {
     }
     sz total = 0;
     for (sz k = 0; k < list->len; k++) {
-        if (BUF != list->ptr[k]->ty) return false;
+        if (BUF != list->ptr[k]->ty) failf(44, "item at %zu isn't a buffer", k);
         if (k) total+= sep->len;
         total+= list->ptr[k]->as.buf.len;
     }
     u8* ptr = realloc(self->ptr, total);
-    if (!ptr) return false;
+    if (!ptr) fail("OOM");
     sz offset = 0;
     for (sz k = 0; k < list->len; k++) {
         if (k) {
@@ -140,7 +140,11 @@ bool _Range3(Lst* self, Num const* const start, Num const* const end, Num const*
     sz len = (end->val - start->val) / step->val;
     Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
     Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
-    if (!arr || !ptr) return free(arr), free(ptr), false;
+    if (!arr || !ptr) {
+        free(arr);
+        free(ptr);
+        fail("OOM");
+    }
     for (sz k = 0, n = start->val; k < len; n+= step->val, k++) {
         memset(arr+k, 0, sizeof(Obj));
         arr[k].ty = NUM;
@@ -173,7 +177,7 @@ bool _Read(Buf* self, Buf const* const file) {
     char filez[256] = {0};
     memcpy(filez, file->ptr, file->len < 255 ? file->len : 255);
     FILE *f = fopen(filez, "rb");
-    if (!f) return false;
+    if (!f) failf(32+strlen(filez), "cannot open file '%s' for reading", filez);
     fseek(f, 0, SEEK_END);
     self->len = ftell(f);
     if (!self->len) {
@@ -205,7 +209,11 @@ bool _Rect3(Lst* self, Buf const* const under, Num const* const item_len, Num co
     sz len = under->len / w;
     Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
     Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
-    if (!arr || !ptr) return free(arr), free(ptr), false;
+    if (!arr || !ptr) {
+        free(arr);
+        free(ptr);
+        fail("OOM");
+    }
     for (sz k = 0; k < len; k++) {
         memset(arr+k, 0, sizeof(Obj));
         arr[k].ty = BUF;
@@ -242,18 +250,17 @@ bool _ReverseB(Buf* self, Buf const* const under) {
         return true;
     }
     u8* ptr = realloc(self->ptr, under->len);
-    if (!ptr) return false;
+    if (!ptr) fail("OOM");
     for (sz k = 0; k < under->len; k++) self->ptr[k] = under->ptr[under->len-1 - k];
     self->ptr = ptr;
     self->len = under->len;
     return true;
 }
 bool _ReverseL(Lst* self, Lst const* const under) {
-    (void)self;
     (void)under;
     // TODO
-    notify("NIY: Lst Reverse(Lst)");
-    return false;
+    if (destroyed(self)) return true;
+    fail("NIY: Lst Reverse(Lst)");
 }
 
 ctor_simple(3, Slice
@@ -265,20 +272,20 @@ ctor_simple(3, Slice
 bool _Slice3(Buf* self, Buf const* const under, Num const* const begin, Num const* const end) {
     sz pbegin, pend;
     if (begin->val < 0) {
-        if (under->len < (sz)-begin->val) return false;
+        if (under->len < (sz)-begin->val) failf(64, "slice begin (%zu) outside buffer (%zu)", begin->val, under->len);
         pbegin = under->len + begin->val;
     } else {
-        if (under->len <= (sz)begin->val) return false;
+        if (under->len <= (sz)begin->val) failf(64, "slice begin (%zu) outside buffer (%zu)", begin->val, under->len);
         pbegin = begin->val;
     }
     if (end->val < 0) {
-        if (under->len < (sz)-end->val) return false;
+        if (under->len < (sz)-end->val) failf(64, "slice end (%zu) outside buffer (%zu)", end->val, under->len);
         pend = under->len + end->val;
     } else {
-        if (under->len <= (sz)end->val) return false;
+        if (under->len <= (sz)end->val) failf(64, "slice end (%zu) outside buffer (%zu)", end->val, under->len);
         pend = end->val;
     }
-    if (pend < pbegin) return false;
+    if (pend < pbegin) failf(75, "slice length would be negative [%zu:%zu]", pbegin, pend);
     self->ptr = under->ptr + pbegin;
     self->len = pend - pbegin;
     return true;
@@ -296,12 +303,11 @@ ctor_simple(2, Split
         , (1, BUF, _Split1, BUF, buffer)
         );
 bool _Split2(Buf* self, Buf const* const buffer, Buf const* const sep) {
-    (void)self;
     (void)buffer;
     (void)sep;
     // TODO
-    notify("NIY: Buf Split(Buf, Buf)");
-    return false;
+    if (destroyed(self)) return true;
+    fail("NIY: Buf Split(Buf, Buf)");
 }
 bool _Split1(Buf* self, Buf const* const buffer) {
     return _Split2(self, buffer, &(Buf){0});
@@ -315,7 +321,7 @@ bool _Write(Buf* self, Buf const* const file, Buf const* const content) {
     char filez[256] = {0};
     memcpy(filez, file->ptr, file->len < 255 ? file->len : 255);
     FILE *f = fopen(filez, "wb");
-    if (!f) return false;
+    if (!f) failf(32+strlen(filez), "cannot open file '%s' for writing", filez);
     fwrite(self->ptr = content->ptr, self->len = content->len, 1, f);
     fclose(f);
     return true;

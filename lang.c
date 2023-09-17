@@ -360,7 +360,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
             Obj* rr = obj_call(r, argc, argv);
             // XXX(cleanup): r, argv[..]
-            if (!rr) fail("could not call function with given arguments");
+            if (!rr) fail("could not call function");
             r = rr;
         }
     }

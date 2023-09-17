@@ -97,6 +97,16 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
 
 
 
+#define fail(__msg) do {      \
+        notify(__msg);        \
+        return false;         \
+    } while (true)
+
+#define failf(__sz, __msg, ...) do {              \
+        notify_printf(__sz, __msg, __VA_ARGS__);  \
+        return false;                             \
+    } while (true)
+
 #define ctor_given(__name, __doc, __make, __meta_overloads)  \
     Meta __name = {                                          \
         .doc= __doc,                                         \
@@ -112,10 +122,7 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
         (void)self;                                                  \
         (void)_no_make_also;                                         \
         typecheck_overloads_##__n_overloads(__name, __VA_ARGS__)     \
-        else {                                                       \
-            notify("no such overload for function " #__name);        \
-            return false;                                            \
-        }                                                            \
+        else fail("no such overload for function " #__name);         \
         return __make_also(self, res);                               \
     }                                                                \
     ctor_given(__name, __doc, _make_##__name, ((struct MetaOvl[]){   \
