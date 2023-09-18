@@ -107,6 +107,8 @@ Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
         on->keepalive++;
     }
 
+    // XXX: does it need to update fully-recursive?
+    //      or can it just be `r->update(r)`?
     if (!obj_update(r)) {
         obj_destroy(r);
         return NULL;

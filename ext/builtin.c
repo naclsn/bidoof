@@ -1,27 +1,46 @@
 #include "../helper.h"
 
 export_names
-    //( "At"
+    ( "At"
     //, "Bind"
-    ( "Count"
+    , "Count"
     //, "Decode"
     , "Delim"
     //, "Encode"
     //, "Fold"
-    //, "Id"
+    , "Id"
     , "Join"
     , "Len"
-    //, "Map"
+    , "Map"
     , "Range"
     , "Read"
     , "Rect"
-    //, "Repeat"
+    , "Repeat"
     , "Reverse"
     , "Slice"
     , "Split"
     , "Write"
     //, "Zip"
     );
+
+ctor_simple(1, At
+        , "get item at index in list; index can be negative"
+        , (2, ANY, _At, LST, list, NUM, index)
+        );
+bool _At(Obj* self, Lst const* const list, Num const* const index) {
+    if (!self->update) return true;
+    sz pindex;
+    if (index->val < 0) {
+        if (list->len < (sz)-index->val) failf(64, "index (%zu) outside list (%zu)", index->val, list->len);
+        pindex = list->len + index->val;
+    } else {
+        if (list->len <= (sz)index->val) failf(64, "index (%zu) outside list (%zu)", index->val, list->len);
+        pindex = index->val;
+    }
+    self->ty = list->ptr[pindex]->ty;
+    self->as = list->ptr[pindex]->as;
+    return true;
+}
 
 ctor_simple(2, Count
         , "count elements of a list or bytes of a buffer that verify a predicate"
@@ -69,6 +88,17 @@ found:
 bool _Delim1(Buf* self, Buf const* const under) {
     self->ptr = under->ptr;
     for (self->len = 0; self->len < under->len && under->ptr[self->len]; self->len++);
+    return true;
+}
+
+ctor_simple(1, Id
+        , "the identity function"
+        , (1, ANY, _Id, ANY, some)
+        );
+bool _Id(Obj* self, Obj const* const some) {
+    if (!self->update) return true;
+    self->ty = some->ty;
+    self->as = some->as;
     return true;
 }
 
@@ -123,6 +153,41 @@ bool _LenL(Num* self, Lst const* const from) {
     return true;
 }
 
+ctor_simple(1, Map
+        , "create a new list with the result of applying the operation to each item of the input list"
+        , (2, LST, _Map, FUN, op, LST, input)
+        );
+bool _Map(Lst* self, Fun const* const op, Lst const* const input) {
+    if (destroyed(self)) {
+        if (!self->ptr) return true;
+        free(*self->ptr);
+        free(self->ptr);
+        self->ptr = NULL;
+        self->len = 0;
+        return true;
+    }
+    sz len = input->len;
+    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * (sizeof(Obj) + 1*sizeof(Obj*)));
+    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
+    if (!arr || !ptr) {
+        free(arr);
+        free(ptr);
+        fail("OOM");
+    }
+    Obj* opf = frommember(op, Obj, as);
+    for (sz k = 0; k < len; k++) {
+        memset(ptr[k] = arr+k, 0, sizeof(Obj));
+        ptr[k]->argc = 1;
+        ptr[k]->argv[0] = input->ptr[k];
+        if (!op->call(opf, ptr[k])) return false; // TODO: all obj_destroy and free
+        fail("NIY: incomplete implementation"); // XXX: 'depnts on' not setup
+        if (ptr[k]->update && !ptr[k]->update(ptr[k])) return false; // TODO: all obj_destroy and free
+    }
+    self->ptr = ptr;
+    self->len = len;
+    return true;
+}
+
 ctor_simple(3, Range
         , "return a list of integral numbers, start inclusive, end exclusive, default step is 1"
         , (3, LST, _Range3, NUM, start, NUM, end, NUM, step)
@@ -139,7 +204,7 @@ bool _Range3(Lst* self, Num const* const start, Num const* const end, Num const*
         return true;
     }
     sz len = (end->val - start->val) / step->val;
-    Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
+    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * sizeof(Obj));
     Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
     if (!arr || !ptr) {
         free(arr);
@@ -150,7 +215,6 @@ bool _Range3(Lst* self, Num const* const start, Num const* const end, Num const*
         memset(arr+k, 0, sizeof(Obj));
         arr[k].ty = NUM;
         arr[k].as.num.val = n;
-        arr[k].keepalive++;
         ptr[k] = arr+k;
     }
     self->ptr = ptr;
@@ -200,7 +264,8 @@ ctor_simple(2, Rect
         );
 bool _Rect3(Lst* self, Buf const* const under, Num const* const item_len, Num const* const item_pad) {
     if (destroyed(self)) {
-        free(self->ptr[0]);
+        if (!self->ptr) return true;
+        free(*self->ptr);
         free(self->ptr);
         self->ptr = NULL;
         self->len = 0;
@@ -208,7 +273,7 @@ bool _Rect3(Lst* self, Buf const* const under, Num const* const item_len, Num co
     }
     sz w = item_len->val + item_pad->val;
     sz len = under->len / w;
-    Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
+    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * sizeof(Obj));
     Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
     if (!arr || !ptr) {
         free(arr);
@@ -230,13 +295,24 @@ bool _Rect2(Lst* self, Buf const* const under, Num const* const item_len) {
     return _Rect3(self, under, item_len, &(Num){0});
 }
 
-//ctor_simple(1, Repeat
-//        , "repeat its argument"
-//        , (2, LST, _Repeat, ANY, one, NUM, count)
-//        );
-//bool _Repeat(Lst* self, Obj const* const one, Num const* const count) {
-//    return false;
-//}
+ctor_simple(1, Repeat
+        , "repeat its argument"
+        , (2, LST, _Repeat, ANY, one, NUM, count)
+        );
+bool _Repeat(Lst* self, Obj const* const one, Num const* const count) {
+    if (destroyed(self)) {
+        free(self->ptr);
+        self->ptr = NULL;
+        self->len = 0;
+        return true;
+    }
+    if (count->val < 0) fail("negative repeat count");
+    self->ptr = realloc(self->ptr, count->val * sizeof(Obj*));
+    if (!self->ptr) fail("OOM");
+    for (sz k = 0; k < (sz)count->val; k++) self->ptr[k] = (Obj*)one;
+    self->len = count->val;
+    return true;
+}
 
 ctor_simple(2, Reverse
         , "reverse a list or a buffer"
@@ -328,7 +404,7 @@ bool _Split2(Lst* self, Buf const* const buffer, Buf const* const sep) {
         }
     }
     len++;
-    Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
+    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * sizeof(Obj));
     Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
     if (!arr || !ptr) {
         free(founds);
@@ -342,14 +418,12 @@ bool _Split2(Lst* self, Buf const* const buffer, Buf const* const sep) {
         arr[k].ty = BUF;
         arr[k].as.buf.ptr = buffer->ptr + p;
         arr[k].as.buf.len = founds[k] - p;
-        arr[k].keepalive++;
         ptr[k] = arr+k;
     }
     memset(arr+len-1, 0, sizeof(Obj));
     arr[len-1].ty = BUF;
     arr[len-1].as.buf.ptr = buffer->ptr + p;
     arr[len-1].as.buf.len = buffer->len - p;
-    arr[len-1].keepalive++;
     ptr[len-1] = arr+len-1;
     free(founds);
     self->ptr = ptr;

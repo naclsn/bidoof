@@ -25,6 +25,7 @@
 
 
 
+#define ty_for_ANY Obj
 #define ty_for_BUF Buf
 #define ty_for_NUM Num
 #define ty_for_FLT Flt
@@ -36,16 +37,17 @@
 #define link_uf_pars(__n_par, __ret, __ufname, ...)  \
     ty_for_##__ret* self _FOR_TYNM_##__n_par(_link_uf_pars, __VA_ARGS__)
 
-#define as_for_BUF buf
-#define as_for_NUM num
-#define as_for_FLT flt
-#define as_for_LST lst
-#define as_for_FUN fun
-#define as_for_SYM sym
+#define as_for_ANY(__o) (__o)
+#define as_for_BUF(__o) (&(__o)->as.buf)
+#define as_for_NUM(__o) (&(__o)->as.num)
+#define as_for_FLT(__o) (&(__o)->as.flt)
+#define as_for_LST(__o) (&(__o)->as.lst)
+#define as_for_FUN(__o) (&(__o)->as.fun)
+#define as_for_SYM(__o) (&(__o)->as.sym)
 
-#define _link_uf_args(__k, __ty, __nm)  , &self->argv[__k]->as.as_for_##__ty
+#define _link_uf_args(__k, __ty, __nm)  , as_for_##__ty(self->argv[__k])
 #define link_uf_args(__n_par, __ret, __ufname, ...)  \
-    &self->as.as_for_##__ret _FOR_TYNM_##__n_par(_link_uf_args, __VA_ARGS__)
+    as_for_##__ret(self) _FOR_TYNM_##__n_par(_link_uf_args, __VA_ARGS__)
 
 
 
@@ -61,7 +63,7 @@
 
 
 
-#define _typecheck_args(__k, __ty, __nm)  && (__ty == res->argv[__k]->ty)
+#define _typecheck_args(__k, __ty, __nm)  && (__ty == ANY || __ty == res->argv[__k]->ty)
 #define typecheck_args(__name, __n_par, __ret, __ufname, ...)                      \
     if (__n_par == res->argc _FOR_TYNM_##__n_par(_typecheck_args, __VA_ARGS__)) {  \
         res->update = link_name(__name, __n_par, __ret, __ufname, __VA_ARGS__);    \
@@ -140,6 +142,7 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
 #define destroyed(__self) (!frommember(__self, Obj, as)->update)
 
 // NOTE: this is comptime, eg. `Bind` cannot use it..
+// TODO: make it work with `fail`/`failf`
 #define inline_call_assign(__ty, __name, __f, __count, ...)           \
     {                                                                 \
         union {                                                       \
@@ -155,7 +158,8 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
         if (!(__f)->as.fun.call(__f, __name)) return false;           \
         bool (*_res_up)(Obj*) = __name->update;                       \
                                                                       \
-        if ((__ty) != __name->ty || (_res_up && !_res_up(__name))) {  \
+        if ((__ty != ANY && __ty != __name->ty)                       \
+                || (_res_up && !_res_up(__name))) {                   \
             __name->update = NULL;                                    \
             if (_res_up) _res_up(__name);                             \
             return false;                                             \

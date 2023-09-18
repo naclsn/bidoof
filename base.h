@@ -37,7 +37,7 @@ typedef struct Lst { struct Obj** ptr; sz len;                        } Lst;
 typedef struct Fun { bool (*call)(struct Obj* self, struct Obj* res); } Fun;
 typedef struct Sym { char txt[16];                                    } Sym;
 
-enum  Ty { BUF,     NUM,     FLT,     LST,     FUN,     SYM,     };
+enum  Ty { BUF,     NUM,     FLT,     LST,     FUN,     SYM,     ANY };
 union As { Buf buf; Num num; Flt flt; Lst lst; Fun fun; Sym sym; };
 
 typedef struct Obj {

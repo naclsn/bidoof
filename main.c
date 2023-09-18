@@ -97,6 +97,9 @@ void repl(void) {
 
     char* line;
     while (printf(">> "), line = line_read()) {
+        sz len = strlen(line);
+        while (' ' == line[len-1]) line[--len] = '\0';
+
         if ('?' == line[0]) {
             switch (line[1]) {
                 case '\0':
@@ -111,7 +114,7 @@ void repl(void) {
 
                         default:
                             {
-                                static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [FLT]= "Flt", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym"};
+                                static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [FLT]= "Flt", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym", [ANY]= "Any"};
 
                                 Meta* meta = exts_lookup(mksym(line+2));
                                 if (!meta) {
