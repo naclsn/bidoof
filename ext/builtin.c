@@ -57,7 +57,7 @@ ctor_simple(2, Delim
         );
 bool _Delim2(Buf* self, Buf const* const under, Buf const* const delim) {
     sz k;
-    for (k = 0; k < under->len - delim->len; k++) {
+    for (k = 0; k < under->len - delim->len+1; k++) {
         if (0 == memcmp(under->ptr+k, delim->ptr, delim->len)) goto found;
     }
     k = under->len;
@@ -131,7 +131,8 @@ ctor_simple(3, Range
         );
 bool _Range3(Lst* self, Num const* const start, Num const* const end, Num const* const step) {
     if (destroyed(self)) {
-        free(self->ptr[0]);
+        if (!self->ptr) return true;
+        free(*self->ptr);
         free(self->ptr);
         self->ptr = NULL;
         self->len = 0;
@@ -299,17 +300,63 @@ bool _Slice1(Buf* self, Buf const* const under) {
 
 ctor_simple(2, Split
         , "split on separator (exclusive) - default delimiter is \"\" (empty)"
-        , (2, BUF, _Split2, BUF, buffer, BUF, sep)
-        , (1, BUF, _Split1, BUF, buffer)
+        , (2, LST, _Split2, BUF, buffer, BUF, sep)
+        , (1, LST, _Split1, BUF, buffer)
         );
-bool _Split2(Buf* self, Buf const* const buffer, Buf const* const sep) {
-    (void)buffer;
-    (void)sep;
-    // TODO
-    if (destroyed(self)) return true;
-    fail("NIY: Buf Split(Buf, Buf)");
+bool _Split2(Lst* self, Buf const* const buffer, Buf const* const sep) {
+    if (destroyed(self)) {
+        if (!self->ptr) return true;
+        free(*self->ptr);
+        free(self->ptr);
+        self->ptr = NULL;
+        self->len = 0;
+        return true;
+    }
+    sz reserved = 64;
+    sz* founds = malloc(reserved);
+    if (!founds) fail("OOM");
+    sz len = 0;
+    for (sz k = 0; k < buffer->len - sep->len+1; k++) {
+        if (0 == memcmp(buffer->ptr+k, sep->ptr, sep->len)) {
+            if (reserved-1 == len) {
+                sz* niw = malloc(reserved);
+                if (!niw) { free(founds); fail("OOM"); }
+                founds = niw;
+            }
+            founds[len++] = k;
+            k+= sep->len-1;
+        }
+    }
+    len++;
+    Obj* arr = realloc(self->ptr ? self->ptr[0] : NULL, len * sizeof(Obj));
+    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
+    if (!arr || !ptr) {
+        free(founds);
+        free(arr);
+        free(ptr);
+        fail("OOM");
+    }
+    sz p = 0;
+    for (sz k = 0; k < len-1; p = founds[k++] + sep->len) {
+        memset(arr+k, 0, sizeof(Obj));
+        arr[k].ty = BUF;
+        arr[k].as.buf.ptr = buffer->ptr + p;
+        arr[k].as.buf.len = founds[k] - p;
+        arr[k].keepalive++;
+        ptr[k] = arr+k;
+    }
+    memset(arr+len-1, 0, sizeof(Obj));
+    arr[len-1].ty = BUF;
+    arr[len-1].as.buf.ptr = buffer->ptr + p;
+    arr[len-1].as.buf.len = buffer->len - p;
+    arr[len-1].keepalive++;
+    ptr[len-1] = arr+len-1;
+    free(founds);
+    self->ptr = ptr;
+    self->len = len;
+    return true;
 }
-bool _Split1(Buf* self, Buf const* const buffer) {
+bool _Split1(Lst* self, Buf const* const buffer) {
     return _Split2(self, buffer, &(Buf){0});
 }
 
