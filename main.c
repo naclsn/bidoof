@@ -148,6 +148,12 @@ void repl(void) {
                     } else puts("(null)");
                 } break;
 
+                case '&': {
+                    Obj const* it = scope_get(&repl_scope, mksym(line+2));
+                    if (it) obj_show_depnts(it, 0);
+                    else puts("(null)");
+                } break;
+
                 default:
                     obj_show(scope_get(&repl_scope, mksym(line+1)), 0);
             }
@@ -200,7 +206,6 @@ void repl(void) {
     } // while ">> " line_read
 
     line_free();
-    scope_show(&repl_scope);
     scope_clear(&repl_scope);
 }
 
@@ -213,6 +218,8 @@ int main(int argc, char** argv) {
     if (r) return r;
 
     repl();
+
+    exts_unload();
 
     return 0;
 }

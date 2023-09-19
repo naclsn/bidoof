@@ -57,13 +57,13 @@ void obj_show(Obj const* self, int indent) {
 }
 
 void obj_show_depnts(Obj const* self, int curdepth) {
-    printf("(keepalive %d)", self->keepalive);
+    printf("(%p) keepalive %d", (void*)self, self->keepalive);
     struct Depnt* cur = self->depnts;
 
     if (!cur)
-        printf(" no depnts");
+        printf(", no depnts");
     else do {
-        printf("\n%*.s-> %p", (curdepth < 0 ? 1 : curdepth+1)*3, "", (void*)cur->obj);
+        printf("\n%*.s-> ", (curdepth < 0 ? 1 : curdepth+1)*3, "");
         if (0 <= curdepth) obj_show_depnts(cur->obj, curdepth+1);
         cur = cur->next;
     } while (cur);
@@ -71,29 +71,20 @@ void obj_show_depnts(Obj const* self, int curdepth) {
     if (curdepth < 1) printf("\n");
 }
 
-Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
-    Obj* r = calloc(1, sizeof(Obj) + argc*sizeof(Obj*));
-    if (!r) return NULL;
+bool obj_call(Obj* self, Obj* res) {
+    if (!self->as.fun.call(self, res)) return false;
 
-    r->argc = argc;
-    memcpy(&r->argv, argv, argc*sizeof(Obj*));
+    for (sz k = 0; k < res->argc; k++) {
+        Obj* on = res->argv[k];
 
-    if (!self->as.fun.call(self, r)) {
-        free(r);
-        return NULL;
-    }
-
-    for (sz k = 0; k < argc; k++) {
-        Obj* on = argv[k];
-
+        // TODO: these could be calloc~ed in a single block?
         struct Depnt* tail = malloc(sizeof *tail);
         if (!tail) {
-            for (; 0 < k; k--) obj_remdep(r, argv[k-1]);
-            free(r);
-            return NULL;
+            for (; 0 < k; k--) obj_remdep(res, res->argv[k-1]);
+            return false;
         }
 
-        tail->obj = r;
+        tail->obj = res;
         tail->next = NULL;
 
         if (!on->depnts)
@@ -108,13 +99,13 @@ Obj* obj_call(Obj* self, u8 argc, Obj** argv) {
     }
 
     // XXX: does it need to update fully-recursive?
-    //      or can it just be `r->update(r)`?
-    if (!obj_update(r)) {
-        obj_destroy(r);
-        return NULL;
+    //      or can it just be `res->update(res)`?
+    if (!obj_update(res)) {
+        obj_destroy(res);
+        return false;
     }
 
-    return r;
+    return true;
 }
 
 bool obj_remdep(Obj* self, Obj* dep) {
@@ -145,12 +136,13 @@ void obj_destroy(Obj* self) {
     // then delete dep if it has no depnts anymore
     for (sz k = 0; k < self->argc; k++) {
         Obj* dep = self->argv[k];
-        if (obj_remdep(self, dep) && 0 == dep->keepalive)
+        if (obj_remdep(self, dep) && 0 == dep->keepalive) {
             obj_destroy(dep);
+            free(dep);
+        }
     }
 
     memset(&self->as, 0, sizeof self->as);
-    free(self);
 }
 
 static u16 _static_curr_cycle = 0;

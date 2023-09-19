@@ -148,9 +148,9 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
         union {                                                       \
             char _b[sizeof(Obj) + __count*sizeof(Obj*)];              \
             Obj _o;                                                   \
-        } _alpaca = {0};                                              \
+        } _stacka = {0};                                              \
                                                                       \
-        Obj* __name = &_alpaca._o;                                    \
+        Obj* __name = &_stacka._o;                                    \
         __name->argc = __count;                                       \
         Obj* _args[] = {__VA_ARGS__};                                 \
         memcpy(&__name->argv, _args, __count*sizeof(Obj*));           \

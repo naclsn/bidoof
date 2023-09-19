@@ -290,23 +290,20 @@ sz _escape(char const* ptr, sz len, u32* res) {
 }
 
 bool _update_free_str(Obj* self) {
-    if (!self->update) {
-        free(self->as.buf.ptr);
-        self->as.buf.ptr = NULL;
-        self->as.buf.len = 0;
-    }
+    if (!self->update) free(self->as.buf.ptr);
     return true;
 }
 
 bool _update_free_lst(Obj* self) {
     if (!self->update) {
         for (sz k = 0; k < self->as.lst.len; k++) {
-            self->as.lst.ptr[k]->keepalive--;
-            obj_destroy(self->as.lst.ptr[k]);
+            Obj* it = self->as.lst.ptr[k];
+            if (!--it->keepalive) {
+                obj_destroy(it);
+                free(it);
+            }
         }
         free(self->as.lst.ptr);
-        self->as.lst.ptr = NULL;
-        self->as.lst.len = 0;
     }
     return true;
 }
@@ -358,9 +355,20 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                      || tok_is("}", self->t)
                      || tok_is(";", self->t) ));
 
-            Obj* rr = obj_call(r, argc, argv);
+            Obj* rr = calloc(1, sizeof(Obj) + argc*sizeof(Obj*));
             // XXX(cleanup): r, argv[..]
-            if (!rr) fail("could not call function");
+            if (!rr) fail("OOM");
+
+            rr->argc = argc;
+            memcpy(&rr->argv, argv, argc*sizeof(Obj*));
+
+            // XXX(cleanup): r, argv[..]
+            if (!obj_call(r, rr)) {
+                free(rr);
+                fail("could not call function");
+            }
+
+            // TODO: shouldn't r (the function) be dropped?
             r = rr;
         }
     }

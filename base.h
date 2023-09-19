@@ -95,13 +95,15 @@ static inline Sym mksym(char const* s) {
 void obj_show(Obj const* self, int indent);
 void obj_show_depnts(Obj const* self, int curdepth);
 
-Obj* obj_call(Obj* self, u8 argc, Obj** argv);
+// self is a function, the argument, and later result, are all in res
+bool obj_call(Obj* self, Obj* res);
 // remove self from dep's depnts and decrement its keepalive
 // false if it was not in
 bool obj_remdep(Obj* self, Obj* dep);
 // do not destroy an Obj which has other Obj depending on it
 // (ie. `self->keepalive` non-zero)
-// destroying is recursive, and frees `self`
+// destroying is recursive and assumes the arguments are allocated
+// (these are freed if identified as not used)
 void obj_destroy(Obj* self);
 bool obj_update(Obj* self);
 

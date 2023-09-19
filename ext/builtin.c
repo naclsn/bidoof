@@ -48,8 +48,8 @@ ctor_simple(2, Count
         , (2, NUM, _CountL, LST, from, FUN, pred)
         );
 bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
+    if (destroyed(self)) return true;
     Obj* predf = frommember(pred, Obj, as);
-    self->val = 0;
     for (sz k = 0; k < from->len; k++) {
         Obj num = {.ty= NUM, .as.num.val= from->ptr[k]};
         inline_call_assign(NUM, res, predf, 1, &num);
@@ -59,8 +59,8 @@ bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
     return true;
 }
 bool _CountL(Num* self, Lst const* const from, Fun const* const pred) {
+    if (destroyed(self)) return true;
     Obj* predf = frommember(pred, Obj, as);
-    self->val = 0;
     for (sz k = 0; k < from->len; k++) {
         inline_call_assign(NUM, res, predf, 1, from->ptr[k]);
             if (0 != res->as.num.val) self->val++;
@@ -75,6 +75,7 @@ ctor_simple(2, Delim
         , (1, BUF, _Delim1, BUF, under)
         );
 bool _Delim2(Buf* self, Buf const* const under, Buf const* const delim) {
+    if (destroyed(self)) return true;
     sz k;
     for (k = 0; k < under->len - delim->len+1; k++) {
         if (0 == memcmp(under->ptr+k, delim->ptr, delim->len)) goto found;
@@ -86,6 +87,7 @@ found:
     return true;
 }
 bool _Delim1(Buf* self, Buf const* const under) {
+    if (destroyed(self)) return true;
     self->ptr = under->ptr;
     for (self->len = 0; self->len < under->len && under->ptr[self->len]; self->len++);
     return true;
@@ -110,8 +112,6 @@ ctor_simple(2, Join
 bool _Join2(Buf* self, Lst const* const list, Buf const* const sep) {
     if (destroyed(self)) {
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     sz total = 0;
@@ -162,8 +162,6 @@ bool _Map(Lst* self, Fun const* const op, Lst const* const input) {
         if (!self->ptr) return true;
         free(*self->ptr);
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     sz len = input->len;
@@ -179,9 +177,7 @@ bool _Map(Lst* self, Fun const* const op, Lst const* const input) {
         memset(ptr[k] = arr+k, 0, sizeof(Obj));
         ptr[k]->argc = 1;
         ptr[k]->argv[0] = input->ptr[k];
-        if (!op->call(opf, ptr[k])) return false; // TODO: all obj_destroy and free
-        fail("NIY: incomplete implementation"); // XXX: 'depnts on' not setup
-        if (ptr[k]->update && !ptr[k]->update(ptr[k])) return false; // TODO: all obj_destroy and free
+        if (!obj_call(opf, ptr[k])) fail(".."); // XXX(cleanup): all obj_destroy and free
     }
     self->ptr = ptr;
     self->len = len;
@@ -199,8 +195,6 @@ bool _Range3(Lst* self, Num const* const start, Num const* const end, Num const*
         if (!self->ptr) return true;
         free(*self->ptr);
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     sz len = (end->val - start->val) / step->val;
@@ -235,8 +229,6 @@ ctor_simple(1, Read
 bool _Read(Buf* self, Buf const* const file) {
     if (destroyed(self)) {
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     char filez[256] = {0};
@@ -267,8 +259,6 @@ bool _Rect3(Lst* self, Buf const* const under, Num const* const item_len, Num co
         if (!self->ptr) return true;
         free(*self->ptr);
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     sz w = item_len->val + item_pad->val;
@@ -302,8 +292,6 @@ ctor_simple(1, Repeat
 bool _Repeat(Lst* self, Obj const* const one, Num const* const count) {
     if (destroyed(self)) {
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     if (count->val < 0) fail("negative repeat count");
@@ -322,8 +310,6 @@ ctor_simple(2, Reverse
 bool _ReverseB(Buf* self, Buf const* const under) {
     if (destroyed(self)) {
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     u8* ptr = realloc(self->ptr, under->len);
@@ -384,8 +370,6 @@ bool _Split2(Lst* self, Buf const* const buffer, Buf const* const sep) {
         if (!self->ptr) return true;
         free(*self->ptr);
         free(self->ptr);
-        self->ptr = NULL;
-        self->len = 0;
         return true;
     }
     sz reserved = 64;

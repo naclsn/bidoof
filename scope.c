@@ -3,7 +3,10 @@
 void scope_clear(Scope* self) {
     for (sz k = 0; k < self->count; k++) {
         Obj* it = self->items[k].value;
-        if (0 == --it->keepalive) obj_destroy(it);
+        if (!--it->keepalive) {
+            obj_destroy(it);
+            free(it);
+        }
     }
 
     free(self->items);
@@ -70,7 +73,10 @@ bool scope_put(Scope* self, Sym const key, Obj* value) {
         Obj* found = self->items[k].value;
         self->items[k].value = value;
 
-        if (0 == --found->keepalive) obj_destroy(found);
+        if (!--found->keepalive) {
+            obj_destroy(found);
+            free(found);
+        }
         return true;
     }
 
@@ -86,7 +92,7 @@ bool scope_put(Scope* self, Sym const key, Obj* value) {
 }
 
 void scope_show(Scope* self) {
-    printf("%zu name-s:\n", self->count);
+    printf("%zu name%s:\n", self->count, 1 < self->count ? "s" : "");
     for (sz k = 0; k < self->count; k++) {
         printf("- %s: ", self->items[k].key.txt);
         obj_show(self->items[k].value, 0);
