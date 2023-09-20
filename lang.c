@@ -369,6 +369,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
             }
 
             // TODO: shouldn't r (the function) be dropped?
+            //       -> no, the result effectively depends on it (TODO)
             r = rr;
         }
     }

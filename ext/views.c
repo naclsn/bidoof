@@ -92,6 +92,7 @@ bool _ViewTxt_once(Obj* fun, Obj* res) {
 }
 
 bool _ViewTxt(Buf* self, Buf const* const txt) {
+    // TODO: use Obj::data
     ViewTxtState* st = frommember(self->ptr, ViewTxtState, ptr);
 
     if (destroyed(self)) {

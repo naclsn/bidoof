@@ -1,6 +1,7 @@
 #ifndef __BIDOOF_BASE_H__
 #define __BIDOOF_BASE_H__
 
+#include <alloca.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -42,6 +43,7 @@ union As { Buf buf; Num num; Flt flt; Lst lst; Fun fun; Sym sym; };
 
 typedef struct Obj {
     bool (*update)(struct Obj* self);
+    void* data;
 
     enum  Ty ty;
     union As as;

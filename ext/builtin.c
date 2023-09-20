@@ -2,7 +2,8 @@
 
 export_names
     ( "At"
-    //, "Bind"
+    , "Bind"
+    , "Call"
     , "Count"
     //, "Decode"
     , "Delim"
@@ -42,6 +43,73 @@ bool _At(Obj* self, Lst const* const list, Num const* const index) {
     return true;
 }
 
+ctor_simple(1, Bind
+        , "bind args to function, use :0 :1 and such for the arguments"
+        , (2, FUN, _Bind, FUN, fn, LST, args)
+        );
+bool _Bind_call(Obj* self, Obj* res) {
+    (void)self;
+    (void)res;
+    notify("NIY: bound function");
+    return false;
+}
+bool _Bind(Fun* self, Fun const* const fn, Lst const* const args) {
+    (void)fn;
+    (void)args;
+    self->call = _Bind_call;
+    return true;
+}
+
+ctor_simple(1, Call
+        , "call a function with the given args"
+        , (2, ANY, _Call, FUN, fn, LST, args)
+        );
+bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
+/*
+    if (!self->update) {
+        if (self->data) {
+            Obj* res = self->data;
+            bool (*up)(Obj*) = res->update;
+            if (up) { res->update = NULL; up(res); }
+            free(self->data);
+            self->data = NULL;
+        }
+        return true;
+    }
+    if (self->data) {
+        Obj* res = self->data;
+        bool changed = args->len != res->argc;
+        for (u8 k = 0; !changed && k < res->argc; k++)
+            changed = args->ptr[k] != res->argc[k];
+        if (!changed) {
+            if (res->update && !res->update(res)) fail("..");
+            self->ty = res->ty;
+            self->as = res->as;
+            return true;
+        }
+        bool (*up)(Obj*) = res->update;
+        if (up) { res->update = NULL; up(res); }
+        free(self->data);
+        self->data = NULL;
+    }
+    Obj* fnf = frommember(fn, Obj, as);
+    Obj* res = calloc(1, sizeof(Obj) + args->len*sizeof(Obj*));
+    res->argc = args->len;
+    memcpy(&res->argv, args->ptr, args->len*sizeof(Obj*));
+    if (!fn->call(fnf, res)) fail(".."); // XXX(cleanup): res
+    if (res->update && !res->update(res)) fail(".."); // XXX(cleanup): res
+    self->data = res;
+    self->ty = res->ty;
+    self->as = res->as;
+    return true;
+*/
+    if (!self->update) return true;
+    (void)fn;
+    (void)args;
+    notify("NIY: call function");
+    return true;
+}
+
 ctor_simple(2, Count
         , "count elements of a list or bytes of a buffer that verify a predicate"
         , (2, NUM, _CountB, BUF, from, FUN, pred)
@@ -52,8 +120,12 @@ bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
     Obj* predf = frommember(pred, Obj, as);
     for (sz k = 0; k < from->len; k++) {
         Obj num = {.ty= NUM, .as.num.val= from->ptr[k]};
-        inline_call_assign(NUM, res, predf, 1, &num);
+        Obj* pnum = &num;
+        inline_call_assign(res, predf, 1, &pnum);
+            if (NUM != res->ty) fail("predicat result should be a number");
             if (0 != res->as.num.val) self->val++;
+        inline_call_failed(res);
+            // TODO
         inline_call_cleanup(res);
     }
     return true;
@@ -62,8 +134,11 @@ bool _CountL(Num* self, Lst const* const from, Fun const* const pred) {
     if (destroyed(self)) return true;
     Obj* predf = frommember(pred, Obj, as);
     for (sz k = 0; k < from->len; k++) {
-        inline_call_assign(NUM, res, predf, 1, from->ptr[k]);
+        inline_call_assign(res, predf, 1, &from->ptr[k]);
+            if (NUM != res->ty) fail("predicat result should be a number");
             if (0 != res->as.num.val) self->val++;
+        inline_call_failed(res);
+            // TODO
         inline_call_cleanup(res);
     }
     return true;

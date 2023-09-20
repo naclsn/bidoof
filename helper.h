@@ -141,31 +141,26 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
 
 #define destroyed(__self) (!frommember(__self, Obj, as)->update)
 
-// NOTE: this is comptime, eg. `Bind` cannot use it..
-// TODO: make it work with `fail`/`failf`
-#define inline_call_assign(__ty, __name, __f, __count, ...)           \
-    {                                                                 \
-        union {                                                       \
-            char _b[sizeof(Obj) + __count*sizeof(Obj*)];              \
-            Obj _o;                                                   \
-        } _stacka = {0};                                              \
-                                                                      \
-        Obj* __name = &_stacka._o;                                    \
-        __name->argc = __count;                                       \
-        Obj* _args[] = {__VA_ARGS__};                                 \
-        memcpy(&__name->argv, _args, __count*sizeof(Obj*));           \
-                                                                      \
-        if (!(__f)->as.fun.call(__f, __name)) return false;           \
-        bool (*_res_up)(Obj*) = __name->update;                       \
-                                                                      \
-        if ((__ty != ANY && __ty != __name->ty)                       \
-                || (_res_up && !_res_up(__name))) {                   \
-            __name->update = NULL;                                    \
-            if (_res_up) _res_up(__name);                             \
-            return false;                                             \
-        }
+#define inline_call_assign(__name, __f, __argc, __argv)          \
+    {                                                            \
+        u8 _argc = __argc;                                       \
+        Obj* __name = alloca(sizeof(Obj) + _argc*sizeof(Obj*));  \
+        memset(__name, 0, sizeof(Obj) + _argc*sizeof(Obj*));     \
+        __name->argc = _argc;                                    \
+        Obj** _argv = __argv;                                    \
+        memcpy(&__name->argv, _argv, _argc*sizeof(Obj*));        \
+                                                                 \
+        Obj* _f = __f;                                           \
+        bool (*_res_up)(Obj*) = NULL;                            \
+        if ( _f->as.fun.call(_f, __name)                         \
+                && (!(_res_up = __name->update)                  \
+                    || _res_up(__name)) ) {
 
-#define inline_call_cleanup(__name)                                   \
-        __name->update = NULL;                                        \
-        if (_res_up) _res_up(__name);                                 \
+#define inline_call_failed(__name)                               \
+        } else {
+
+#define inline_call_cleanup(__name)                              \
+        }                                                        \
+        __name->update = NULL;                                   \
+        if (_res_up) _res_up(__name);                            \
     }
