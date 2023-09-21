@@ -164,3 +164,20 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
         __name->update = NULL;                                   \
         if (_res_up) _res_up(__name);                            \
     }
+
+#define dyarr_alloc(__elty, __name, __inisz)                          \
+    sz __name##_len = 0, __name##_cap = __inisz;                      \
+    __elty* __name##_niw;                                             \
+    __elty* __name = malloc(0 == __name##_cap ? ++__name##_cap : 0);
+
+#define dyarr_push(__name)                                            \
+    (__name##_len < __name##_cap                                      \
+        ? &__name[__name##_len++]                                     \
+        : ( __name##_niw = realloc(__name, __name##_cap*= 2)          \
+          , !__name##_niw                                             \
+                ? free(__name), __name = NULL                         \
+                : &(__name = __name##_niw)[__name##_len++]            \
+          ))                                                          \
+
+#define dyarr_pop(__name)                                             \
+    __name[__name##_len--]

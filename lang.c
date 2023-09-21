@@ -410,21 +410,21 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                     // unicode to utf8
                     if (val < 0b10000000) bufptr[buflen++] = val;
                     else {
-                      u8 x = val & 0b00111111;
-                      val>>= 6;
-                      if (val < 0b00100000) bufptr[buflen++] = 0b11000000 | val;
-                      else {
-                        u8 y = val & 0b00111111;
+                        u8 x = val & 0b00111111;
                         val>>= 6;
-                        if (val < 0b00010000) bufptr[buflen++] = 0b11100000 | val;
+                        if (val < 0b00100000) bufptr[buflen++] = 0b11000000 | val;
                         else {
-                          u8 z = val & 0b00111111;
-                          bufptr[buflen++] = 0b11110000 | (val >> 6);
-                          bufptr[buflen++] = 0b10000000 | z;
+                            u8 y = val & 0b00111111;
+                            val>>= 6;
+                            if (val < 0b00010000) bufptr[buflen++] = 0b11100000 | val;
+                            else {
+                                u8 z = val & 0b00111111;
+                                bufptr[buflen++] = 0b11110000 | (val >> 6);
+                                bufptr[buflen++] = 0b10000000 | z;
+                            }
+                            bufptr[buflen++] = 0b10000000 | y;
                         }
-                        bufptr[buflen++] = 0b10000000 | y;
-                      }
-                      bufptr[buflen++] = 0b10000000 | x;
+                        bufptr[buflen++] = 0b10000000 | x;
                     }
                 } // if unicode
             } // if '\\'

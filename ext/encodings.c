@@ -47,7 +47,7 @@ bool _Base64Decode(Buf* self, Buf const* const source) {
         failf(53, "length (%zu) is not a multiple of 4", source->len);
     for (sz k = 0; k < source->len; k++)
         if (66 == from64[source->ptr[k]])
-            failf(46, "invalid character at %zu '%#4X'", k, source->ptr[k]);
+            failf(49, "invalid character at %zu '%#4X'", k, source->ptr[k]);
     if (2 < source->len && '=' == source->ptr[source->len-3])
         fail("invalid padding");
 
@@ -151,11 +151,51 @@ ctor_simple(1, Utf8Decode
         );
 
 bool _Utf8Decode(Buf* self, Lst const* const source) {
-    if (destroyed(self)) return free(self->ptr), true;
+    free(self->ptr);
+    if (destroyed(self)) return true;
+    self->ptr = NULL;
 
-    (void)source;
-    notify("NIY: Utf8Decode");
-    return false;
+    dyarr_alloc(u8, arr, source->len);
+    if (!arr) fail("OOM");
+
+    for (sz k = 0; k < source->len; k++) {
+        if (NUM != source->ptr[k]->ty) {
+            free(self->ptr);
+            failf(45, "not a number at index %zu", k);
+        }
+        u32 val = source->ptr[k]->as.num.val;
+
+#define _push(__val) do {              \
+            u8* at = dyarr_push(arr);  \
+            if (!at) fail("OOM");      \
+            *at = __val;               \
+        } while (false)
+
+        if (val < 0b10000000) _push(val);
+        else {
+            u8 x = val & 0b00111111;
+            val>>= 6;
+            if (val < 0b00100000) _push(0b11000000 | val);
+            else {
+                u8 y = val & 0b00111111;
+                val>>= 6;
+                if (val < 0b00010000) _push(0b11100000 | val);
+                else {
+                    u8 z = val & 0b00111111;
+                    _push(0b11110000 | (val >> 6));
+                    _push(0b10000000 | z);
+                }
+                _push(0b10000000 | y);
+            }
+            _push(0b10000000 | x);
+        }
+
+#undef _push
+    }
+
+    self->ptr = arr;
+    self->len = arr_len;
+    return true;
 }
 
 ctor_simple(1, Utf8Encode
@@ -164,9 +204,46 @@ ctor_simple(1, Utf8Encode
         );
 
 bool _Utf8Encode(Lst* self, Buf const* const source) {
-    if (destroyed(self)) return free(self->ptr), true;
+    if (self->ptr) free(*self->ptr);
+    free(self->ptr);
+    if (destroyed(self)) return true;
+    self->ptr = NULL;
+    self->len = 0;
 
-    (void)source;
-    notify("NIY: Utf8Encode");
-    return false;
+    dyarr_alloc(Obj, arr, source->len/2);
+    if (!arr) fail("OOM");
+
+    for (sz k = 0; k < source->len; k++) {
+        u32 u = source->ptr[k];
+
+        if (0 == (0b10000000 & u))
+            ;
+        else if (0 == (0b00100000 & u) && k+1 < source->len) {
+            u8 x = source->ptr[++k];
+            u = ((u & 0b00011111) << 6) | (x & 0b00111111);
+        }
+        else if (0 == (0b00010000 & u) && k+2 < source->len) {
+            u8 x = source->ptr[++k], y = source->ptr[++k];
+            u = ((u & 0b00001111) << 12) | ((x & 0b00111111) << 6) | (y & 0b00111111);
+        }
+        else if (0 == (0b00001000 & u) && k+3 < source->len) {
+            u8 x = source->ptr[++k], y = source->ptr[++k], z = source->ptr[++k];
+            u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
+        }
+        else failf(68, "unexpected byte %#4X or end of stream at index %zu", u, k);
+
+        Obj* niw = dyarr_push(arr);
+        if (!niw) fail("OOM");
+        memset(niw, 0, sizeof *niw);
+        niw->ty = NUM;
+        niw->as.num.val = u;
+    }
+
+    Obj** ptr = calloc(arr_len, sizeof(Obj**));
+    if (!ptr) { free(arr); fail("OOM"); }
+    for (sz k = 0; k < arr_len; k++) ptr[k] = arr+k;
+
+    self->ptr = ptr;
+    self->len = arr_len;
+    return true;
 }
