@@ -29,7 +29,7 @@
 char* line_read(void);
 // this is a direct access to the history (careful with editing it)
 char** line_histget(size_t* count);
-// `lines` is NULL terminated; these are copied using the default allocator
+// the lines are copied using the default allocator
 void line_histset(char** lines, size_t count);
 // always call this after at least one `line_read`
 void line_free(void);

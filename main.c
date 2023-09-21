@@ -92,7 +92,35 @@ void compgen_clean(char** words) {
     free(words);
 }
 
-void repl(void) {
+void repl(char* histfn) {
+    {
+        FILE* histf = fopen(histfn, "rb");
+        if (histf) {
+            fseek(histf, 0, SEEK_END);
+            sz len = ftell(histf);
+            fseek(histf, 0, SEEK_SET);
+
+            char* txt = malloc(len);
+            if (txt) {
+                fread(txt, len, 1, histf);
+                char* start = txt;
+
+                char* lines[_hist_ln];
+                sz count = 0;
+                for (sz k = 0; count < _hist_ln && k < len; k++) {
+                    if ('\n' == txt[k]) {
+                        txt[k] = '\0';
+                        lines[count++] = start;
+                        start = txt+k+1;
+                    }
+                }
+
+                line_histset(lines, count);
+                free(txt);
+            }
+            fclose(histf);
+        }
+    }
     line_compgen(compgen_words, compgen_clean);
 
     char* line;
@@ -160,8 +188,8 @@ void repl(void) {
         } // if '?'
 
         else if ('.' == line[0]) {
-            if (0 == strcmp(".exit", line) || 0 == strcmp(".quit", line))
-                break;
+            if (0 == strcmp(".exit", line)) goto exit_no_hist;
+            if (0 == strcmp(".quit", line)) break;
 
             if (0 == strcmp(".help", line))
                 puts(
@@ -174,6 +202,7 @@ void repl(void) {
                     "  .help\n"
                     "  .sleep[sec]\n"
                     "  .source <file>\n"
+                    "  .tokens <script>\n"
                 );
 
             else if (0 == memcmp(".sleep", line, 6)) {
@@ -200,11 +229,30 @@ void repl(void) {
                 if (script) lang_process(filename, script, &repl_scope);
                 else printf("could not read file '%s'\n", filename);
             }
+
+            else if (0 == memcmp(".tokens ", line, 8)) {
+                char* script = line+8;
+                lang_show_tokens("<repl_line>", script);
+            }
         } // if '.'
 
         else lang_process("<repl_line>", line, &repl_scope);
     } // while ">> " line_read
 
+    {
+        FILE* histf = fopen(histfn, "wb");
+        if (histf) {
+            sz o = 0;
+            char** lines = line_histget(&o);
+            for (--o ;o; o--) {
+                fputs(lines[o], histf);
+                fputc('\n', histf);
+            }
+            fflush(histf);
+            fclose(histf);
+        }
+    }
+exit_no_hist:
     line_free();
     scope_clear(&repl_scope);
 }
@@ -217,7 +265,14 @@ int main(int argc, char** argv) {
     int r = parse_args(prog, argc, argv);
     if (r) return r;
 
-    repl();
+    {
+        char histfn[256];
+        char* end = strrchr(strncpy(histfn, prog, 256), '/');
+        memcpy(end+1, ".line_hist", 10);
+        end[11] = '\0';
+
+        repl(histfn);
+    }
 
     exts_unload();
 

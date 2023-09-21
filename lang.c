@@ -541,7 +541,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     else if (tok_is_sym(self->t)) {
         if (!(r = calloc(1, sizeof *r))) fail("OOM");
         r->ty = SYM;
-        r->as.sym = slice2sym((++self->t.ptr, self->t));
+        r->as.sym = slice2sym((++self->t.ptr, --self->t.len, self->t));
     }
 
     else if (tok_is("_", self->t)) {

@@ -48,8 +48,17 @@ ctor_simple(1, Bind
         , (2, FUN, _Bind, FUN, fn, LST, args)
         );
 bool _Bind_call(Obj* self, Obj* res) {
-    (void)self;
     (void)res;
+    Fun const* const fn = &self->argv[0]->as.fun;
+    Lst const* const args = &self->argv[1]->as.lst;
+    printf("fn: %p\n", fn->call);
+    printf("args: "); obj_show(frommember(args, Obj, as), 0); putchar('\n');
+    printf("argc: %u\n", res->argc);
+    for (u8 k = 0; k < res->argc; k++) {
+        printf("[%u]: ", k);
+        obj_show(res->argv[k], 0);
+        putchar('\n');
+    }
     notify("NIY: bound function");
     return false;
 }
@@ -57,6 +66,8 @@ bool _Bind(Fun* self, Fun const* const fn, Lst const* const args) {
     (void)fn;
     (void)args;
     self->call = _Bind_call;
+    printf("fn: %p\n", fn->call);
+    printf("args: "); obj_show(frommember(args, Obj, as), 0); putchar('\n');
     return true;
 }
 
@@ -65,7 +76,6 @@ ctor_simple(1, Call
         , (2, ANY, _Call, FUN, fn, LST, args)
         );
 bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
-/*
     if (!self->update) {
         if (self->data) {
             Obj* res = self->data;
@@ -80,7 +90,7 @@ bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
         Obj* res = self->data;
         bool changed = args->len != res->argc;
         for (u8 k = 0; !changed && k < res->argc; k++)
-            changed = args->ptr[k] != res->argc[k];
+            changed = args->ptr[k] != res->argv[k];
         if (!changed) {
             if (res->update && !res->update(res)) fail("..");
             self->ty = res->ty;
@@ -96,17 +106,15 @@ bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
     Obj* res = calloc(1, sizeof(Obj) + args->len*sizeof(Obj*));
     res->argc = args->len;
     memcpy(&res->argv, args->ptr, args->len*sizeof(Obj*));
-    if (!fn->call(fnf, res)) fail(".."); // XXX(cleanup): res
-    if (res->update && !res->update(res)) fail(".."); // XXX(cleanup): res
+    if (!fn->call(fnf, res)) return free(res), false;
+    if (res->update && !res->update(res)) {
+        bool (*up)(Obj*) = res->update;
+        if (up) { res->update = NULL; up(res); }
+        return free(res), false;
+    }
     self->data = res;
     self->ty = res->ty;
     self->as = res->as;
-    return true;
-*/
-    if (!self->update) return true;
-    (void)fn;
-    (void)args;
-    notify("NIY: call function");
     return true;
 }
 
