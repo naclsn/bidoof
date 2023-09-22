@@ -244,7 +244,7 @@ void repl(char* histfn) {
         if (histf) {
             sz o = 0;
             char** lines = line_histget(&o);
-            for (--o ;o; o--) {
+            for (;o; o--) {
                 fputs(lines[o], histf);
                 fputc('\n', histf);
             }

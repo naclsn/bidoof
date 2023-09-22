@@ -230,7 +230,7 @@ bool _Utf8Encode(Lst* self, Buf const* const source) {
             u8 x = source->ptr[++k], y = source->ptr[++k], z = source->ptr[++k];
             u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
         }
-        else failf(68, "unexpected byte %#4X or end of stream at index %zu", u, k);
+        else failf(92, "unexpected byte 0x%02X or end of stream at index %zu (/%zu)", u, k, source->len);
 
         Obj* niw = dyarr_push(arr);
         if (!niw) fail("OOM");

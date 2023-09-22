@@ -100,10 +100,9 @@ bool _lex(Pars* self) {
             return true;
 
         case '"': {
-            char const* end = AT;
-            do end = strchr(end+1, '"');
-            while (end && '\\' == end[-1]);
-            if (!end) fail("missing closing double-quote");
+            char const* end = AT+1;
+            while (*end && '"' != *end) if ('\\' == *(end++)) end++;
+            if (!*end) fail("missing closing double quote");
             self->t.len = end+1 - AT;
             self->i+= self->t.len;
         } return true;
@@ -160,7 +159,7 @@ bool _lex(Pars* self) {
             char const* end = AT;
             do end = strchr(end+1, '\'');
             while (end && '\\' == end[-1]);
-            if (!end) fail("missing closing simple-quote");
+            if (!end) fail("missing closing simple quote");
             self->t.len = end+1 - AT;
             self->i+= self->t.len;
         } return true;
@@ -399,10 +398,11 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                 bufptr[buflen++] = self->t.ptr[k];
             else {
                 u32 val = 0;
-                sz sk = _escape(self->t.ptr+2, self->t.len-1, &val);
+                k++;
+                sz sk = _escape(self->t.ptr+k, self->t.len-1-k, &val);
                 // XXX(cleanup): bufptr
                 if (0 == sk) fail("invalid escape sequence");
-                k+= sk;
+                k+= sk-1;
 
                 if (1 == sk || 3 == sk)
                     bufptr[buflen++] = val & 0xff;

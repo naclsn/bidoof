@@ -167,8 +167,9 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
 
 #define dyarr_alloc(__elty, __name, __inisz)                          \
     sz __name##_len = 0, __name##_cap = __inisz;                      \
-    __elty* __name##_niw;                                             \
-    __elty* __name = malloc(0 == __name##_cap ? ++__name##_cap : 0);
+    __elty* __name##_niw; (void)__name##_niw;                         \
+    __elty* __name = malloc(sizeof(__elty) *                          \
+            (0 == __name##_cap ? ++__name##_cap : __name##_cap));
 
 #define dyarr_push(__name)                                            \
     (__name##_len < __name##_cap                                      \
