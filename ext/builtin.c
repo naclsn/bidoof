@@ -1,18 +1,21 @@
 #include "../helper.h"
+#include <math.h>
 
 export_names
-    ( "At"
+    ( "Abs"
+    , "Add"
+    , "At"
     , "Bind"
     , "Call"
     , "Count"
-    //, "Decode"
     , "Delim"
-    //, "Encode"
-    //, "Fold"
+    , "Div"
     , "Id"
     , "Join"
     , "Len"
     , "Map"
+    , "Mul"
+    , "Pow"
     , "Range"
     , "Read"
     , "Rect"
@@ -20,9 +23,34 @@ export_names
     , "Reverse"
     , "Slice"
     , "Split"
+    , "Sub"
     , "Write"
+    //, "Fold"
     //, "Zip"
     );
+
+ctor_simple(2, Abs, "abs", (1, NUM, _AbsN, NUM, v), (1, FLT, _AbsF, FLT, v));
+bool _AbsN(Num* self, Num const* const v) { self->val = labs(v->val); return true; }
+bool _AbsF(Flt* self, Flt const* const v) { self->val = fabsl(v->val); return true; }
+
+ctor_simple(2, Add, "add", (2, NUM, _AddN, NUM, l, NUM, r), (2, FLT, _AddF, FLT, l, FLT, r));
+bool _AddN(Num* self, Num const* const l, Num const* const r) { self->val = l->val + r->val; return true; }
+bool _AddF(Flt* self, Flt const* const l, Flt const* const r) { self->val = l->val + r->val; return true; }
+
+ctor_simple(2, Div, "div", (2, NUM, _DivN, NUM, l, NUM, r), (2, FLT, _DivF, FLT, l, FLT, r));
+bool _DivN(Num* self, Num const* const l, Num const* const r) { self->val = l->val / r->val; return true; }
+bool _DivF(Flt* self, Flt const* const l, Flt const* const r) { self->val = l->val / r->val; return true; }
+
+ctor_simple(2, Mul, "mul", (2, NUM, _MulN, NUM, l, NUM, r), (2, FLT, _MulF, FLT, l, FLT, r));
+bool _MulN(Num* self, Num const* const l, Num const* const r) { self->val = l->val * r->val; return true; }
+bool _MulF(Flt* self, Flt const* const l, Flt const* const r) { self->val = l->val * r->val; return true; }
+
+ctor_simple(1, Pow, "pow", (2, FLT, _SubF, FLT, l, FLT, r));
+bool _PowF(Flt* self, Flt const* const l, Flt const* const r) { self->val = powl(l->val, r->val); return true; }
+
+ctor_simple(2, Sub, "sub", (2, NUM, _SubN, NUM, l, NUM, r), (2, FLT, _SubF, FLT, l, FLT, r));
+bool _SubN(Num* self, Num const* const l, Num const* const r) { self->val = l->val - r->val; return true; }
+bool _SubF(Flt* self, Flt const* const l, Flt const* const r) { self->val = l->val - r->val; return true; }
 
 ctor_simple(1, At
         , "get item at index in list; index can be negative"

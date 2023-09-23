@@ -181,4 +181,12 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
           ))                                                          \
 
 #define dyarr_pop(__name)                                             \
-    __name[__name##_len--]
+    (__name##_len ? &__name[__name##_len--] : NULL)
+
+#define enum_symcvt(__enum_name, __var_name, __n, __sym, ...)       \
+    enum __enum_name {__VA_ARGS__} __var_name                       \
+            = symcvt(__n, __sym, __VA_ARGS__);
+#define try_enum_symcvt(__enum_name, __var_name, __n, __sym, ...)   \
+    enum_symcvt(__enum_name, __var_name, __n, __sym, __VA_ARGS__);  \
+    if ((enum __enum_name)-1 == __var_name)                         \
+        fail("expected one of: " #__VA_ARGS__);

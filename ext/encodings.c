@@ -1,20 +1,17 @@
 /// Encode and decode semantics are as follow:
-/// - SomeEncode: bytes -> intermediary
-/// - SomeDecode: intermediary -> bytes
+/// - SomeEncode: source -> some
+/// - SomeDecode: some -> source
 ///
-/// Thus: `decode (encode source) == source`;
-/// but *not necessarily*: `encode (decode source) == source`
-///
-/// This means in particular that, for example,
-/// Utf8Decode _takes codepoints as parameter!_
-/// Maybe that's a mistake, I'll sleep on it /
-/// think about it more...
+/// Thus: `SomeDecode (SomeEncode source) == source`;
+/// but *not necessarily*: `SomeEncode (SomeDecode source) == source`
 
 #include "../helper.h"
 
 export_names
     ( "Base64Decode"
     , "Base64Encode"
+    , "NumDecode"
+    , "NumEncode"
     , "Utf8Decode"
     , "Utf8Encode"
     );
@@ -145,12 +142,91 @@ bool _Base64Encode(Buf* self, Buf const* const source) {
     return true;
 }
 
-ctor_simple(1, Utf8Decode
-        , "decodes unicode codepoints to UTF-8 bytes"
-        , (1, BUF, _Utf8Decode, LST, source)
+ctor_simple(1, NumDecode
+        , "decodes bytes to integral value; does not pay attention to a potential overflow"
+        , (3, NUM, _NumDecode, BUF, source, SYM, endian, SYM, sign)
         );
 
-bool _Utf8Decode(Buf* self, Lst const* const source) {
+bool _NumDecode(Num* self, Buf const* const source, Sym const* const endian, Sym const* const sign) {
+    try_enum_symcvt(Endian, ed, 2, *endian, BIG_END, LITTLE_END);
+    try_enum_symcvt(Sign, sg, 2, *sign, SIGNED, UNSIGNED);
+
+    printf("ed: %d, sg: %d\n", ed, sg);
+
+    (void)self;
+    (void)source;
+    fail("NIY");
+}
+
+ctor_simple(1, NumEncode
+        , "encode an integral value to bytes"
+        , (2, BUF, _NumEncode, NUM, source, SYM, endian)
+        );
+
+bool _NumEncode(Buf* self, Num const* const source, Sym const* const endian) {
+    (void)self;
+    (void)source;
+    (void)endian;
+    fail("NIY");
+}
+
+ctor_simple(1, Utf8Decode
+        , "decodes UTF-8 bytes to unicode codepoints"
+        , (1, LST, _Utf8Decode, BUF, source)
+        );
+
+bool _Utf8Decode(Lst* self, Buf const* const source) {
+    if (self->ptr) free(*self->ptr);
+    free(self->ptr);
+    if (destroyed(self)) return true;
+    self->ptr = NULL;
+    self->len = 0;
+
+    dyarr_alloc(Obj, arr, source->len/2);
+    if (!arr) fail("OOM");
+
+    for (sz k = 0; k < source->len; k++) {
+        u32 u = source->ptr[k];
+
+        if (0 == (0b10000000 & u))
+            ;
+        else if (0 == (0b00100000 & u) && k+1 < source->len) {
+            u8 x = source->ptr[++k];
+            u = ((u & 0b00011111) << 6) | (x & 0b00111111);
+        }
+        else if (0 == (0b00010000 & u) && k+2 < source->len) {
+            u8 x = source->ptr[++k], y = source->ptr[++k];
+            u = ((u & 0b00001111) << 12) | ((x & 0b00111111) << 6) | (y & 0b00111111);
+        }
+        else if (0 == (0b00001000 & u) && k+3 < source->len) {
+            u8 x = source->ptr[++k], y = source->ptr[++k], z = source->ptr[++k];
+            u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
+        }
+        else failf(92, "unexpected byte 0x%02X or end of stream at index %zu (/%zu)", u, k, source->len);
+
+        Obj* niw = dyarr_push(arr);
+        if (!niw) fail("OOM");
+        memset(niw, 0, sizeof *niw);
+        niw->ty = NUM;
+        niw->as.num.val = u;
+    }
+
+    Obj** ptr = calloc(arr_len, sizeof(Obj**));
+    if (!ptr) { free(arr); fail("OOM"); }
+    for (sz k = 0; k < arr_len; k++) ptr[k] = arr+k;
+
+    self->ptr = ptr;
+    self->len = arr_len;
+    return true;
+}
+
+
+ctor_simple(1, Utf8Encode
+        , "encodes unicode codepoints to UTF-8 bytes"
+        , (1, BUF, _Utf8Encode, LST, source)
+        );
+
+bool _Utf8Encode(Buf* self, Lst const* const source) {
     free(self->ptr);
     if (destroyed(self)) return true;
     self->ptr = NULL;
@@ -194,56 +270,6 @@ bool _Utf8Decode(Buf* self, Lst const* const source) {
     }
 
     self->ptr = arr;
-    self->len = arr_len;
-    return true;
-}
-
-ctor_simple(1, Utf8Encode
-        , "encodes UTF-8 bytes to unicode codepoints"
-        , (1, LST, _Utf8Encode, BUF, source)
-        );
-
-bool _Utf8Encode(Lst* self, Buf const* const source) {
-    if (self->ptr) free(*self->ptr);
-    free(self->ptr);
-    if (destroyed(self)) return true;
-    self->ptr = NULL;
-    self->len = 0;
-
-    dyarr_alloc(Obj, arr, source->len/2);
-    if (!arr) fail("OOM");
-
-    for (sz k = 0; k < source->len; k++) {
-        u32 u = source->ptr[k];
-
-        if (0 == (0b10000000 & u))
-            ;
-        else if (0 == (0b00100000 & u) && k+1 < source->len) {
-            u8 x = source->ptr[++k];
-            u = ((u & 0b00011111) << 6) | (x & 0b00111111);
-        }
-        else if (0 == (0b00010000 & u) && k+2 < source->len) {
-            u8 x = source->ptr[++k], y = source->ptr[++k];
-            u = ((u & 0b00001111) << 12) | ((x & 0b00111111) << 6) | (y & 0b00111111);
-        }
-        else if (0 == (0b00001000 & u) && k+3 < source->len) {
-            u8 x = source->ptr[++k], y = source->ptr[++k], z = source->ptr[++k];
-            u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
-        }
-        else failf(92, "unexpected byte 0x%02X or end of stream at index %zu (/%zu)", u, k, source->len);
-
-        Obj* niw = dyarr_push(arr);
-        if (!niw) fail("OOM");
-        memset(niw, 0, sizeof *niw);
-        niw->ty = NUM;
-        niw->as.num.val = u;
-    }
-
-    Obj** ptr = calloc(arr_len, sizeof(Obj**));
-    if (!ptr) { free(arr); fail("OOM"); }
-    for (sz k = 0; k < arr_len; k++) ptr[k] = arr+k;
-
-    self->ptr = ptr;
     self->len = arr_len;
     return true;
 }
