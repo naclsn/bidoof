@@ -56,7 +56,11 @@ bool exts_load(char const* filename) {
     // append to loaded (to-be-dlclose-ed)
     {
         struct LoadedList* niw = malloc(sizeof *niw);
-        if (!niw) exit(1);
+        if (!niw) {
+            notify("OOM");
+            dlclose(ext);
+            return false;
+        }
 
         niw->ext = ext;
         niw->next = NULL;

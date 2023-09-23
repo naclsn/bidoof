@@ -49,19 +49,16 @@ Obj* scope_get(Scope* self, Sym const key) {
 }
 
 bool scope_put(Scope* self, Sym const key, Obj* value) {
-    {
-        sz resize = 0 == self->size ? 16 : self->size;
-        if (resize < self->size+1) resize*= 2;
+    if (self->count == self->size) {
+        sz resize = self->size ? self->size*2 : 16;
 
-        if (resize != self->size) {
-            ScopeEntry* niw = calloc(resize, sizeof(ScopeEntry));
-            if (!niw) return false;
-            memcpy(niw, self->items, self->size * sizeof(ScopeEntry));
-            free(self->items);
+        ScopeEntry* niw = calloc(resize, sizeof(ScopeEntry));
+        if (!niw) return false;
+        memcpy(niw, self->items, self->size * sizeof(ScopeEntry));
+        free(self->items);
 
-            self->items = niw;
-            self->size = resize;
-        }
+        self->items = niw;
+        self->size = resize;
     }
 
     value->keepalive++;
