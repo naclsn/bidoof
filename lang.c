@@ -521,7 +521,9 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
             }
 
             lstptr[lstlen++] = item;
-            item->keepalive++;
+            item->keepalive++; // TODO: change to the list being a proper depnt
+                               // which means that when an item gets updated,
+                               // the whole list does too
         } while (_lex(self) && tok_is(",", self->t));
 
         if (!tok_is("}", self->t)) {

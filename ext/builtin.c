@@ -1,6 +1,8 @@
 #include "../helper.h"
 #include <math.h>
 
+#define freenul(__v) free(__v), __v = NULL;
+
 export_names
     ( "Abs"
     , "Add"
@@ -109,13 +111,14 @@ bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
             Obj* res = self->data;
             bool (*up)(Obj*) = res->update;
             if (up) { res->update = NULL; up(res); }
-            free(self->data);
-            self->data = NULL;
+            freenul(self->data);
         }
         return true;
     }
     if (self->data) {
         Obj* res = self->data;
+        // XXX: yes but also no, to see if something was updated it will
+        // probably be indicated by the cycle
         bool changed = args->len != res->argc;
         for (u8 k = 0; !changed && k < res->argc; k++)
             changed = args->ptr[k] != res->argv[k];
@@ -127,8 +130,7 @@ bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
         }
         bool (*up)(Obj*) = res->update;
         if (up) { res->update = NULL; up(res); }
-        free(self->data);
-        self->data = NULL;
+        freenul(self->data);
     }
     Obj* fnf = frommember(fn, Obj, as);
     Obj* res = calloc(1, sizeof(Obj) + args->len*sizeof(Obj*));
@@ -152,6 +154,7 @@ ctor_simple(2, Count
         , (2, NUM, _CountL, LST, from, FUN, pred)
         );
 bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
+    // TODO: if the pred didn't change, we only need to check if the items in from did...
     if (destroyed(self)) return true;
     Obj* predf = frommember(pred, Obj, as);
     for (sz k = 0; k < from->len; k++) {
@@ -221,29 +224,26 @@ ctor_simple(2, Join
         , (1, BUF, _Join1, LST, list)
         );
 bool _Join2(Buf* self, Lst const* const list, Buf const* const sep) {
-    if (destroyed(self)) {
-        free(self->ptr);
-        return true;
-    }
-    sz total = 0;
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
+    self->len = 0;
     for (sz k = 0; k < list->len; k++) {
         if (BUF != list->ptr[k]->ty) failf(44, "item at %zu isn't a buffer", k);
-        if (k) total+= sep->len;
-        total+= list->ptr[k]->as.buf.len;
+        if (k) self->len+= sep->len;
+        self->len+= list->ptr[k]->as.buf.len;
     }
-    u8* ptr = realloc(self->ptr, total);
-    if (!ptr) fail("OOM");
+    if (!self->len) return true;
+    self->ptr = malloc(self->len);
+    if (!self->ptr) fail("OOM");
     sz offset = 0;
     for (sz k = 0; k < list->len; k++) {
         if (k) {
-            memcpy(ptr+offset, sep->ptr, sep->len);
+            memcpy(self->ptr+offset, sep->ptr, sep->len);
             offset+= sep->len;
         }
-        memcpy(ptr+offset, list->ptr[k]->as.buf.ptr, list->ptr[k]->as.buf.len);
+        memcpy(self->ptr+offset, list->ptr[k]->as.buf.ptr, list->ptr[k]->as.buf.len);
         offset+= list->ptr[k]->as.buf.len;
     }
-    self->ptr = ptr;
-    self->len = total;
     return true;
 }
 bool _Join1(Buf* self, Lst const* const list) {
@@ -269,29 +269,32 @@ ctor_simple(1, Map
         , (2, LST, _Map, FUN, op, LST, input)
         );
 bool _Map(Lst* self, Fun const* const op, Lst const* const input) {
-    if (destroyed(self)) {
-        if (!self->ptr) return true;
-        free(*self->ptr);
-        free(self->ptr);
-        return true;
-    }
-    sz len = input->len;
-    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * (sizeof(Obj) + 1*sizeof(Obj*)));
-    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
-    if (!arr || !ptr) {
+    // TODO/XXX/FIXME: many things are not right
+    // - the items are not destroyed before the free(*..)
+    // - the input list will be marked updated and cause a full update even
+    //   when a single item was actually updated; Map should play is smart
+    //   enough to not do more that what's needed
+    // - because we return a list of proper objects, we probably also need
+    //   to be proper in updated ourself
+    if (self->ptr) free(*self->ptr);
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
+    self->len = input->len;
+    if (!self->len) return true;
+    Obj* arr = malloc(self->len * (sizeof(Obj) + 1*sizeof(Obj*)));
+    self->ptr = malloc(self->len * sizeof(Obj*));
+    if (!arr || !self->ptr) {
         free(arr);
-        free(ptr);
+        freenul(self->ptr);
         fail("OOM");
     }
     Obj* opf = frommember(op, Obj, as);
-    for (sz k = 0; k < len; k++) {
-        memset(ptr[k] = arr+k, 0, sizeof(Obj));
-        ptr[k]->argc = 1;
-        ptr[k]->argv[0] = input->ptr[k];
-        if (!obj_call(opf, ptr[k])) fail(".."); // XXX(cleanup): all obj_destroy and free
+    for (sz k = 0; k < self->len; k++) {
+        memset(self->ptr[k] = arr+k, 0, sizeof(Obj));
+        self->ptr[k]->argc = 1;
+        self->ptr[k]->argv[0] = input->ptr[k];
+        if (!obj_call(opf, self->ptr[k])) fail(".."); // XXX(cleanup): all obj_destroy and free
     }
-    self->ptr = ptr;
-    self->len = len;
     return true;
 }
 
@@ -302,28 +305,23 @@ ctor_simple(3, Range
         , (1, LST, _Range1, NUM, end)
         );
 bool _Range3(Lst* self, Num const* const start, Num const* const end, Num const* const step) {
-    if (destroyed(self)) {
-        if (!self->ptr) return true;
-        free(*self->ptr);
-        free(self->ptr);
-        return true;
-    }
-    sz len = (end->val - start->val) / step->val;
-    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * sizeof(Obj));
-    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
-    if (!arr || !ptr) {
+    if (self->ptr) free(*self->ptr);
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
+    self->len = (end->val - start->val) / step->val;
+    if (!self->len) return true;
+    Obj* arr = malloc(self->len * sizeof(Obj));
+    self->ptr = malloc(self->len * sizeof(Obj*));
+    if (!arr || !self->ptr) {
         free(arr);
-        free(ptr);
+        freenul(self->ptr);
         fail("OOM");
     }
-    for (sz k = 0, n = start->val; k < len; n+= step->val, k++) {
-        memset(arr+k, 0, sizeof(Obj));
+    for (sz k = 0, n = start->val; k < self->len; n+= step->val, k++) {
         arr[k].ty = NUM;
         arr[k].as.num.val = n;
-        ptr[k] = arr+k;
+        self->ptr[k] = arr+k;
     }
-    self->ptr = ptr;
-    self->len = len;
     return true;
 }
 bool _Range2(Lst* self, Num const* const start, Num const* const end) {
@@ -338,26 +336,22 @@ ctor_simple(1, Read
         , (1, BUF, _Read, BUF, file)
         );
 bool _Read(Buf* self, Buf const* const file) {
-    if (destroyed(self)) {
-        free(self->ptr);
-        return true;
-    }
-    char filez[256] = {0};
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
+    char filez[256] = {0}; // XXX: file path length limitation (what is that, DOS?)
     memcpy(filez, file->ptr, file->len < 255 ? file->len : 255);
     FILE *f = fopen(filez, "rb");
     if (!f) failf(32+strlen(filez), "cannot open file '%s' for reading", filez);
     fseek(f, 0, SEEK_END);
     self->len = ftell(f);
-    if (!self->len) {
-        fclose(f);
-        return true;
+    if (self->len) {
+        fseek(f, 0, SEEK_SET);
+        self->ptr = malloc(self->len);
+        if (!self->ptr) { fclose(f); fail("OOM"); }
+        fread(self->ptr, self->len, 1, f);
     }
-    fseek(f, 0, SEEK_SET);
-    self->ptr = malloc(self->len);
-    if (!self->ptr) self->len = 0;
-    else fread(self->ptr, self->len, 1, f);
     fclose(f);
-    return !!self->ptr;
+    return true;
 }
 
 ctor_simple(2, Rect
@@ -366,30 +360,25 @@ ctor_simple(2, Rect
         , (2, LST, _Rect2, BUF, under, NUM, item_len)
         );
 bool _Rect3(Lst* self, Buf const* const under, Num const* const item_len, Num const* const item_pad) {
-    if (destroyed(self)) {
-        if (!self->ptr) return true;
-        free(*self->ptr);
-        free(self->ptr);
-        return true;
-    }
+    if (self->ptr) free(*self->ptr);
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
     sz w = item_len->val + item_pad->val;
-    sz len = under->len / w;
-    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * sizeof(Obj));
-    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
-    if (!arr || !ptr) {
+    self->len = under->len / w;
+    if (!self->len) return true;
+    Obj* arr = malloc(self->len * sizeof(Obj));
+    self->ptr = malloc(self->len * sizeof(Obj*));
+    if (!arr || !self->ptr) {
         free(arr);
-        free(ptr);
+        freenul(self->ptr);
         fail("OOM");
     }
-    for (sz k = 0; k < len; k++) {
-        memset(arr+k, 0, sizeof(Obj));
+    for (sz k = 0; k < self->len; k++) {
         arr[k].ty = BUF;
         arr[k].as.buf.ptr = under->ptr + (w*k);
         arr[k].as.buf.len = item_len->val;
-        ptr[k] = arr+k;
+        self->ptr[k] = arr+k;
     }
-    self->ptr = ptr;
-    self->len = len;
     return true;
 }
 bool _Rect2(Lst* self, Buf const* const under, Num const* const item_len) {
@@ -401,15 +390,14 @@ ctor_simple(1, Repeat
         , (2, LST, _Repeat, ANY, one, NUM, count)
         );
 bool _Repeat(Lst* self, Obj const* const one, Num const* const count) {
-    if (destroyed(self)) {
-        free(self->ptr);
-        return true;
-    }
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
     if (count->val < 0) fail("negative repeat count");
-    self->ptr = realloc(self->ptr, count->val * sizeof(Obj*));
+    self->len = count->val;
+    if (!self->len) return true;
+    self->ptr = malloc(self->len * sizeof(Obj*));
     if (!self->ptr) fail("OOM");
     for (sz k = 0; k < (sz)count->val; k++) self->ptr[k] = (Obj*)one;
-    self->len = count->val;
     return true;
 }
 
@@ -419,22 +407,33 @@ ctor_simple(2, Reverse
         , (1, LST, _ReverseL, LST, under)
         );
 bool _ReverseB(Buf* self, Buf const* const under) {
-    if (destroyed(self)) {
-        free(self->ptr);
-        return true;
-    }
-    u8* ptr = realloc(self->ptr, under->len);
-    if (!ptr) fail("OOM");
-    for (sz k = 0; k < under->len; k++) self->ptr[k] = under->ptr[under->len-1 - k];
-    self->ptr = ptr;
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
     self->len = under->len;
+    if (!self->len) return true;
+    self->ptr = malloc(self->len);
+    if (!self->ptr) fail("OOM");
+    for (sz k = 0; k < under->len; k++) self->ptr[k] = under->ptr[under->len-1 - k];
     return true;
 }
 bool _ReverseL(Lst* self, Lst const* const under) {
-    (void)under;
-    // TODO
+    freenul(self->ptr);
     if (destroyed(self)) return true;
-    fail("NIY: Lst Reverse(Lst)");
+    self->len = under->len;
+    if (!self->len) return true;
+    Obj* arr = malloc(self->len * sizeof(Obj));
+    self->ptr = malloc(self->len * sizeof(Obj*));
+    if (!arr || !self->ptr) {
+        free(arr);
+        freenul(self->ptr);
+        fail("OOM");
+    }
+    for (sz k = 0; k < under->len; k++) {
+        arr[k].ty = under->ptr[under->len-1 - k]->ty;
+        arr[k].as = under->ptr[under->len-1 - k]->as;
+        self->ptr[k] = arr+k;
+    }
+    return true;
 }
 
 ctor_simple(3, Slice
@@ -477,52 +476,39 @@ ctor_simple(2, Split
         , (1, LST, _Split1, BUF, buffer)
         );
 bool _Split2(Lst* self, Buf const* const buffer, Buf const* const sep) {
-    if (destroyed(self)) {
-        if (!self->ptr) return true;
-        free(*self->ptr);
-        free(self->ptr);
-        return true;
-    }
-    sz reserved = 64;
-    sz* founds = malloc(reserved);
+    if (self->ptr) free(*self->ptr);
+    freenul(self->ptr);
+    if (destroyed(self)) return true;
+    dyarr_alloc(sz, founds, 64);
     if (!founds) fail("OOM");
-    sz len = 0;
+    self->len = 0;
     for (sz k = 0; k < buffer->len - sep->len+1; k++) {
         if (0 == memcmp(buffer->ptr+k, sep->ptr, sep->len)) {
-            if (reserved-1 == len) {
-                sz* niw = malloc(reserved);
-                if (!niw) { free(founds); fail("OOM"); }
-                founds = niw;
-            }
-            founds[len++] = k;
+            *dyarr_push(founds) = k;
             k+= sep->len-1;
         }
     }
-    len++;
-    Obj* arr = realloc(self->ptr ? *self->ptr : NULL, len * sizeof(Obj));
-    Obj** ptr = realloc(self->ptr, len * sizeof(Obj*));
-    if (!arr || !ptr) {
+    self->len = founds_len+1;
+    Obj* arr = malloc(self->len * sizeof(Obj));
+    self->ptr = malloc(self->len * sizeof(Obj*));
+    if (!arr || !self->ptr) {
         free(founds);
         free(arr);
-        free(ptr);
+        freenul(self->ptr);
         fail("OOM");
     }
     sz p = 0;
-    for (sz k = 0; k < len-1; p = founds[k++] + sep->len) {
-        memset(arr+k, 0, sizeof(Obj));
+    for (sz k = 0; k < founds_len; p = founds[k++] + sep->len) {
         arr[k].ty = BUF;
         arr[k].as.buf.ptr = buffer->ptr + p;
         arr[k].as.buf.len = founds[k] - p;
-        ptr[k] = arr+k;
+        self->ptr[k] = arr+k;
     }
-    memset(arr+len-1, 0, sizeof(Obj));
-    arr[len-1].ty = BUF;
-    arr[len-1].as.buf.ptr = buffer->ptr + p;
-    arr[len-1].as.buf.len = buffer->len - p;
-    ptr[len-1] = arr+len-1;
+    arr[self->len-1].ty = BUF;
+    arr[self->len-1].as.buf.ptr = buffer->ptr + p;
+    arr[self->len-1].as.buf.len = buffer->len - p;
+    self->ptr[self->len-1] = arr+self->len-1;
     free(founds);
-    self->ptr = ptr;
-    self->len = len;
     return true;
 }
 bool _Split1(Lst* self, Buf const* const buffer) {
@@ -534,7 +520,8 @@ ctor_simple(1, Write
         , (2, BUF, _Write, BUF, file, BUF, content)
         );
 bool _Write(Buf* self, Buf const* const file, Buf const* const content) {
-    char filez[256] = {0};
+    if (destroyed(self)) return true; // XXX: should it disregard and write out anyways?
+    char filez[256] = {0}; // XXX: file path length limitation (what is that, DOS?)
     memcpy(filez, file->ptr, file->len < 255 ? file->len : 255);
     FILE *f = fopen(filez, "wb");
     if (!f) failf(32+strlen(filez), "cannot open file '%s' for writing", filez);
