@@ -1,12 +1,9 @@
-// XXX/FIXME: this only works out of luck!
-// changing anything in the `Frame` structure (with impact on its size) just
-// doesn't work and passes garbage around or segfaults
 #include "../helper.h"
 
 #define FRAME_IMPLEMENTATION
 #include "views/frame.h"
 #include <pthread.h>
-#include <unistd.h> // sleep
+#include <unistd.h> // ZZZ: sleep
 
 export_names("ViewTxt");
 
@@ -23,7 +20,6 @@ ctor_w_also(1, ViewTxt, _ViewTxt_once
 typedef struct ViewTxtState {
     Frame frame;
     pthread_t thread;
-    u8 ptr[];
 } ViewTxtState;
 
 void _ViewTxt_render(Frame* frame) {
@@ -74,26 +70,33 @@ bool _ViewTxt_once(Obj* fun, Obj* res) {
     st->frame.height = 256;
     st->frame.title = "Some ViewTxt";
     st->frame.events.render = _ViewTxt_render;
-    st->frame.events.closing = frame_close;
+    st->frame.events.closing = frame_close; // ZZZ
 
-    res->as.buf.ptr = st->ptr;
+    res->data = st;
 
     puts("== creating frame in background thread");
 
     if (pthread_create(&st->thread, NULL, (void*(*)(void*))_ViewTxt_thread, &st->frame)
-            || pthread_detach(st->thread)) return false;
+            || pthread_detach(st->thread)) {
+        free(st);
+        fail("could not create background thread");
+    }
 
     _frame_ok_ok = false;
     pthread_mutex_lock(&_frame_ok_mx);
     while (!_frame_ok_ok) pthread_cond_wait(&_frame_ok_cv, &_frame_ok_mx);
     pthread_mutex_unlock(&_frame_ok_mx);
 
-    return _frame_ok_st;
+    if (!_frame_ok_st) {
+        free(st);
+        fail("could not create window");
+    }
+
+    return true;
 }
 
 bool _ViewTxt(Buf* self, Buf const* const txt) {
-    // TODO: use Obj::data
-    ViewTxtState* st = frommember(self->ptr, ViewTxtState, ptr);
+    ViewTxtState* st = getdata(self);
 
     if (destroyed(self)) {
         puts("== frame close request");
@@ -105,17 +108,7 @@ bool _ViewTxt(Buf* self, Buf const* const txt) {
         return true;
     }
 
-    if (self->len < txt->len) {
-        ViewTxtState tmp = *st;
-
-        free(st);
-        st = malloc(sizeof *st + txt->len);
-        if (!st) return false;
-        memcpy(st, &tmp, sizeof *st);
-
-        self->ptr = st->ptr;
-    }
-
-    memcpy(self->ptr, txt->ptr, self->len = txt->len);
+    //if (!edited) ..
+    *self = *txt;
     return true;
 }

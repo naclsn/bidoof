@@ -140,6 +140,7 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
     char const* const names[] = {__VA_ARGS__, NULL}
 
 #define destroyed(__self) (!frommember(__self, Obj, as)->update)
+#define getdata(__self) (frommember(__self, Obj, as)->data)
 
 #define inline_call_assign(__name, __f, __argc, __argv)          \
     {                                                            \

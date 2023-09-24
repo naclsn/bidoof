@@ -77,7 +77,6 @@ bool obj_call(Obj* self, Obj* res) {
     for (sz k = 0; k < res->argc; k++) {
         Obj* on = res->argv[k];
 
-        // TODO: these could be calloc~ed in a single block?
         struct Depnt* tail = malloc(sizeof *tail);
         if (!tail) {
             for (; 0 < k; k--) obj_remdep(res, res->argv[k-1]);
@@ -98,9 +97,7 @@ bool obj_call(Obj* self, Obj* res) {
         on->keepalive++;
     }
 
-    // XXX: does it need to update fully-recursive?
-    //      or can it just be `res->update(res)`?
-    if (!obj_update(res)) {
+    if (res->update && !res->update(res)) {
         obj_destroy(res);
         return false;
     }
