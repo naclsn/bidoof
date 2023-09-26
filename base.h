@@ -9,19 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dyarr.h"
+
 #define frommember(__it, __type, __member)  (  (__type*)( ((char*)__it) - offsetof(__type, __member) )  )
 
 void notify_default(char const* s);
 void notify_null(char const* s);
 extern void (*notify)(char const* s);
 #define notify_printf(__sz, __fmt, ...) do {  \
-        char* m = malloc(__sz);               \
-        if (!m) notify("OOM");                \
-        else {                                \
-            sprintf(m, __fmt, __VA_ARGS__);   \
-            notify(m);                        \
-            free(m);                          \
-        }                                     \
+        char* m = alloca(__sz);               \
+        sprintf(m, __fmt, __VA_ARGS__);       \
+        notify(m);                            \
     } while (false)                           \
 
 typedef uint8_t u8;

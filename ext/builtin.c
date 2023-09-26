@@ -479,36 +479,40 @@ bool _Split2(Lst* self, Buf const* const buffer, Buf const* const sep) {
     if (self->ptr) free(*self->ptr);
     freenul(self->ptr);
     if (destroyed(self)) return true;
-    dyarr_alloc(sz, founds, 64);
-    if (!founds) fail("OOM");
+    dyarr(sz) founds;
     self->len = 0;
     for (sz k = 0; k < buffer->len - sep->len+1; k++) {
         if (0 == memcmp(buffer->ptr+k, sep->ptr, sep->len)) {
-            *dyarr_push(founds) = k;
+            sz* at = dyarr_push(&founds);
+            if (!at) {
+                free(founds.ptr);
+                fail("OOM");
+            }
+            *at = k;
             k+= sep->len-1;
         }
     }
-    self->len = founds_len+1;
+    self->len = founds.len+1;
     Obj* arr = malloc(self->len * sizeof(Obj));
     self->ptr = malloc(self->len * sizeof(Obj*));
     if (!arr || !self->ptr) {
-        free(founds);
+        free(founds.ptr);
         free(arr);
         freenul(self->ptr);
         fail("OOM");
     }
     sz p = 0;
-    for (sz k = 0; k < founds_len; p = founds[k++] + sep->len) {
+    for (sz k = 0; k < founds.len; p = founds.ptr[k++] + sep->len) {
         arr[k].ty = BUF;
         arr[k].as.buf.ptr = buffer->ptr + p;
-        arr[k].as.buf.len = founds[k] - p;
+        arr[k].as.buf.len = founds.ptr[k] - p;
         self->ptr[k] = arr+k;
     }
     arr[self->len-1].ty = BUF;
     arr[self->len-1].as.buf.ptr = buffer->ptr + p;
     arr[self->len-1].as.buf.len = buffer->len - p;
     self->ptr[self->len-1] = arr+self->len-1;
-    free(founds);
+    free(founds.ptr);
     return true;
 }
 bool _Split1(Lst* self, Buf const* const buffer) {

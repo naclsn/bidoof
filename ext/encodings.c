@@ -182,8 +182,8 @@ bool _Utf8Decode(Lst* self, Buf const* const source) {
     self->ptr = NULL;
     self->len = 0;
 
-    dyarr_alloc(Obj, arr, source->len/2);
-    if (!arr) fail("OOM");
+    dyarr(Obj) arr;
+    if (!dyarr_resize(&arr, source->len/2)) fail("OOM");
 
     for (sz k = 0; k < source->len; k++) {
         u32 u = source->ptr[k];
@@ -204,19 +204,19 @@ bool _Utf8Decode(Lst* self, Buf const* const source) {
         }
         else failf(92, "unexpected byte 0x%02X or end of stream at index %zu (/%zu)", u, k, source->len);
 
-        Obj* niw = dyarr_push(arr);
+        Obj* niw = dyarr_push(&arr);
         if (!niw) fail("OOM");
         memset(niw, 0, sizeof *niw);
         niw->ty = NUM;
         niw->as.num.val = u;
     }
 
-    Obj** ptr = calloc(arr_len, sizeof(Obj**));
-    if (!ptr) { free(arr); fail("OOM"); }
-    for (sz k = 0; k < arr_len; k++) ptr[k] = arr+k;
+    Obj** ptr = calloc(arr.len, sizeof(Obj**));
+    if (!ptr) { free(arr.ptr); fail("OOM"); }
+    for (sz k = 0; k < arr.len; k++) ptr[k] = arr.ptr+k;
 
     self->ptr = ptr;
-    self->len = arr_len;
+    self->len = arr.len;
     return true;
 }
 
@@ -231,8 +231,8 @@ bool _Utf8Encode(Buf* self, Lst const* const source) {
     if (destroyed(self)) return true;
     self->ptr = NULL;
 
-    dyarr_alloc(u8, arr, source->len);
-    if (!arr) fail("OOM");
+    dyarr(u8) arr;
+    if (!dyarr_resize(&arr, source->len)) fail("OOM");
 
     for (sz k = 0; k < source->len; k++) {
         if (NUM != source->ptr[k]->ty) {
@@ -241,10 +241,10 @@ bool _Utf8Encode(Buf* self, Lst const* const source) {
         }
         u32 val = source->ptr[k]->as.num.val;
 
-#define _push(__val) do {              \
-            u8* at = dyarr_push(arr);  \
-            if (!at) fail("OOM");      \
-            *at = __val;               \
+#define _push(__val) do {               \
+            u8* at = dyarr_push(&arr);  \
+            if (!at) fail("OOM");       \
+            *at = __val;                \
         } while (false)
 
         if (val < 0b10000000) _push(val);
@@ -269,7 +269,7 @@ bool _Utf8Encode(Buf* self, Lst const* const source) {
 #undef _push
     }
 
-    self->ptr = arr;
-    self->len = arr_len;
+    self->ptr = arr.ptr;
+    self->len = arr.len;
     return true;
 }

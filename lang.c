@@ -369,6 +369,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
             // TODO: shouldn't r (the function) be dropped?
             //       -> no, the result effectively depends on it (TODO)
+            //       when you eventually come back to it, also do make argv a dyarr, thanks
             r = rr;
         }
     }
@@ -499,6 +500,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
     else if (tok_is("{", self->t)) {
         // XXX/FIXME: ok parsing lists is completely broken
+        // also do use dyarr, thanks
         sz before = self->i;
 
         sz cap = 16;

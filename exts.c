@@ -32,11 +32,7 @@ char const* dlerror(void) {
 #include <dlfcn.h>
 #endif
 
-struct LoadedList {
-    void* ext;
-    struct LoadedList* next;
-}* loaded = NULL;
-
+dyarr(void*) loaded = {0};
 Scope exts_scope = {0};
 
 bool exts_load(char const* filename) {
@@ -55,23 +51,13 @@ bool exts_load(char const* filename) {
 
     // append to loaded (to-be-dlclose-ed)
     {
-        struct LoadedList* niw = malloc(sizeof *niw);
+        void** niw = dyarr_push(&loaded);
         if (!niw) {
             notify("OOM");
             dlclose(ext);
             return false;
         }
-
-        niw->ext = ext;
-        niw->next = NULL;
-
-        if (!loaded)
-            loaded = niw;
-        else {
-            struct LoadedList* cur = loaded;
-            while (cur->next) cur = cur->next;
-            cur->next = niw;
-        }
+        *niw = ext;
     }
 
     for (; *names; names++) {
@@ -106,9 +92,7 @@ void exts_unload(void) {
     //scope_destroy(&exts_scope);
     free(exts_scope.items);
 
-    for (struct LoadedList* it = loaded, * next; it; it = next) {
-        dlclose(it->ext);
-        next = it->next;
-        free(it);
-    }
+    for (sz k = 0; k < loaded.len; k++)
+        dlclose(loaded.ptr[k]);
+    dyarr_clear(&loaded);
 }

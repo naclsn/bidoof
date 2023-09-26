@@ -271,6 +271,7 @@ int main(int argc, char** argv) {
         memcpy(end+1, ".line_hist", 10);
         end[11] = '\0';
 
+        puts("type '.help' for a list of REPL-specific commands");
         repl(histfn);
     }
 
