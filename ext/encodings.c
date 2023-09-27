@@ -182,7 +182,7 @@ bool _Utf8Decode(Lst* self, Buf const* const source) {
     self->ptr = NULL;
     self->len = 0;
 
-    dyarr(Obj) arr;
+    dyarr(Obj) arr = {0};
     if (!dyarr_resize(&arr, source->len/2)) fail("OOM");
 
     for (sz k = 0; k < source->len; k++) {
@@ -231,7 +231,7 @@ bool _Utf8Encode(Buf* self, Lst const* const source) {
     if (destroyed(self)) return true;
     self->ptr = NULL;
 
-    dyarr(u8) arr;
+    dyarr(u8) arr = {0};
     if (!dyarr_resize(&arr, source->len)) fail("OOM");
 
     for (sz k = 0; k < source->len; k++) {

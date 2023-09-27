@@ -479,7 +479,7 @@ bool _Split2(Lst* self, Buf const* const buffer, Buf const* const sep) {
     if (self->ptr) free(*self->ptr);
     freenul(self->ptr);
     if (destroyed(self)) return true;
-    dyarr(sz) founds;
+    dyarr(sz) founds = {0};
     self->len = 0;
     for (sz k = 0; k < buffer->len - sep->len+1; k++) {
         if (0 == memcmp(buffer->ptr+k, sep->ptr, sep->len)) {
