@@ -2,7 +2,7 @@
 
 void text_init(void);
 void text_draw(char const* txt, size_t len, float scale, int x, int y);
-//void text_draw_u32(uint32_t const* c, size_t l, int x, int y, float s);
+//void text_draw_u32(uint32_t const* txt, size_t len, float scale, int x, int y);
 void text_free(void);
 
 #ifdef TEXT_IMPLEMENTATION
@@ -76,21 +76,21 @@ void text_draw(char const* txt, size_t len, float scale, int x, int y) {
     glBegin(GL_QUADS);
 
     size_t cx = 0, cy = 0;
-    for (size_t k = 0; k < l; k++) {
-        uint32_t u = c[k];
+    for (size_t k = 0; k < len; k++) {
+        uint32_t u = txt[k];
 
         if (0 == (0b10000000 & u))
             ;
-        else if (0 == (0b00100000 & u) && k+1 < l) {
-            char x = c[++k];
+        else if (0 == (0b00100000 & u) && k+1 < len) {
+            char x = txt[++k];
             u = ((u & 0b00011111) << 6) | (x & 0b00111111);
         }
-        else if (0 == (0b00010000 & u) && k+2 < l) {
-            char x = c[++k], y = c[++k];
+        else if (0 == (0b00010000 & u) && k+2 < len) {
+            char x = txt[++k], y = txt[++k];
             u = ((u & 0b00001111) << 12) | ((x & 0b00111111) << 6) | (y & 0b00111111);
         }
-        else if (0 == (0b00001000 & u) && k+3 < l) {
-            char x = c[++k], y = c[++k], z = c[++k];
+        else if (0 == (0b00001000 & u) && k+3 < len) {
+            char x = txt[++k], y = txt[++k], z = txt[++k];
             u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
         }
         else u = '?';
@@ -108,10 +108,10 @@ void text_draw(char const* txt, size_t len, float scale, int x, int y) {
         }
         if (!found) { u = off = '?'; k = 0; }
 
-        glTexCoord2f((float)(off+0)/128, (float)(k+0)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 0*s);
-        glTexCoord2f((float)(off+0)/128, (float)(k+1)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 8*s);
-        glTexCoord2f((float)(off+1)/128, (float)(k+1)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 8*s);
-        glTexCoord2f((float)(off+1)/128, (float)(k+0)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 0*s);
+        glTexCoord2f((float)(off+0)/128, (float)(k+0)/_text_allf8x8_count); glVertex2f(x + cx*8*scale + 0*scale, y + cy*8*scale + 0*scale);
+        glTexCoord2f((float)(off+0)/128, (float)(k+1)/_text_allf8x8_count); glVertex2f(x + cx*8*scale + 0*scale, y + cy*8*scale + 8*scale);
+        glTexCoord2f((float)(off+1)/128, (float)(k+1)/_text_allf8x8_count); glVertex2f(x + cx*8*scale + 8*scale, y + cy*8*scale + 8*scale);
+        glTexCoord2f((float)(off+1)/128, (float)(k+0)/_text_allf8x8_count); glVertex2f(x + cx*8*scale + 8*scale, y + cy*8*scale + 0*scale);
 
         switch (u) {
             case '\b': if (cx) cx--; break;

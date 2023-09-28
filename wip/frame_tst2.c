@@ -25,12 +25,15 @@ void resize(Frame* f, int w, int h) {
 }
 
 void keydown(Frame* f, unsigned key) {
+    (void)f;
     switch (key) {
         case KEY_BACKSPACE:  printf("KEY_BACKSPACE");  break;
         case KEY_TAB:        printf("KEY_TAB");        break;
         case KEY_RETURN:     printf("KEY_RETURN");     break;
-        case KEY_SHIFT:      printf("KEY_SHIFT");      break;
-        case KEY_CONTROL:    printf("KEY_CONTROL");    break;
+        case KEY_LSHIFT:     printf("KEY_LSHIFT");     break;
+        case KEY_RSHIFT:     printf("KEY_RSHIFT");     break;
+        case KEY_LCTRL:      printf("KEY_LCTRL");      break;
+        case KEY_RCTRL:      printf("KEY_RCTRL");      break;
         case KEY_CAPLOCK:    printf("KEY_CAPLOCK");    break;
         case KEY_ESCAPE:     printf("KEY_ESCAPE");     break;
         case KEY_SPACE:      printf("KEY_SPACE");      break;
@@ -80,22 +83,22 @@ void keydown(Frame* f, unsigned key) {
         case KEY_X:          printf("KEY_X");          break;
         case KEY_Y:          printf("KEY_Y");          break;
         case KEY_Z:          printf("KEY_Z");          break;
-        case KEY_MENU:       printf("KEY_MENU");       break;
-        case KEY_NUMPAD0:    printf("KEY_NUMPAD0");    break;
-        case KEY_NUMPAD1:    printf("KEY_NUMPAD1");    break;
-        case KEY_NUMPAD2:    printf("KEY_NUMPAD2");    break;
-        case KEY_NUMPAD3:    printf("KEY_NUMPAD3");    break;
-        case KEY_NUMPAD4:    printf("KEY_NUMPAD4");    break;
-        case KEY_NUMPAD5:    printf("KEY_NUMPAD5");    break;
-        case KEY_NUMPAD6:    printf("KEY_NUMPAD6");    break;
-        case KEY_NUMPAD7:    printf("KEY_NUMPAD7");    break;
-        case KEY_NUMPAD8:    printf("KEY_NUMPAD8");    break;
-        case KEY_NUMPAD9:    printf("KEY_NUMPAD9");    break;
-        case KEY_MULTIPLY:   printf("KEY_MULTIPLY");   break;
-        case KEY_ADD:        printf("KEY_ADD");        break;
-        case KEY_SUBTRACT:   printf("KEY_SUBTRACT");   break;
-        case KEY_DECIMAL:    printf("KEY_DECIMAL");    break;
-        case KEY_DIVIDE:     printf("KEY_DIVIDE");     break;
+        //case KEY_MENU:       printf("KEY_MENU");       break;
+        //case KEY_NUMPAD0:    printf("KEY_NUMPAD0");    break;
+        //case KEY_NUMPAD1:    printf("KEY_NUMPAD1");    break;
+        //case KEY_NUMPAD2:    printf("KEY_NUMPAD2");    break;
+        //case KEY_NUMPAD3:    printf("KEY_NUMPAD3");    break;
+        //case KEY_NUMPAD4:    printf("KEY_NUMPAD4");    break;
+        //case KEY_NUMPAD5:    printf("KEY_NUMPAD5");    break;
+        //case KEY_NUMPAD6:    printf("KEY_NUMPAD6");    break;
+        //case KEY_NUMPAD7:    printf("KEY_NUMPAD7");    break;
+        //case KEY_NUMPAD8:    printf("KEY_NUMPAD8");    break;
+        //case KEY_NUMPAD9:    printf("KEY_NUMPAD9");    break;
+        //case KEY_MULTIPLY:   printf("KEY_MULTIPLY");   break;
+        //case KEY_ADD:        printf("KEY_ADD");        break;
+        //case KEY_SUBTRACT:   printf("KEY_SUBTRACT");   break;
+        //case KEY_DECIMAL:    printf("KEY_DECIMAL");    break;
+        //case KEY_DIVIDE:     printf("KEY_DIVIDE");     break;
         case KEY_F1:         printf("KEY_F1");         break;
         case KEY_F2:         printf("KEY_F2");         break;
         case KEY_F3:         printf("KEY_F3");         break;
@@ -108,23 +111,32 @@ void keydown(Frame* f, unsigned key) {
         case KEY_F10:        printf("KEY_F10");        break;
         case KEY_F11:        printf("KEY_F11");        break;
         case KEY_F12:        printf("KEY_F12");        break;
-        case KEY_F13:        printf("KEY_F13");        break;
-        case KEY_F14:        printf("KEY_F14");        break;
-        case KEY_F15:        printf("KEY_F15");        break;
-        case KEY_F16:        printf("KEY_F16");        break;
-        case KEY_F17:        printf("KEY_F17");        break;
-        case KEY_F18:        printf("KEY_F18");        break;
-        case KEY_F19:        printf("KEY_F19");        break;
-        case KEY_F20:        printf("KEY_F20");        break;
-        case KEY_F21:        printf("KEY_F21");        break;
-        case KEY_F22:        printf("KEY_F22");        break;
-        case KEY_F23:        printf("KEY_F23");        break;
-        case KEY_F24:        printf("KEY_F24");        break;
-        default: printf("unknown keycode: 0x%02X", key);
+        //case KEY_F13:        printf("KEY_F13");        break;
+        //case KEY_F14:        printf("KEY_F14");        break;
+        //case KEY_F15:        printf("KEY_F15");        break;
+        //case KEY_F16:        printf("KEY_F16");        break;
+        //case KEY_F17:        printf("KEY_F17");        break;
+        //case KEY_F18:        printf("KEY_F18");        break;
+        //case KEY_F19:        printf("KEY_F19");        break;
+        //case KEY_F20:        printf("KEY_F20");        break;
+        //case KEY_F21:        printf("KEY_F21");        break;
+        //case KEY_F22:        printf("KEY_F22");        break;
+        //case KEY_F23:        printf("KEY_F23");        break;
+        //case KEY_F24:        printf("KEY_F24");        break;
+        default: printf("other keycode: 0x%02X", key);
     }
     printf("\n");
+}
 
-    if (27 == key || 9 == key) frame_close(f);
+void mousedown(Frame* f, int button, int x, int y) {
+    (void)f;
+    switch (button) {
+        case MOUSE_LEFT:   printf("MOUSE_LEFT");   break;
+        case MOUSE_RIGHT:  printf("MOUSE_RIGHT");  break;
+        case MOUSE_MIDDLE: printf("MOUSE_MIDDLE"); break;
+        default: printf("other button: %d", button);
+    }
+    printf(" at (%d, %d)\n", x, y);
 }
 
 int main(int argc, char** argv) {
@@ -139,6 +151,7 @@ int main(int argc, char** argv) {
             .resize= resize,
             .closing= frame_close,
             .keydown= keydown,
+            .mousedown= mousedown,
         },
     };
 
