@@ -67,7 +67,7 @@ void render1(Frame* f) {
     puts("hi :<");
 }
 
-void keyup(Frame* f, char key) {
+void keyup(Frame* f, unsigned key) {
     if (27 == key) frame_close(f);
 }
 

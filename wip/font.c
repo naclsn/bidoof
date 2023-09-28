@@ -225,7 +225,7 @@ void myReshape(Frame* f, int w, int h)
     glMatrixMode(GL_MODELVIEW);
 }
 
-void esc_close(Frame* f, char key) {
+void esc_close(Frame* f, unsigned key) {
     if (27 == key) frame_close(f);
 }
 

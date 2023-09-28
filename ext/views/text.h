@@ -29,7 +29,6 @@ static struct _f8x8 {
 static GLuint _text_gl_tex;
 
 void text_init(void) {
-    glEnable(GL_TEXTURE_2D);
     glGenTextures(1, &_text_gl_tex);
     glBindTexture(GL_TEXTURE_2D, _text_gl_tex);
 
@@ -39,10 +38,10 @@ void text_init(void) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     glTexImage2D(GL_TEXTURE_2D,
-            0, GL_RGBA,
+            0, GL_ALPHA,
             128*8, _text_allf8x8_count*8,
             0,
-            GL_RGBA,
+            GL_ALPHA,
             GL_UNSIGNED_BYTE,
             0);
 
@@ -50,65 +49,32 @@ void text_init(void) {
         struct _f8x8 const it = _text_allf8x8[k];
         uint32_t count = it.cp_to - it.cp_from;
 
-        uint8_t bata[128*8*8*4] = {0};
-        for (size_t ch = 0; ch < count; ch++) {
-            for (size_t j = 0; j < 8; j++) {
-                for (size_t i = 0; i < 8; i++) {
-                    size_t at = ch*8 + i + count*j*8;
-                    uint8_t v = ((it.data[ch*8 + 7-j] >> i) & 1) * 255;
-                    bata[at*4+0] = 255;
-                    bata[at*4+1] = 255;
-                    bata[at*4+2] = 255;
-                    bata[at*4+3] = v;
-                }
-            }
-        }
+        uint8_t data[128*8*8] = {0};
+        for (size_t ch = 0; ch < count; ch++)
+            for (size_t j = 0; j < 8; j++)
+                for (size_t i = 0; i < 8; i++)
+                    data[ch*8 + i + count*j*8] = ((it.data[ch*8 + 7-j] >> i) & 1) * 255;
 
         glTexSubImage2D(GL_TEXTURE_2D,
                 0,
                 0, k*8,
                 count*8, 8,
-                GL_RGBA,
+                GL_ALPHA,
                 GL_UNSIGNED_BYTE,
-                bata);
+                data);
     }
-}
 
-void text_allf8x8(void) {
-    glMatrixMode(GL_TEXTURE);
-    glLoadIdentity();
-    glScalef(1.f/128, 1.f/_text_allf8x8_count, 1.f);
-    glMatrixMode(GL_MODELVIEW);
-
-    glEnable(GL_TEXTURE_2D);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    glBegin(GL_QUADS);
-    {
-        float s = 2;
-        glTexCoord2f(0, 0); glVertex2f(0, 0);
-        glTexCoord2f(0, _text_allf8x8_count); glVertex2f(0, _text_allf8x8_count*s);
-        glTexCoord2f(128, _text_allf8x8_count); glVertex2f(128*s, _text_allf8x8_count*s);
-        glTexCoord2f(128, 0); glVertex2f(128*s, 0);
-    }
-    glEnd();
-
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_BLEND);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void text_draw(char const* c, size_t l, int x, int y, float s) {
-    glMatrixMode(GL_TEXTURE);
-    glLoadIdentity();
-    glScalef(1.f/128, 1.f/_text_allf8x8_count, 1.f);
-    glMatrixMode(GL_MODELVIEW);
-
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBindTexture(GL_TEXTURE_2D, _text_gl_tex);
 
     glBegin(GL_QUADS);
+
     int cx = 0, cy = 0;
     for (size_t k = 0; k < l; k++) {
         uint32_t u = c[k];
@@ -140,16 +106,12 @@ void text_draw(char const* c, size_t l, int x, int y, float s) {
                 break;
             }
         }
-        if (!found) {
-            u = '?';
-            k = 0;
-            off = u;
-        }
+        if (!found) { u = off = '?'; k = 0; }
 
-        glTexCoord2f(off+0, k+0); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 0*s);
-        glTexCoord2f(off+0, k+1); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 8*s);
-        glTexCoord2f(off+1, k+1); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 8*s);
-        glTexCoord2f(off+1, k+0); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 0*s);
+        glTexCoord2f((float)(off+0)/128, (float)(k+0)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 0*s);
+        glTexCoord2f((float)(off+0)/128, (float)(k+1)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 0*s, y + cy*8*s + 8*s);
+        glTexCoord2f((float)(off+1)/128, (float)(k+1)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 8*s);
+        glTexCoord2f((float)(off+1)/128, (float)(k+0)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 0*s);
 
         switch (u) {
             case '\t': cx = ((cx/4) + 1)*4; break;
@@ -158,10 +120,12 @@ void text_draw(char const* c, size_t l, int x, int y, float s) {
             default: cx++;
         }
     }
+
     glEnd();
 
-    glDisable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glDisable(GL_BLEND);
+    glDisable(GL_TEXTURE_2D);
 }
 
 void text_free(void) {

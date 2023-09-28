@@ -33,8 +33,8 @@ void frame_destroy(Frame* self);
         void (*resize)(Frame* self, int w, int h);                   \
         void (*closing)(Frame* self);                                \
                                                                      \
-        void (*keydown)(Frame* self, char key);                      \
-        void (*keyup)(Frame* self, char key);                        \
+        void (*keydown)(Frame* self, unsigned key);                  \
+        void (*keyup)(Frame* self, unsigned key);                    \
                                                                      \
         void (*mousedown)(Frame* self, int button, int x, int y);    \
         void (*mouseup)(Frame* self, int button, int x, int y);      \
