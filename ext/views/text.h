@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void text_init(void);
-void text_draw(char const* c, size_t l, int x, int y, float s);
+void text_draw(char const* txt, size_t len, float scale, int x, int y);
 //void text_draw_u32(uint32_t const* c, size_t l, int x, int y, float s);
 void text_free(void);
 
@@ -67,7 +67,7 @@ void text_init(void) {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void text_draw(char const* c, size_t l, int x, int y, float s) {
+void text_draw(char const* txt, size_t len, float scale, int x, int y) {
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -75,7 +75,7 @@ void text_draw(char const* c, size_t l, int x, int y, float s) {
 
     glBegin(GL_QUADS);
 
-    int cx = 0, cy = 0;
+    size_t cx = 0, cy = 0;
     for (size_t k = 0; k < l; k++) {
         uint32_t u = c[k];
 
@@ -114,8 +114,9 @@ void text_draw(char const* c, size_t l, int x, int y, float s) {
         glTexCoord2f((float)(off+1)/128, (float)(k+0)/_text_allf8x8_count); glVertex2f(x + cx*8*s + 8*s, y + cy*8*s + 0*s);
 
         switch (u) {
+            case '\b': if (cx) cx--; break;
             case '\t': cx = ((cx/4) + 1)*4; break;
-            case '\n': cy--; break;
+            case '\n': if (cy) cy--; break;
             case '\r': cx = 0; break;
             default: cx++;
         }
