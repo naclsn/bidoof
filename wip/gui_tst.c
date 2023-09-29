@@ -8,27 +8,26 @@
 #include "../ext/views/gui.h"
 
 gui_state(gst);
+void my_gui_logic(Frame* f) {
+    gui_begin(&gst);
+
+    gui_button(&gst, my_button, "press me", true);
+    if (my_button.pressed) puts("button pressed!");
+    if (my_button.released) puts("button released!");
+
+    gui_end(&gst);
+    if (gui_need_redraw(&gst)) frame_redraw(f);
+}
 
 void render(Frame* f) {
     (void)f;
-    glClearColor(.12f, .15f, .18f, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    //glColor4f(.88f, .66f, .77f, 1.f);
-    //char const* const txt = "hi and such\r\n\u3057\u304A";
-    //text_draw(txt, strlen(txt), 2, 10, 10);
-
-    gui_button(my_button, &gst, "press me", true);
-    if (my_button.pressed) {
-        puts("button pressed!");
-    }
-
+    my_gui_logic(f);
     puts("redrawn!");
 }
 
 void resize(Frame* f, int w, int h) {
     gui_event_reshape(&gst, w, h, gst.scale);
-    frame_redraw(f);
+    my_gui_logic(f);
 }
 
 void keydown(Frame* f, unsigned key) {
@@ -38,20 +37,29 @@ void keydown(Frame* f, unsigned key) {
 }
 
 void mousedown(Frame* f, int button, int x, int y) {
-    (void)f;
-    printf("mousedown(%d, %d, %d)\n", button, x, y);
+    (void)x;
+    (void)y;
+    gui_event_mousedown(&gst, button);
+    my_gui_logic(f);
+}
+
+void mouseup(Frame* f, int button, int x, int y) {
+    (void)x;
+    (void)y;
+    gui_event_mouseup(&gst, button);
+    my_gui_logic(f);
 }
 
 void mousewheel(Frame* f, int delta, int x, int y) {
     (void)x;
     (void)y;
     gui_event_reshape(&gst, gst.width, gst.height, gst.scale * (delta < 0 ? 0.9f : 1.1f));
-    frame_redraw(f);
+    my_gui_logic(f);
 }
 
 void mousemove(Frame* f, int x, int y) {
     gui_event_mousemove(&gst, x, y);
-    frame_redraw(f);
+    my_gui_logic(f);
 }
 
 int main(void) {
@@ -65,6 +73,7 @@ int main(void) {
             .closing= frame_close,
             .keydown= keydown,
             .mousedown= mousedown,
+            .mouseup= mouseup,
             .mousewheel= mousewheel,
             .mousemove= mousemove,
         },
