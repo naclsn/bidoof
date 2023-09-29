@@ -147,7 +147,7 @@ void frame_destroy(Frame* self) {
 #define KEY_LCTRL      0x11 // LEFT CTRL key
 #define KEY_RCTRL      0x11 // RIGHT CTRL key
 #define KEY_CAPLOCK    0x14 // CAPS LOCK key
-#define KEY_ESCAPE     0x1B // ESC key
+#define KEY_ESC        0x1B // ESC key
 #define KEY_SPACE      0x20 // SPACEBAR
 #define KEY_PAGEUP     0x21 // PAGE UP key
 #define KEY_PAGEDOWN   0x22 // PAGE DOWN key
