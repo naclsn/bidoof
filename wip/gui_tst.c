@@ -7,14 +7,13 @@
 #define GUI_IMPLEMENTATION
 #include "../ext/views/gui.h"
 
-// TODO: typedefs/macros for public api types
-static struct _GuiState gst = {0};
+static GuiState gst = {0};
 void my_gui_logic(Frame* f) {
     gui_begin(&gst);
 
     static char button_text[16] = {0};
     if (!*button_text) strcpy(button_text, "press me");
-    static struct _GuiButton my_button = {.text= button_text};
+    static GuiButton my_button = {.text= button_text};
     gui_button(&gst, &my_button);
 
     static char const* curr_text;
@@ -27,7 +26,6 @@ void my_gui_logic(Frame* f) {
     }
     gui_text(&gst, curr_text);
 
-    // FIXME: gets incremented twice
     if (BUTTON_RELEASED == my_button.state) {
         static int press_count = 0;
         sprintf(button_text, "pressed %d", ++press_count);
@@ -41,7 +39,8 @@ void my_gui_logic(Frame* f) {
 void render(Frame* f) {
     (void)f;
     my_gui_logic(f);
-    puts("redrawn!");
+    static int counter = 0;
+    printf("redrawn! %d times\n", ++counter);
 }
 
 void resize(Frame* f, int w, int h) {
