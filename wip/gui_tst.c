@@ -10,28 +10,37 @@
 static GuiState gst = {0};
 void my_gui_logic(Frame* f) {
     gui_begin(&gst);
+    {
+        static GuiLayoutSplits lo = {.direction= SPLITS_HORIZONTAL, .count= 2};
+        gui_layout_splits(&gst, &lo);
 
-    static char button_text[16] = {0};
-    if (!*button_text) strcpy(button_text, "press me");
-    static GuiButton my_button = {.text= button_text};
-    gui_button(&gst, &my_button);
+        gui_layout_push(&gst, &lo);
+        {
+            static char button_text[16] = {0};
+            if (!*button_text) strcpy(button_text, "press me");
+            static GuiButton my_button = {.text= button_text};
+            gui_layout_splits_next(&gst, &lo);
+                gui_button(&gst, &my_button);
 
-    static char const* curr_text;
-    switch (my_button.state) {
-        case BUTTON_RESTING:  curr_text = "BUTTON_RESTING";  break;
-        case BUTTON_HOVERED:  curr_text = "BUTTON_HOVERED";  break;
-        case BUTTON_PRESSED:  curr_text = "BUTTON_PRESSED";  break;
-        case BUTTON_RELEASED: curr_text = "BUTTON_RELEASED"; break;
-        case BUTTON_DISABLED: curr_text = "BUTTON_DISABLED"; break;
+            static char const* curr_text;
+            switch (my_button.state) {
+                case BUTTON_RESTING:  curr_text = "BUTTON_RESTING";  break;
+                case BUTTON_HOVERED:  curr_text = "BUTTON_HOVERED";  break;
+                case BUTTON_PRESSED:  curr_text = "BUTTON_PRESSED";  break;
+                case BUTTON_RELEASED: curr_text = "BUTTON_RELEASED"; break;
+                case BUTTON_DISABLED: curr_text = "BUTTON_DISABLED"; break;
+            }
+            gui_layout_splits_next(&gst, &lo);
+                gui_text(&gst, curr_text);
+
+            if (BUTTON_RELEASED == my_button.state) {
+                static int press_count = 0;
+                sprintf(button_text, "pressed %d", ++press_count);
+                if (5 == press_count) my_button.state = BUTTON_DISABLED;
+            }
+        }
+        gui_layout_pop(&gst, &lo);
     }
-    gui_text(&gst, curr_text);
-
-    if (BUTTON_RELEASED == my_button.state) {
-        static int press_count = 0;
-        sprintf(button_text, "pressed %d", ++press_count);
-        if (5 == press_count) my_button.state = BUTTON_DISABLED;
-    }
-
     gui_end(&gst);
     if (gui_need_redraw(&gst)) frame_redraw(f);
 }
@@ -71,7 +80,7 @@ void mouseup(Frame* f, int button, int x, int y) {
 void mousewheel(Frame* f, int delta, int x, int y) {
     (void)x;
     (void)y;
-    gui_event_reshape(&gst, gst.width, gst.height, gst.scale * (delta < 0 ? 0.9f : 1.1f));
+    gui_event_reshape(&gst, gst.rect.width, gst.rect.height, gst.scale * (delta < 0 ? 0.9f : 1.1f));
     my_gui_logic(f);
 }
 

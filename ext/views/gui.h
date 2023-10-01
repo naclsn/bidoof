@@ -22,14 +22,24 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+typedef struct GuiRect { int x, y, width, height; } GuiRect;
+
+struct _GuiLayoutBase { struct _GuiLayoutBase* parent; GuiRect rect; };
+
 typedef struct GuiState {
-    int width, height;
+    struct _GuiLayoutBase* parent;
+    GuiRect rect;
+
+    struct _GuiLayoutBase* layout;
+
     float scale;
+
     struct {
         bool need_redraw :1;
         bool will_need_redraw :1;
         bool mouse_event :1;
     } flags;
+
     struct {
         int x, y;
         struct {
@@ -48,6 +58,23 @@ void gui_event_reshape(GuiState* st, int w, int h, float scale);
 void gui_event_mousedown(GuiState* st, int button);
 void gui_event_mouseup(GuiState* st, int button);
 void gui_event_mousemove(GuiState* st, int x, int y);
+
+void gui_layout_push(GuiState* st, void* layout);
+void gui_layout_pop(GuiState* st, void* layout);
+
+typedef struct GuiLayoutFixed {
+    struct _GuiLayoutBase* parent;
+    GuiRect rect;
+} GuiLayoutFixed;
+
+typedef struct GuiLayoutSplits {
+    struct _GuiLayoutBase* parent;
+    GuiRect rect;
+    enum { SPLITS_VERTICAL, SPLITS_HORIZONTAL } direction;
+    unsigned count, current;
+} GuiLayoutSplits;
+void gui_layout_splits(GuiState* st, GuiLayoutSplits* self);
+void gui_layout_splits_next(GuiState* st, GuiLayoutSplits* self);
 
 void gui_text(GuiState* st, char const* text);
 
@@ -93,12 +120,12 @@ void text_area(char const* txt, size_t len, int* w, int* h) {
 }
 #endif
 
-struct _GuiRect { int x, y, width, height; };
-static inline bool rect_in(struct _GuiRect* r, int x, int y)
+static inline bool rect_in(GuiRect* r, int x, int y)
 { return r->x <= x && x < r->x+r->width && r->y <= y && y < r->y+r->height; }
 
 void gui_begin(GuiState* st) {
     if (!st->scale) st->scale = 1;
+    st->layout = (struct _GuiLayoutBase*)st;
     if (st->flags.need_redraw) {
         glClearColor(.12f, .15f, .18f, 1);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -114,8 +141,8 @@ void gui_end(GuiState* st) {
 }
 
 void gui_event_reshape(GuiState* st, int w, int h, float scale) {
-    st->width = w;
-    st->height = h;
+    st->rect.width = w;
+    st->rect.height = h;
     st->scale = scale;
 
     glMatrixMode(GL_PROJECTION);
@@ -144,8 +171,46 @@ void gui_event_mousemove(GuiState* st, int x, int y) {
     st->flags.mouse_event = true;
 }
 
+void gui_layout_push(GuiState* st, void* layout) {
+    ((struct _GuiLayoutBase*)layout)->parent = st->layout;
+    st->layout = (struct _GuiLayoutBase*)layout;
+}
+
+void gui_layout_pop(GuiState* st, void* layout) {
+    st->layout = ((struct _GuiLayoutBase*)layout)->parent;
+}
+
+void gui_layout_splits(GuiState* st, GuiLayoutSplits* self) {
+    (void)st;
+    self->current = 0;
+}
+
+void gui_layout_splits_next(GuiState* st, GuiLayoutSplits* self) {
+    (void)st;
+    //assert(self->current < self->count);
+    //assert(st->layout == (void*)self);
+    self->current++;
+    float f = 1.f/self->count;
+
+    switch (self->direction) {
+        case SPLITS_VERTICAL:
+            self->rect.width = self->parent->rect.width * f;
+            self->rect.height = self->parent->rect.height;
+            self->rect.x = self->parent->rect.x + self->parent->rect.width * (self->current-1)*f;
+            self->rect.y = self->parent->rect.y;
+            break;
+        case SPLITS_HORIZONTAL:
+            self->rect.width = self->parent->rect.width;
+            self->rect.height = self->parent->rect.height * f;
+            self->rect.x = self->parent->rect.x;
+            self->rect.y = self->parent->rect.y + self->parent->rect.height * (self->current-1)*f;
+            break;
+        //default: false
+    }
+}
+
 void gui_text(GuiState* st, char const* text) {
-    struct _GuiRect r;
+    GuiRect r;
 
     text_area(text, strlen(text), &r.width, &r.height);
     r.x = r.y = 16;
@@ -153,11 +218,15 @@ void gui_text(GuiState* st, char const* text) {
     if (st->flags.need_redraw) {
         glColor4f(1, .4, .7, 1);
         text_draw(text, strlen(text), r.x, r.y);
+
+        glColor4f(1, 0, 1, .5);
+        GuiRect l = st->layout->rect;
+        glRecti(l.x, l.y, l.x+l.width, l.y+l.height);
     }
 }
 
 void gui_button(GuiState* st, GuiButton* self) {
-    struct _GuiRect r;
+    GuiRect r;
 
     static int const padx = 4;
     static int const pady = 4;
@@ -207,6 +276,10 @@ void gui_button(GuiState* st, GuiButton* self) {
         }
 
         text_draw(self->text, strlen(self->text), r.x+padx, r.y+pady);
+
+        glColor4f(1, 1, 0, .5);
+        GuiRect l = st->layout->rect;
+        glRecti(l.x, l.y, l.x+l.width, l.y+l.height);
     }
 }
 
