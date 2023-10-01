@@ -1,3 +1,4 @@
+#define GUI_IMPLEMENTATION
 ///
 /// label
 /// button
@@ -22,7 +23,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-typedef struct GuiRect { int x, y, width, height; } GuiRect;
+typedef struct GuiRect { float x, y, width, height; } GuiRect;
 
 struct _GuiLayoutBase { struct _GuiLayoutBase* parent; GuiRect rect; };
 
@@ -41,7 +42,7 @@ typedef struct GuiState {
     } flags;
 
     struct {
-        int x, y;
+        float x, y;
         struct {
             bool left :1;
             bool right :1;
@@ -76,7 +77,10 @@ typedef struct GuiLayoutSplits {
 void gui_layout_splits(GuiState* st, GuiLayoutSplits* self);
 void gui_layout_splits_next(GuiState* st, GuiLayoutSplits* self);
 
-void gui_text(GuiState* st, char const* text);
+typedef struct GuiLabel {
+    char const* text;
+} GuiLabel;
+void gui_label(GuiState* st, GuiLabel* text);
 
 typedef enum GuiButtonState {
     BUTTON_RESTING,
@@ -120,8 +124,10 @@ void text_area(char const* txt, size_t len, int* w, int* h) {
 }
 #endif
 
-static inline bool rect_in(GuiRect* r, int x, int y)
-{ return r->x <= x && x < r->x+r->width && r->y <= y && y < r->y+r->height; }
+static inline bool rect_in(GuiRect const r, float x, float y)
+{ return r.x <= x && x < r.x+r.width && r.y <= y && y < r.y+r.height; }
+static inline GuiRect rect_pad(GuiRect const r, float dx, float dy)
+{ return (GuiRect){.x= r.x-dx, .y= r.y-dy, .width= r.width+2*dx, .height= r.height+2*dy}; }
 
 void gui_begin(GuiState* st) {
     if (!st->scale) st->scale = 1;
@@ -141,8 +147,8 @@ void gui_end(GuiState* st) {
 }
 
 void gui_event_reshape(GuiState* st, int w, int h, float scale) {
-    st->rect.width = w;
-    st->rect.height = h;
+    st->rect.width = w/scale;
+    st->rect.height = h/scale;
     st->scale = scale;
 
     glMatrixMode(GL_PROJECTION);
@@ -166,8 +172,8 @@ void gui_event_mouseup(GuiState* st, int button) {
     st->flags.mouse_event = true;
 }
 void gui_event_mousemove(GuiState* st, int x, int y) {
-    st->mouse.x = x;
-    st->mouse.y = y;
+    st->mouse.x = x/st->scale;
+    st->mouse.y = y/st->scale;
     st->flags.mouse_event = true;
 }
 
@@ -209,33 +215,40 @@ void gui_layout_splits_next(GuiState* st, GuiLayoutSplits* self) {
     }
 }
 
-void gui_text(GuiState* st, char const* text) {
+static GuiRect _layout_rect_pos(GuiState* st, float ww, float hh, float padx, float pady) {
+    GuiRect const l = st->layout->rect;
     GuiRect r;
+    r.width = ww;
+    r.height = hh;
+    // this is for it centered, but we could take some params for hz/ve positioning
+    r.x = l.x + l.width/2.f - r.width/2.f;
+    r.y = l.y + l.height/2.f - r.height/2.f;
+    return rect_pad(r, padx, pady);
+}
 
-    text_area(text, strlen(text), &r.width, &r.height);
-    r.x = r.y = 16;
+void gui_label(GuiState* st, GuiLabel* self) {
+    int ww, hh;
+    text_area(self->text, strlen(self->text), &ww, &hh);
+
+    static int const padx = 4;
+    static int const pady = 4;
+    GuiRect const r = _layout_rect_pos(st, ww, hh, padx, pady);
 
     if (st->flags.need_redraw) {
         glColor4f(1, .4, .7, 1);
-        text_draw(text, strlen(text), r.x, r.y);
-
-        glColor4f(1, 0, 1, .5);
-        GuiRect l = st->layout->rect;
-        glRecti(l.x, l.y, l.x+l.width, l.y+l.height);
+        text_draw(self->text, strlen(self->text), r.x, r.y);
     }
 }
 
 void gui_button(GuiState* st, GuiButton* self) {
-    GuiRect r;
+    int ww, hh;
+    text_area(self->text, strlen(self->text), &ww, &hh);
 
     static int const padx = 4;
     static int const pady = 4;
-    text_area(self->text, strlen(self->text), &r.width, &r.height);
-    r.width+= padx*2;
-    r.height+= pady*2;
-    r.x = r.y = 8;
+    GuiRect const r = _layout_rect_pos(st, ww, hh, padx, pady);
 
-    bool is_in = rect_in(&r, st->mouse.x/st->scale, st->mouse.y/st->scale);
+    bool is_in = rect_in(r, st->mouse.x, st->mouse.y);
     bool is_down = st->flags.mouse_event && st->mouse.buttons.left;
     bool is_up = st->flags.mouse_event && !st->mouse.buttons.left;
 
@@ -276,10 +289,6 @@ void gui_button(GuiState* st, GuiButton* self) {
         }
 
         text_draw(self->text, strlen(self->text), r.x+padx, r.y+pady);
-
-        glColor4f(1, 1, 0, .5);
-        GuiRect l = st->layout->rect;
-        glRecti(l.x, l.y, l.x+l.width, l.y+l.height);
     }
 }
 
