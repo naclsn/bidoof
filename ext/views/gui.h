@@ -1,4 +1,3 @@
-#define GUI_IMPLEMENTATION
 ///
 /// label
 /// button
@@ -18,18 +17,17 @@
 /// - `int const MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE;`
 ///
 /// Optionally, text_area can be `#define`d to a custom function.
-/// The default behavior should match with text.h for ASCII text.
+/// The default behavior should match with text.h.
 
 #include <stdbool.h>
-#include <stdlib.h>
 
 typedef struct GuiRect { float x, y, width, height; } GuiRect;
 
-struct _GuiLayoutBase { struct _GuiLayoutBase* parent; GuiRect rect; };
+#define _extends_GuiLayoutBase  struct _GuiLayoutBase* parent; GuiRect rect
+struct _GuiLayoutBase { _extends_GuiLayoutBase; };
 
 typedef struct GuiState {
-    struct _GuiLayoutBase* parent;
-    GuiRect rect;
+    _extends_GuiLayoutBase;
 
     struct _GuiLayoutBase* layout;
 
@@ -64,13 +62,12 @@ void gui_layout_push(GuiState* st, void* layout);
 void gui_layout_pop(GuiState* st, void* layout);
 
 typedef struct GuiLayoutFixed {
-    struct _GuiLayoutBase* parent;
-    GuiRect rect;
+    _extends_GuiLayoutBase;
 } GuiLayoutFixed;
+void gui_layout_fixed(GuiState* st, GuiLayoutFixed* self);
 
 typedef struct GuiLayoutSplits {
-    struct _GuiLayoutBase* parent;
-    GuiRect rect;
+    _extends_GuiLayoutBase;
     enum { SPLITS_VERTICAL, SPLITS_HORIZONTAL } direction;
     unsigned count, current;
 } GuiLayoutSplits;
@@ -95,8 +92,22 @@ typedef struct GuiButton {
 } GuiButton;
 void gui_button(GuiState* st, GuiButton* self);
 
+typedef enum GuiMenuState {
+    MENU_RESTING,
+    MENU_OPENED,
+    MENU_SELECTED,
+} GuiMenuState;
+typedef struct GuiMenu {
+    GuiMenuState state;
+    GuiLayoutFixed box;
+    GuiLayoutSplits splits;
+    unsigned count, pick;
+    GuiButton choices[];
+} GuiMenu;
+void gui_menu(GuiState* st, GuiMenu* self);
+
 #ifdef GUI_IMPLEMENTATION
-#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <GL/gl.h>
 
@@ -107,6 +118,23 @@ void text_area(char const* txt, size_t len, int* w, int* h) {
     int cx = 0, cy = 1;
     for (size_t k = 0; k < len; k++) {
         uint32_t u = txt[k];
+
+        if (0 == (0b10000000 & u))
+            ;
+        else if (0 == (0b00100000 & u) && k+1 < len) {
+            char x = txt[++k];
+            u = ((u & 0b00011111) << 6) | (x & 0b00111111);
+        }
+        else if (0 == (0b00010000 & u) && k+2 < len) {
+            char x = txt[++k], y = txt[++k];
+            u = ((u & 0b00001111) << 12) | ((x & 0b00111111) << 6) | (y & 0b00111111);
+        }
+        else if (0 == (0b00001000 & u) && k+3 < len) {
+            char x = txt[++k], y = txt[++k], z = txt[++k];
+            u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
+        }
+
+        else u = '?';
         switch (u) {
             case '\b': if (cx) cx--; break;
             case '\t': cx = ((cx/4) + 1)*4; break;
@@ -186,6 +214,13 @@ void gui_layout_pop(GuiState* st, void* layout) {
     st->layout = ((struct _GuiLayoutBase*)layout)->parent;
 }
 
+void gui_layout_fixed(GuiState* st, GuiLayoutFixed* self) {
+    if (st->flags.need_redraw) {
+        glColor4f(.42, .37, .40, .4);
+        glRecti(self->rect.x, self->rect.y, self->rect.x+self->rect.width, self->rect.y+self->rect.height);
+    }
+}
+
 void gui_layout_splits(GuiState* st, GuiLayoutSplits* self) {
     (void)st;
     self->current = 0;
@@ -230,8 +265,8 @@ void gui_label(GuiState* st, GuiLabel* self) {
     int ww, hh;
     text_area(self->text, strlen(self->text), &ww, &hh);
 
-    static int const padx = 4;
-    static int const pady = 4;
+    static int const padx = 2;
+    static int const pady = 2;
     GuiRect const r = _layout_rect_pos(st, ww, hh, padx, pady);
 
     if (st->flags.need_redraw) {
@@ -244,8 +279,8 @@ void gui_button(GuiState* st, GuiButton* self) {
     int ww, hh;
     text_area(self->text, strlen(self->text), &ww, &hh);
 
-    static int const padx = 4;
-    static int const pady = 4;
+    static int const padx = 2;
+    static int const pady = 2;
     GuiRect const r = _layout_rect_pos(st, ww, hh, padx, pady);
 
     bool is_in = rect_in(r, st->mouse.x, st->mouse.y);
@@ -274,7 +309,10 @@ void gui_button(GuiState* st, GuiButton* self) {
             break;
     }
 
-    if (pstate != self->state) st->flags.will_need_redraw = true;
+    if (pstate != self->state) {
+        st->flags.mouse_event = false; // XXX:/
+        st->flags.will_need_redraw = true;
+    }
 
     if (st->flags.need_redraw) {
         glColor4f(.42, .72, .12, 1);
@@ -290,6 +328,67 @@ void gui_button(GuiState* st, GuiButton* self) {
 
         text_draw(self->text, strlen(self->text), r.x+padx, r.y+pady);
     }
+}
+
+void gui_menu(GuiState* st, GuiMenu* self) {
+    switch (self->state) {
+        case MENU_RESTING:
+            if (st->flags.mouse_event && st->mouse.buttons.right) {
+                st->flags.mouse_event = false;
+                self->state = MENU_OPENED;
+                st->flags.will_need_redraw = true;
+                self->box.rect.x = st->mouse.x;
+                self->box.rect.y = st->mouse.y;
+                self->box.rect.width = 60;
+                self->box.rect.height = self->count*16;
+                self->box.rect = rect_pad(self->box.rect, 4, 4);
+            }
+            break;
+
+        case MENU_OPENED:
+            if (st->flags.mouse_event && st->mouse.buttons.left
+                    && !rect_in(self->box.rect, st->mouse.x, st->mouse.y)) {
+                st->flags.mouse_event = false;
+                st->flags.will_need_redraw = true;
+                self->state = MENU_RESTING;
+                break;
+            }
+            if (st->flags.mouse_event && st->mouse.buttons.right) {
+                st->flags.mouse_event = false;
+                st->flags.will_need_redraw = true;
+                self->box.rect.x = st->mouse.x;
+                self->box.rect.y = st->mouse.y;
+                self->box.rect.width = 60;
+                self->box.rect.height = self->count*16;
+                self->box.rect = rect_pad(self->box.rect, 4, 4);
+                break;
+            }
+
+            gui_layout_push(st, &self->box);
+            gui_layout_fixed(st, &self->box);
+            {
+                self->splits.direction = SPLITS_HORIZONTAL;
+                self->splits.count = self->count;
+
+                gui_layout_push(st, &self->splits);
+                gui_layout_splits(st, &self->splits);
+                for (unsigned k = 0; k < self->count; k++) {
+                    gui_layout_splits_next(st, &self->splits);
+                    gui_button(st, &self->choices[k]);
+                    if (BUTTON_RELEASED == self->choices[k].state) {
+                        self->state = MENU_SELECTED;
+                        self->pick = k;
+                    }
+                }
+                gui_layout_pop(st, &self->splits);
+            }
+            gui_layout_pop(st, &self->box);
+            break;
+
+        case MENU_SELECTED:
+            self->state = MENU_RESTING;
+            break;
+    } // switch state
 }
 
 #endif // GUI_IMPLEMENTATION

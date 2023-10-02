@@ -7,14 +7,30 @@
 #define GUI_IMPLEMENTATION
 #include "../ext/views/gui.h"
 
-static GuiState gst = {.scale= 3};
+static GuiState gst = {.scale= 2.4};
 void my_gui_logic(Frame* f) {
     gui_begin(&gst);
     {
-        static GuiLayoutSplits lo = {.direction= SPLITS_HORIZONTAL, .count= 2};
-        gui_layout_splits(&gst, &lo);
+        {
+            static GuiMenu alt = {.count= 3, .choices= {
+                {.text= "hello"},
+                {.text= "bonjour"},
+                {.text= "\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x82\x8f"},
+            }};
+            gui_menu(&gst, &alt);
+            if (MENU_SELECTED == alt.state) {
+                static char* const ans[] = {
+                    "well hi there",
+                    "bien le bonjour",
+                    "\xe3\x81\xb8\xe3\x81\x84\xe3\x81\x8d\xe3\x81\xaa\xe3\x81\xae",
+                };
+                printf("%s\n", ans[alt.pick]);
+            }
+        }
 
+        static GuiLayoutSplits lo = {.direction= SPLITS_HORIZONTAL, .count= 2};
         gui_layout_push(&gst, &lo);
+        gui_layout_splits(&gst, &lo);
         {
             static char button_text[16] = {0};
             if (!*button_text) strcpy(button_text, "press me");
@@ -56,8 +72,8 @@ void render(Frame* f) {
 }
 
 void resize(Frame* f, int w, int h) {
-    // NOTE: frame.h could be filtering the first few 'resize' events
-    //       as from my testing these can be pretty wild..
+    // TODO: frame.h could be filtering the first few 'resize' events
+    //       as these can be pretty wild.. (seems to be an X11 thing)
     if (1 < w && 1 < h) {
         gui_event_reshape(&gst, w, h, gst.scale);
         my_gui_logic(f);
