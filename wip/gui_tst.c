@@ -11,26 +11,8 @@ static GuiState gst = {.scale= 2.4};
 void my_gui_logic(Frame* f) {
     gui_begin(&gst);
     {
-        {
-            static GuiMenu alt = {.count= 3, .choices= {
-                {.text= "hello"},
-                {.text= "bonjour"},
-                {.text= "\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x82\x8f"},
-            }};
-            gui_menu(&gst, &alt);
-            if (MENU_SELECTED == alt.state) {
-                static char* const ans[] = {
-                    "well hi there",
-                    "bien le bonjour",
-                    "\xe3\x81\xb8\xe3\x81\x84\xe3\x81\x8d\xe3\x81\xaa\xe3\x81\xae",
-                };
-                printf("%s\n", ans[alt.pick]);
-            }
-        }
-
         static GuiLayoutSplits lo = {.direction= SPLITS_HORIZONTAL, .count= 2};
-        gui_layout_push(&gst, &lo);
-        gui_layout_splits(&gst, &lo);
+        gui_layout_splits_push(&gst, &lo);
         {
             static char button_text[16] = {0};
             if (!*button_text) strcpy(button_text, "press me");
@@ -58,7 +40,22 @@ void my_gui_logic(Frame* f) {
                 }
             }
         }
-        gui_layout_pop(&gst, &lo);
+        gui_layout_splits_pop(&gst, &lo);
+
+        static GuiMenu alt = {.count= 3, .choices= {
+            {.text= "hello"},
+            {.text= "bonjour"},
+            {.text= "\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x82\x8f"},
+        }};
+        gui_menu_alt(&gst, &alt);
+        if (MENU_SELECTED == alt.state) {
+            static char* const ans[] = {
+                "well hi there",
+                "bien le bonjour",
+                "\xe3\x81\xb8\xe3\x81\x84\xe3\x81\x8d\xe3\x81\xaa\xe3\x81\xae",
+            };
+            printf("%s\n", ans[alt.pick]);
+        }
     }
     gui_end(&gst);
     if (gui_need_redraw(&gst)) frame_redraw(f);

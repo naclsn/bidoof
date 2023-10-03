@@ -58,21 +58,20 @@ void gui_event_mousedown(GuiState* st, int button);
 void gui_event_mouseup(GuiState* st, int button);
 void gui_event_mousemove(GuiState* st, int x, int y);
 
-void gui_layout_push(GuiState* st, void* layout);
-void gui_layout_pop(GuiState* st, void* layout);
-
 typedef struct GuiLayoutFixed {
     _extends_GuiLayoutBase;
 } GuiLayoutFixed;
-void gui_layout_fixed(GuiState* st, GuiLayoutFixed* self);
+void gui_layout_fixed_push(GuiState* st, GuiLayoutFixed* self);
+void gui_layout_fixed_pop(GuiState* st, GuiLayoutFixed* self);
 
 typedef struct GuiLayoutSplits {
     _extends_GuiLayoutBase;
     enum { SPLITS_VERTICAL, SPLITS_HORIZONTAL } direction;
     unsigned count, current;
 } GuiLayoutSplits;
-void gui_layout_splits(GuiState* st, GuiLayoutSplits* self);
+void gui_layout_splits_push(GuiState* st, GuiLayoutSplits* self);
 void gui_layout_splits_next(GuiState* st, GuiLayoutSplits* self);
+void gui_layout_splits_pop(GuiState* st, GuiLayoutSplits* self);
 
 typedef struct GuiLabel {
     char const* text;
@@ -105,6 +104,7 @@ typedef struct GuiMenu {
     GuiButton choices[];
 } GuiMenu;
 void gui_menu(GuiState* st, GuiMenu* self);
+void gui_menu_alt(GuiState* st, GuiMenu* self);
 
 #ifdef GUI_IMPLEMENTATION
 #include <stdlib.h>
@@ -205,34 +205,35 @@ void gui_event_mousemove(GuiState* st, int x, int y) {
     st->flags.mouse_event = true;
 }
 
-void gui_layout_push(GuiState* st, void* layout) {
+void _gui_layout_push(GuiState* st, void* layout) {
     ((struct _GuiLayoutBase*)layout)->parent = st->layout;
     st->layout = (struct _GuiLayoutBase*)layout;
 }
-
-void gui_layout_pop(GuiState* st, void* layout) {
+void _gui_layout_pop(GuiState* st, void* layout) {
     st->layout = ((struct _GuiLayoutBase*)layout)->parent;
 }
 
-void gui_layout_fixed(GuiState* st, GuiLayoutFixed* self) {
+void gui_layout_fixed_push(GuiState* st, GuiLayoutFixed* self) {
+    _gui_layout_push(st, self);
     if (st->flags.need_redraw) {
         glColor4f(.42, .37, .40, .4);
         glRecti(self->rect.x, self->rect.y, self->rect.x+self->rect.width, self->rect.y+self->rect.height);
     }
 }
-
-void gui_layout_splits(GuiState* st, GuiLayoutSplits* self) {
-    (void)st;
-    self->current = 0;
+void gui_layout_fixed_pop(GuiState* st, GuiLayoutFixed* self) {
+    _gui_layout_pop(st, self);
 }
 
+void gui_layout_splits_push(GuiState* st, GuiLayoutSplits* self) {
+    _gui_layout_push(st, self);
+    self->current = 0;
+}
 void gui_layout_splits_next(GuiState* st, GuiLayoutSplits* self) {
     (void)st;
     //assert(self->current < self->count);
     //assert(st->layout == (void*)self);
     self->current++;
     float f = 1.f/self->count;
-
     switch (self->direction) {
         case SPLITS_VERTICAL:
             self->rect.width = self->parent->rect.width * f;
@@ -248,6 +249,9 @@ void gui_layout_splits_next(GuiState* st, GuiLayoutSplits* self) {
             break;
         //default: false
     }
+}
+void gui_layout_splits_pop(GuiState* st, GuiLayoutSplits* self) {
+    _gui_layout_pop(st, self);
 }
 
 static GuiRect _layout_rect_pos(GuiState* st, float ww, float hh, float padx, float pady) {
@@ -333,16 +337,6 @@ void gui_button(GuiState* st, GuiButton* self) {
 void gui_menu(GuiState* st, GuiMenu* self) {
     switch (self->state) {
         case MENU_RESTING:
-            if (st->flags.mouse_event && st->mouse.buttons.right) {
-                st->flags.mouse_event = false;
-                self->state = MENU_OPENED;
-                st->flags.will_need_redraw = true;
-                self->box.rect.x = st->mouse.x;
-                self->box.rect.y = st->mouse.y;
-                self->box.rect.width = 60;
-                self->box.rect.height = self->count*16;
-                self->box.rect = rect_pad(self->box.rect, 4, 4);
-            }
             break;
 
         case MENU_OPENED:
@@ -353,25 +347,13 @@ void gui_menu(GuiState* st, GuiMenu* self) {
                 self->state = MENU_RESTING;
                 break;
             }
-            if (st->flags.mouse_event && st->mouse.buttons.right) {
-                st->flags.mouse_event = false;
-                st->flags.will_need_redraw = true;
-                self->box.rect.x = st->mouse.x;
-                self->box.rect.y = st->mouse.y;
-                self->box.rect.width = 60;
-                self->box.rect.height = self->count*16;
-                self->box.rect = rect_pad(self->box.rect, 4, 4);
-                break;
-            }
 
-            gui_layout_push(st, &self->box);
-            gui_layout_fixed(st, &self->box);
+            gui_layout_fixed_push(st, &self->box);
             {
                 self->splits.direction = SPLITS_HORIZONTAL;
                 self->splits.count = self->count;
 
-                gui_layout_push(st, &self->splits);
-                gui_layout_splits(st, &self->splits);
+                gui_layout_splits_push(st, &self->splits);
                 for (unsigned k = 0; k < self->count; k++) {
                     gui_layout_splits_next(st, &self->splits);
                     gui_button(st, &self->choices[k]);
@@ -380,15 +362,50 @@ void gui_menu(GuiState* st, GuiMenu* self) {
                         self->pick = k;
                     }
                 }
-                gui_layout_pop(st, &self->splits);
+                gui_layout_splits_pop(st, &self->splits);
             }
-            gui_layout_pop(st, &self->box);
+            gui_layout_fixed_pop(st, &self->box);
             break;
 
         case MENU_SELECTED:
             self->state = MENU_RESTING;
             break;
-    } // switch state
+    }
+}
+
+void gui_menu_alt(GuiState* st, GuiMenu* self) {
+    switch (self->state) {
+        case MENU_RESTING:
+            if (st->flags.mouse_event && st->mouse.buttons.right) {
+                st->flags.mouse_event = false;
+                self->state = MENU_OPENED;
+                if (!st->flags.need_redraw) st->flags.will_need_redraw = true;
+                self->box.rect.x = st->mouse.x;
+                self->box.rect.y = st->mouse.y;
+                self->box.rect.width = 60;
+                self->box.rect.height = self->count*16;
+                self->box.rect = rect_pad(self->box.rect, 4, 4);
+                if (!st->flags.need_redraw) return;
+            }
+            break;
+
+        case MENU_OPENED:
+            if (st->flags.mouse_event && st->mouse.buttons.right) {
+                st->flags.mouse_event = false;
+                if (!st->flags.need_redraw) st->flags.will_need_redraw = true;
+                self->box.rect.x = st->mouse.x;
+                self->box.rect.y = st->mouse.y;
+                self->box.rect.width = 60;
+                self->box.rect.height = self->count*16;
+                self->box.rect = rect_pad(self->box.rect, 4, 4);
+            }
+            break;
+
+        case MENU_SELECTED:
+            break;
+    }
+
+    gui_menu(st, self);
 }
 
 #endif // GUI_IMPLEMENTATION

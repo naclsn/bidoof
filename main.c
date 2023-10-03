@@ -223,7 +223,10 @@ void repl(char* histfn) {
                 if (len) {
                     fseek(f, 0, SEEK_SET);
                     script = malloc(len);
-                    if (script) fread(script, len, 1, f);
+                    if (script) {
+                        fread(script, len, 1, f);
+                        script[len-1] = '\0';
+                    }
                 }
                 fclose(f);
                 if (script) lang_process(filename, script, &repl_scope);
