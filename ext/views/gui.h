@@ -1,4 +1,3 @@
-#define GUI_IMPLEMENTATION
 ///
 /// label
 /// button
@@ -299,6 +298,9 @@ void gui_label(GuiState* st, GuiLabel* self) {
 }
 
 void gui_button(GuiState* st, GuiButton* self) {
+    // TODO: focused return/space
+    if (GUI_KEY_EVENT_BUBBLE == st->state) return; // YYY: not interested yet
+
     int ww, hh;
     text_area(self->text, strlen(self->text), &ww, &hh);
 
@@ -308,7 +310,9 @@ void gui_button(GuiState* st, GuiButton* self) {
 
     bool is_in = rect_in(r, st->mouse.x, st->mouse.y);
     if (GUI_MOUSE_EVENT_BUBBLE == st->state) {
-        if (is_in) st->event_captured = self;
+        if (is_in && (GUI_MOUSE_DOWN_LEFT == st->mouse.button
+                   || GUI_MOUSE_UP_LEFT == st->mouse.button
+                )) st->event_captured = self;
         return;
     }
 
@@ -358,20 +362,24 @@ void gui_button(GuiState* st, GuiButton* self) {
 }
 
 void gui_menu(GuiState* st, GuiMenu* self) {
-    (void)st;
-    (void)self;
-}/*
+    if (GUI_KEY_EVENT_BUBBLE == st->state) return; // YYY: not interested yet
+
     switch (self->state) {
         case MENU_RESTING:
             break;
 
         case MENU_OPENED:
-            if (st->flags.mouse_event && st->mouse.buttons.left
-                    && !rect_in(self->box.rect, st->mouse.x, st->mouse.y)) {
-                st->flags.mouse_event = false;
-                st->flags.redraw_needed = true;
-                self->state = MENU_RESTING;
-                break;
+            bool is_in = rect_in(self->box.rect, st->mouse.x, st->mouse.y);
+            if (GUI_MOUSE_EVENT_BUBBLE == st->state) {
+                if (!is_in) {
+                    // well in this case we know it's not for us
+                    st->needs_redraw = true;
+                    self->state = MENU_RESTING;
+                    return;
+                }
+
+                // capture just in case (prevent click-through)
+                if (is_in) st->event_captured = self;
             }
 
             gui_layout_fixed_push(st, &self->box);
@@ -394,39 +402,41 @@ void gui_menu(GuiState* st, GuiMenu* self) {
             break;
 
         case MENU_SELECTED:
+            if (GUI_MOUSE_EVENT_BUBBLE == st->state) return;
+            st->needs_redraw = true;
             self->state = MENU_RESTING;
             break;
     }
-}*/
+}
 
 void gui_menu_alt(GuiState* st, GuiMenu* self) {
-    (void)st;
-    (void)self;
-}/*
+    // TODO: menu key?
+    if (GUI_KEY_EVENT_BUBBLE == st->state) return; // YYY: not interested yet
+
+    if (GUI_MOUSE_EVENT_BUBBLE == st->state) {
+        // we don't take too much prioriy
+        if (GUI_MOUSE_DOWN_RIGHT == st->mouse.button && !st->event_captured)
+            st->event_captured = self;
+        else
+            gui_menu(st, self);
+        return;
+    }
+
+    bool captured = GUI_MOUSE_EVENT_CAPTURED == st->state && self == st->event_captured;
+    bool is_down = captured && GUI_MOUSE_DOWN_RIGHT == st->mouse.button;
+
     switch (self->state) {
         case MENU_RESTING:
-            if (st->flags.mouse_event && st->mouse.buttons.right) {
-                st->flags.mouse_event = false;
-                self->state = MENU_OPENED;
-                if (!st->flags.redrawing) st->flags.redraw_needed = true;
-                self->box.rect.x = st->mouse.x;
-                self->box.rect.y = st->mouse.y;
-                self->box.rect.width = 60;
-                self->box.rect.height = self->count*16;
-                self->box.rect = rect_pad(self->box.rect, 4, 4);
-                if (!st->flags.redrawing) return;
-            }
-            break;
-
         case MENU_OPENED:
-            if (st->flags.mouse_event && st->mouse.buttons.right) {
-                st->flags.mouse_event = false;
-                if (!st->flags.redrawing) st->flags.redraw_needed = true;
+            if (is_down) {
+                st->needs_redraw = true;
+                self->state = MENU_OPENED;
                 self->box.rect.x = st->mouse.x;
                 self->box.rect.y = st->mouse.y;
                 self->box.rect.width = 60;
                 self->box.rect.height = self->count*16;
                 self->box.rect = rect_pad(self->box.rect, 4, 4);
+                return;
             }
             break;
 
@@ -435,6 +445,6 @@ void gui_menu_alt(GuiState* st, GuiMenu* self) {
     }
 
     gui_menu(st, self);
-}*/
+}
 
 #endif // GUI_IMPLEMENTATION
