@@ -1,3 +1,4 @@
+#define GUI_IMPLEMENTATION
 ///
 /// label
 /// button
@@ -33,25 +34,36 @@ typedef struct GuiState {
 
     float scale;
 
-    struct {
-        bool need_redraw :1;
-        bool will_need_redraw :1;
-        bool mouse_event :1;
-    } flags;
+    enum {
+        GUI_RESTING,
+        GUI_REDRAWING,
+        GUI_MOUSE_EVENT_BUBBLE,
+        GUI_MOUSE_EVENT_CAPTURED,
+        GUI_KEY_EVENT_BUBBLE,
+        GUI_KEY_EVENT_CAPTURED,
+        //GUI_OTHER_EVENT,
+    } state;
+
+    void* event_captured;
+    bool needs_redraw;
 
     struct {
         float x, y;
-        struct {
-            bool left :1;
-            bool right :1;
-            bool middle :1;
-        } buttons;
+        enum {
+            GUI_MOUSE_DOWN_LEFT = MOUSE_LEFT,
+            GUI_MOUSE_DOWN_RIGHT = MOUSE_RIGHT,
+            GUI_MOUSE_DOWN_MIDDLE = MOUSE_MIDDLE,
+            GUI_MOUSE_UP_LEFT = MOUSE_LEFT+3,
+            GUI_MOUSE_UP_RIGHT = MOUSE_RIGHT+3,
+            GUI_MOUSE_UP_MIDDLE = MOUSE_MIDDLE+3,
+        } button;
     } mouse;
 } GuiState;
 
 void gui_begin(GuiState* st);
 void gui_end(GuiState* st);
-#define gui_need_redraw(__st)  ((__st)->flags.need_redraw)
+#define gui_needed_redraw(__st)  (GUI_REDRAWING == (__st)->state)
+#define gui_needed_reloop(__st)  (GUI_RESTING != (__st)->state)
 
 void gui_event_reshape(GuiState* st, int w, int h, float scale);
 void gui_event_mousedown(GuiState* st, int button);
@@ -160,18 +172,29 @@ static inline GuiRect rect_pad(GuiRect const r, float dx, float dy)
 void gui_begin(GuiState* st) {
     if (!st->scale) st->scale = 1;
     st->layout = (struct _GuiLayoutBase*)st;
-    if (st->flags.need_redraw) {
+    if (GUI_REDRAWING == st->state) {
         glClearColor(.12f, .15f, .18f, 1);
         glClear(GL_COLOR_BUFFER_BIT);
     }
 }
 void gui_end(GuiState* st) {
-    if (st->flags.will_need_redraw) {
-        st->flags.will_need_redraw = false;
-        st->flags.need_redraw = true;
-    } else if (st->flags.need_redraw)
-        st->flags.need_redraw = false;
-    st->flags.mouse_event = false;
+    switch (st->state) {
+        case GUI_RESTING: break;
+        case GUI_REDRAWING: st->state = GUI_RESTING; break;
+
+        case GUI_MOUSE_EVENT_BUBBLE: st->state = st->event_captured ? GUI_MOUSE_EVENT_CAPTURED : GUI_RESTING; break;
+        case GUI_KEY_EVENT_BUBBLE: st->state = st->event_captured ? GUI_KEY_EVENT_CAPTURED : GUI_RESTING; break;
+
+        case GUI_MOUSE_EVENT_CAPTURED:
+        case GUI_KEY_EVENT_CAPTURED:
+            st->event_captured = NULL;
+            st->state = GUI_RESTING;
+            break;
+    }
+
+    if (st->needs_redraw && GUI_RESTING == st->state)
+        st->state = GUI_REDRAWING;
+    st->needs_redraw = false;
 }
 
 void gui_event_reshape(GuiState* st, int w, int h, float scale) {
@@ -184,25 +207,21 @@ void gui_event_reshape(GuiState* st, int w, int h, float scale) {
     glOrtho(0.0, w/scale, h/scale, 0.0, -1.0, 1.0);
     glMatrixMode(GL_MODELVIEW);
 
-    st->flags.will_need_redraw = true;
+    st->state = GUI_REDRAWING;
 }
 
 void gui_event_mousedown(GuiState* st, int button) {
-    if (MOUSE_LEFT   == button) st->mouse.buttons.left   = true;
-    if (MOUSE_RIGHT  == button) st->mouse.buttons.right  = true;
-    if (MOUSE_MIDDLE == button) st->mouse.buttons.middle = true;
-    st->flags.mouse_event = true;
+    st->mouse.button = button;
+    st->state = GUI_MOUSE_EVENT_BUBBLE;
 }
 void gui_event_mouseup(GuiState* st, int button) {
-    if (MOUSE_LEFT   == button) st->mouse.buttons.left   = false;
-    if (MOUSE_RIGHT  == button) st->mouse.buttons.right  = false;
-    if (MOUSE_MIDDLE == button) st->mouse.buttons.middle = false;
-    st->flags.mouse_event = true;
+    st->mouse.button = button+3;
+    st->state = GUI_MOUSE_EVENT_BUBBLE;
 }
 void gui_event_mousemove(GuiState* st, int x, int y) {
     st->mouse.x = x/st->scale;
     st->mouse.y = y/st->scale;
-    st->flags.mouse_event = true;
+    //st->state = GUI_MOUSE_EVENT_BUBBLE;
 }
 
 void _gui_layout_push(GuiState* st, void* layout) {
@@ -215,7 +234,7 @@ void _gui_layout_pop(GuiState* st, void* layout) {
 
 void gui_layout_fixed_push(GuiState* st, GuiLayoutFixed* self) {
     _gui_layout_push(st, self);
-    if (st->flags.need_redraw) {
+    if (GUI_REDRAWING == st->state) {
         glColor4f(.42, .37, .40, .4);
         glRecti(self->rect.x, self->rect.y, self->rect.x+self->rect.width, self->rect.y+self->rect.height);
     }
@@ -273,7 +292,7 @@ void gui_label(GuiState* st, GuiLabel* self) {
     static int const pady = 2;
     GuiRect const r = _layout_rect_pos(st, ww, hh, padx, pady);
 
-    if (st->flags.need_redraw) {
+    if (GUI_REDRAWING == st->state) {
         glColor4f(1, .4, .7, 1);
         text_draw(self->text, strlen(self->text), r.x, r.y);
     }
@@ -288,8 +307,14 @@ void gui_button(GuiState* st, GuiButton* self) {
     GuiRect const r = _layout_rect_pos(st, ww, hh, padx, pady);
 
     bool is_in = rect_in(r, st->mouse.x, st->mouse.y);
-    bool is_down = st->flags.mouse_event && st->mouse.buttons.left;
-    bool is_up = st->flags.mouse_event && !st->mouse.buttons.left;
+    if (GUI_MOUSE_EVENT_BUBBLE == st->state) {
+        if (is_in) st->event_captured = self;
+        return;
+    }
+
+    bool captured = GUI_MOUSE_EVENT_CAPTURED == st->state && self == st->event_captured;
+    bool is_down = captured && GUI_MOUSE_DOWN_LEFT == st->mouse.button;
+    bool is_up = captured && GUI_MOUSE_UP_LEFT == st->mouse.button;
 
     GuiButtonState const pstate = self->state;
     switch (self->state) {
@@ -313,12 +338,10 @@ void gui_button(GuiState* st, GuiButton* self) {
             break;
     }
 
-    if (pstate != self->state) {
-        st->flags.mouse_event = false; // XXX:/
-        st->flags.will_need_redraw = true;
-    }
+    if (pstate != self->state)
+        st->needs_redraw = true;
 
-    if (st->flags.need_redraw) {
+    if (GUI_REDRAWING == st->state) {
         glColor4f(.42, .72, .12, 1);
         glRecti(r.x, r.y, r.x+r.width, r.y+r.height);
 
@@ -335,6 +358,9 @@ void gui_button(GuiState* st, GuiButton* self) {
 }
 
 void gui_menu(GuiState* st, GuiMenu* self) {
+    (void)st;
+    (void)self;
+}/*
     switch (self->state) {
         case MENU_RESTING:
             break;
@@ -343,7 +369,7 @@ void gui_menu(GuiState* st, GuiMenu* self) {
             if (st->flags.mouse_event && st->mouse.buttons.left
                     && !rect_in(self->box.rect, st->mouse.x, st->mouse.y)) {
                 st->flags.mouse_event = false;
-                st->flags.will_need_redraw = true;
+                st->flags.redraw_needed = true;
                 self->state = MENU_RESTING;
                 break;
             }
@@ -371,28 +397,31 @@ void gui_menu(GuiState* st, GuiMenu* self) {
             self->state = MENU_RESTING;
             break;
     }
-}
+}*/
 
 void gui_menu_alt(GuiState* st, GuiMenu* self) {
+    (void)st;
+    (void)self;
+}/*
     switch (self->state) {
         case MENU_RESTING:
             if (st->flags.mouse_event && st->mouse.buttons.right) {
                 st->flags.mouse_event = false;
                 self->state = MENU_OPENED;
-                if (!st->flags.need_redraw) st->flags.will_need_redraw = true;
+                if (!st->flags.redrawing) st->flags.redraw_needed = true;
                 self->box.rect.x = st->mouse.x;
                 self->box.rect.y = st->mouse.y;
                 self->box.rect.width = 60;
                 self->box.rect.height = self->count*16;
                 self->box.rect = rect_pad(self->box.rect, 4, 4);
-                if (!st->flags.need_redraw) return;
+                if (!st->flags.redrawing) return;
             }
             break;
 
         case MENU_OPENED:
             if (st->flags.mouse_event && st->mouse.buttons.right) {
                 st->flags.mouse_event = false;
-                if (!st->flags.need_redraw) st->flags.will_need_redraw = true;
+                if (!st->flags.redrawing) st->flags.redraw_needed = true;
                 self->box.rect.x = st->mouse.x;
                 self->box.rect.y = st->mouse.y;
                 self->box.rect.width = 60;
@@ -406,6 +435,6 @@ void gui_menu_alt(GuiState* st, GuiMenu* self) {
     }
 
     gui_menu(st, self);
-}
+}*/
 
 #endif // GUI_IMPLEMENTATION

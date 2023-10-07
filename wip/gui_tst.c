@@ -58,7 +58,20 @@ void my_gui_logic(Frame* f) {
         }
     }
     gui_end(&gst);
-    if (gui_need_redraw(&gst)) frame_redraw(f);
+
+    /*switch (gst.state) {
+        case GUI_RESTING: printf("GUI_RESTING"); break;
+        case GUI_REDRAWING: printf("GUI_REDRAWING"); break;
+        case GUI_MOUSE_EVENT_BUBBLE: printf("GUI_MOUSE_EVENT_BUBBLE"); break;
+        case GUI_MOUSE_EVENT_CAPTURED: printf("GUI_MOUSE_EVENT_CAPTURED by %p", gst.event_captured); break;
+        case GUI_KEY_EVENT_BUBBLE: printf("GUI_KEY_EVENT_BUBBLE"); break;
+        case GUI_KEY_EVENT_CAPTURED: printf("GUI_KEY_EVENT_CAPTURED by %p", gst.event_captured); break;
+        default: printf("broken state"); break;
+    }
+    printf("\n");*/
+
+    if (gui_needed_redraw(&gst)) frame_redraw(f);
+    else if (gui_needed_reloop(&gst)) my_gui_logic(f);
 }
 
 void render(Frame* f) {
@@ -73,7 +86,7 @@ void resize(Frame* f, int w, int h) {
     //       as these can be pretty wild.. (seems to be an X11 thing)
     if (1 < w && 1 < h) {
         gui_event_reshape(&gst, w, h, gst.scale);
-        my_gui_logic(f);
+        frame_redraw(f); // YYY: special case
     }
 }
 
@@ -82,7 +95,7 @@ void keydown(Frame* f, unsigned key) {
     printf("keydown(0x%02X)\n", key);
     if (KEY_ESC == key) frame_close(f);
     if (KEY_SPACE == key) {
-        gst.flags.need_redraw = true;
+        gst.state = GUI_REDRAWING; // ZZZ: maybe user code shouldn't do that too much
         frame_redraw(f);
     }
 }
