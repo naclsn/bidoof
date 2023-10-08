@@ -82,12 +82,8 @@ void render(Frame* f) {
 }
 
 void resize(Frame* f, int w, int h) {
-    // TODO: frame.h could be filtering the first few 'resize' events
-    //       as these can be pretty wild.. (seems to be an X11 thing)
-    if (1 < w && 1 < h) {
-        gui_event_reshape(&gst, w, h, gst.scale);
-        frame_redraw(f); // YYY: special case
-    }
+    gui_event_reshape(&gst, w, h, gst.scale);
+    frame_redraw(f); // YYY: special case
 }
 
 void keydown(Frame* f, unsigned key) {

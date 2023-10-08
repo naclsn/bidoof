@@ -66,6 +66,12 @@ bool frame_create(Frame* self) {
 }
 
 void frame_loop(Frame* self) {
+    Atom wm_protocols = XInternAtom(self->dpy, "WM_PROTOCOLS", true);
+    Atom wm_frame_redraw = XInternAtom(self->dpy, "_FRAME_WM_REDRAW_WINDOW", false);
+    Atom wm_frame_close = XInternAtom(self->dpy, "_FRAME_WM_CLOSE_WINDOW", false);
+    Atom wm_delete = XInternAtom(self->dpy, "WM_DELETE_WINDOW", false);
+    XSetWMProtocols(self->dpy, self->win, &wm_delete, 1);
+
     XEvent xev;
     while (true) {
         XNextEvent(self->dpy, &xev);
@@ -74,29 +80,18 @@ void frame_loop(Frame* self) {
             case Expose: {
                 int ww = xev.xexpose.width;
                 int hh = xev.xexpose.height;
-                glViewport(0, 0, ww, hh);
-                _event(resize, self, ww, hh);
-                self->width = ww;
-                self->height = hh;
-                _event(render, self);
-                glXSwapBuffers(self->dpy, self->win);
+                if (1 < ww && 1 < hh) {
+                    glViewport(0, 0, ww, hh);
+                    _event(resize, self, ww, hh);
+                    self->width = ww;
+                    self->height = hh;
+                    _event(render, self);
+                    //glXSwapBuffers(self->dpy, self->win); // XXX: idk
+                }
              } break;
 
-            //case ResizeRequest: {
-            //    int ww = xev.xresizerequest.width;
-            //    int hh = xev.xresizerequest.height;
-            //    _event(resize, self, ww, hh);
-            //    self->width = ww;
-            //    self->height = hh;
-            //    glViewport(0, 0, ww, hh);
-            //    _event(render, self);
-            //    glXSwapBuffers(self->dpy, self->win);
-            //} break;
-
-            //case TODO: _event(closing, self); break;
-
-            case KeyPress:      _event(keydown, self, xev.xkey.keycode); break;
-            case KeyRelease:    _event(keyup,   self, xev.xkey.keycode); break;
+            case KeyPress:   _event(keydown, self, xev.xkey.keycode); break;
+            case KeyRelease: _event(keyup,   self, xev.xkey.keycode); break;
 
             case ButtonPress:
                 if (4 == xev.xbutton.button || 5 == xev.xbutton.button)
@@ -108,36 +103,59 @@ void frame_loop(Frame* self) {
             case MotionNotify:  _event(mousemove, self, xev.xmotion.x, xev.xmotion.y); break;
 
             case ClientMessage:
-                if (XInternAtom(self->dpy, "WM_PROTOCOLS", true) ==  xev.xclient.message_type) {
-                    if (XInternAtom(self->dpy, "WM_REDRAW_WINDOW", false) == (unsigned long)xev.xclient.data.l[0]) {
+                if (wm_protocols == xev.xclient.message_type) {
+                    if (wm_frame_redraw == (Atom)xev.xclient.data.l[0]) {
                         _event(render, self);
                         glXSwapBuffers(self->dpy, self->win);
                         break;
                     }
-                    if (XInternAtom(self->dpy, "WM_DELETE_WINDOW", false) == (unsigned long)xev.xclient.data.l[0]) return;
+                    if (wm_delete == (Atom)xev.xclient.data.l[0]) {
+                        _event(closing, self);
+                        break;
+                    }
+                    if (wm_frame_close == (Atom)xev.xclient.data.l[0])
+                        return;
                 }
         }
     } // while true
 }
 
 void frame_redraw(Frame* self) {
+    static bool once = false;
+    static Atom wm_protocols = 0;
+    static Atom wm_frame_redraw = 0;
+    if (!once) {
+        once = true;
+        wm_protocols = XInternAtom(self->dpy, "WM_PROTOCOLS", true);
+        wm_frame_redraw = XInternAtom(self->dpy, "_FRAME_WM_REDRAW_WINDOW", false);
+    }
+
     XEvent event;
     event.xclient.type = ClientMessage;
     event.xclient.window = self->win;
-    event.xclient.message_type = XInternAtom(self->dpy, "WM_PROTOCOLS", true);
+    event.xclient.message_type = wm_protocols;
     event.xclient.format = 32;
-    event.xclient.data.l[0] = XInternAtom(self->dpy, "WM_REDRAW_WINDOW", false);
+    event.xclient.data.l[0] = wm_frame_redraw;
     event.xclient.data.l[1] = CurrentTime;
     XSendEvent(self->dpy, self->win, False, NoEventMask, &event);
 }
 
 void frame_close(Frame* self) {
+    static bool once = false;
+    static Atom wm_protocols = 0;
+    static Atom wm_frame_close = 0;
+    if (!once) {
+        once = true;
+        wm_protocols = XInternAtom(self->dpy, "WM_PROTOCOLS", true);
+        wm_frame_close = XInternAtom(self->dpy, "_FRAME_WM_CLOSE_WINDOW", false);
+    }
+
     XEvent event;
     event.xclient.type = ClientMessage;
     event.xclient.window = self->win;
-    event.xclient.message_type = XInternAtom(self->dpy, "WM_PROTOCOLS", true);
+    event.xclient.message_type = wm_protocols;
     event.xclient.format = 32;
-    event.xclient.data.l[0] = XInternAtom(self->dpy, "WM_DELETE_WINDOW", false);
+    event.xclient.data.l[0] = wm_frame_close;
     event.xclient.data.l[1] = CurrentTime;
     XSendEvent(self->dpy, self->win, False, NoEventMask, &event);
 }
@@ -161,6 +179,7 @@ void frame_destroy(Frame* self) {
 #define MOUSE_RIGHT  3
 #define MOUSE_MIDDLE 2
 
+// TODO: these are not correct everywhere
 #define KEY_BACKSPACE  0x16 // BACKSPACE key
 #define KEY_TAB        0x17 // TAB key
 #define KEY_RETURN     0x24 // ENTER key
