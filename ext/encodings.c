@@ -143,31 +143,76 @@ bool _Base64Encode(Buf* self, Buf const* const source) {
 }
 
 ctor_simple(1, NumDecode
-        , "decodes bytes to integral value; does not pay attention to a potential overflow"
+        , "decodes bytes to integral value"
         , (3, NUM, _NumDecode, BUF, source, SYM, endian, SYM, sign)
         );
 
 bool _NumDecode(Num* self, Buf const* const source, Sym const* const endian, Sym const* const sign) {
+    if (destroyed(self)) return true;
+
     try_enum_symcvt(Endian, ed, 2, *endian, BIG_END, LITTLE_END);
     try_enum_symcvt(Sign, sg, 2, *sign, SIGNED, UNSIGNED);
 
-    printf("ed: %d, sg: %d\n", ed, sg);
+    if (8 < source->len) fail("NIY: ints larger than 64 bits");
+    if (0 == source->len) return self->val = 0, true;
 
-    (void)self;
-    (void)source;
-    fail("NIY");
+    i64 val = 0;
+    bool ngt = false;
+
+    if (LITTLE_END == ed) {
+        ngt = source->ptr[source->len-1] & 0x80;
+        for (sz k = 0; k < source->len; k++)
+            val = val << 8 | source->ptr[source->len-1-k];
+    }
+
+    else {
+        ngt = source->ptr[0] & 0x80;
+        for (sz k = 0; k < source->len; k++)
+            val = val << 8 | source->ptr[k];
+    }
+
+    // YYY: meh (sign extends to 64 bits)
+    if (SIGNED == sg && ngt) for (sz k = source->len; k < 8; k++) val|= (u64)0xff << k*8;
+
+    self->val = val;
+    return true;
 }
 
 ctor_simple(1, NumEncode
         , "encode an integral value to bytes"
-        , (2, BUF, _NumEncode, NUM, source, SYM, endian)
+        , (3, BUF, _NumEncode, NUM, source, SYM, endian, NUM, width)
         );
 
-bool _NumEncode(Buf* self, Num const* const source, Sym const* const endian) {
-    (void)self;
-    (void)source;
-    (void)endian;
-    fail("NIY");
+bool _NumEncode(Buf* self, Num const* const source, Sym const* const endian, Num const* const width) {
+    free(self->ptr);
+    if (destroyed(self)) return true;
+
+    try_enum_symcvt(Endian, ed, 2, *endian, BIG_END, LITTLE_END);
+
+    if (width->val < 0) fail("width is negative");
+    if (8 < width->val) fail("NIY: ints larger than 64 bits");
+    if (0 == width->val) return self->len = 0, true;
+
+    self->ptr = malloc(self->len = width->val);
+    if (!self->ptr) fail("OOM");
+
+    i64 val = source->val;
+
+    if (LITTLE_END == ed) {
+        for (sz k = 0; k < self->len; k++) {
+            self->ptr[k] = val & 0xff;
+            val<<= 8;
+        }
+    }
+
+    else {
+        for (sz k = 0; k < self->len; k++) {
+            self->ptr[self->len-1-k] = val & 0xff;
+            val<<= 8;
+        }
+    }
+
+    return true;
 }
 
 ctor_simple(1, Utf8Decode
