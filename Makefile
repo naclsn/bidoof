@@ -7,12 +7,12 @@ ifeq ($(OS), Windows_NT)
   as-exe = $(1).exe
   as-lib = $(1).dll
   MD ?= mkdir -p #md
-  views-LDFLAGS = -lopengl32 -lgdi32
+  views-LDFLAGS = -pthread -lopengl32 -lgdi32
 else
   as-exe = $(1)
   as-lib = lib$(1).so
   MD ?= mkdir -p
-  views-LDFLAGS = -lGL -lX11
+  views-LDFLAGS = -pthread -lGL -lX11
 endif
 as-test = $(call as-exe,$(OUT)/test-$(1))
 

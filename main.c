@@ -1,10 +1,10 @@
-#include "exts.h"
-#include "lang.h"
-
 #define LINE_IMPLEMENTATION
 #include "line.h"
 
 #include <unistd.h> // YYY(temp): sleep
+
+#include "exts.h"
+#include "lang.h"
 
 #ifndef EXTS_NAMES
 #error "no $EXTS_NAMES, there would be no function..."

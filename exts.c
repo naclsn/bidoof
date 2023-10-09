@@ -1,5 +1,3 @@
-#include "exts.h"
-
 #if (defined(__MINGW32__) || defined(__MINGW64__)) && !defined(__CYGWIN__)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -31,6 +29,8 @@ char const* dlerror(void) {
 #else
 #include <dlfcn.h>
 #endif
+
+#include "exts.h"
 
 dyarr(void*) loaded = {0};
 Scope exts_scope = {0};

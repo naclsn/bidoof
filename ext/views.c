@@ -1,9 +1,9 @@
-#include "../helper.h"
-
 #define FRAME_IMPLEMENTATION
 #include "views/frame.h"
 #include <pthread.h>
 #include <unistd.h> // ZZZ: sleep
+
+#include "../helper.h"
 
 export_names("ViewTxt");
 

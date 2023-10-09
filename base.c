@@ -1,5 +1,12 @@
 #include "base.h"
 
+#ifdef TRACE_ALLOCS
+void* __trace_allocs_r;
+void* __trace_allocs_p;
+size_t __trace_allocs_c;
+size_t __trace_allocs_s;
+#endif
+
 void notify_default(char const* s) { printf("INFO: %s\n", s); }
 void notify_null(char const* s) { (void)s; }
 void (*notify)(char const* s) = notify_default;

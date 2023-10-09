@@ -9,6 +9,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef TRACE_ALLOCS
+extern void* __trace_allocs_r;
+extern void* __trace_allocs_p;
+extern size_t __trace_allocs_c;
+extern size_t __trace_allocs_s;
+#define __trace_allocs_str(__x) #__x
+#define __trace_allocs_stamp(__fn, __ln) " // " __fn ":" __trace_allocs_str(__ln) ": "
+#define malloc(__s)        (fprintf(stderr, "malloc %11zu = %11p%16s"      __trace_allocs_stamp(__FILE__, __LINE__) "malloc(" #__s ")\n",            __trace_allocs_s = (__s),                           __trace_allocs_r = malloc(__trace_allocs_s), ""),                    __trace_allocs_r)
+#define free(__p)          (fprintf(stderr, "free %11p%32s"                __trace_allocs_stamp(__FILE__, __LINE__) "free(" #__p ")\n",              __trace_allocs_p = (__p), ""),                                         free(__trace_allocs_p)                                            )
+#define calloc(__c, __s)   (fprintf(stderr, "calloc %11zu %11zu = %11p%4s" __trace_allocs_stamp(__FILE__, __LINE__) "calloc(" #__c ", " #__s ")\n",  __trace_allocs_c = (__c), __trace_allocs_s = (__s), __trace_allocs_r = calloc(__trace_allocs_c, __trace_allocs_s), ""),  __trace_allocs_r)
+#define realloc(__p, __s)  (fprintf(stderr, "realloc %11p %11zu = %11p%3s" __trace_allocs_stamp(__FILE__, __LINE__) "realloc(" #__p ", " #__s ")\n", __trace_allocs_p = (__p), __trace_allocs_s = (__s), __trace_allocs_r = realloc(__trace_allocs_p, __trace_allocs_s), ""), __trace_allocs_r)
+#endif
+
 #include "dyarr.h"
 
 #define frommember(__it, __type, __member)  (  (__type*)( ((char*)__it) - offsetof(__type, __member) )  )
