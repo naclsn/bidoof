@@ -143,7 +143,7 @@ bool _Base64Encode(Buf* self, Buf const* const source) {
 }
 
 ctor_simple(1, NumDecode
-        , "decodes bytes to integral value"
+        , "decodes bytes to an integral value"
         , (3, NUM, _NumDecode, BUF, source, SYM, endian, SYM, sign)
         );
 
@@ -172,7 +172,7 @@ bool _NumDecode(Num* self, Buf const* const source, Sym const* const endian, Sym
     }
 
     // YYY: meh (sign extends to 64 bits)
-    if (SIGNED == sg && ngt) for (sz k = source->len; k < 8; k++) val|= (u64)0xff << k*8;
+    if (SIGNED == sg && ngt) for (sz k = source->len; k < 8; k++) val|= (i64)0xff << k*8;
 
     self->val = val;
     return true;
@@ -201,14 +201,14 @@ bool _NumEncode(Buf* self, Num const* const source, Sym const* const endian, Num
     if (LITTLE_END == ed) {
         for (sz k = 0; k < self->len; k++) {
             self->ptr[k] = val & 0xff;
-            val<<= 8;
+            val>>= 8;
         }
     }
 
     else {
         for (sz k = 0; k < self->len; k++) {
             self->ptr[self->len-1-k] = val & 0xff;
-            val<<= 8;
+            val>>= 8;
         }
     }
 

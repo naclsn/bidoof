@@ -53,10 +53,35 @@ int parse_args(char* prog, int argc, char** argv) {
     return 0;
 }
 
+void show_meta(char* name, sz len) {
+    // (trim)
+    while (' ' == name[len-1]) name[--len] = '\0';
+
+    static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [FLT]= "Flt", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym", [ANY]= "Any"};
+
+    Meta* meta = exts_lookup(mksym(name));
+    if (!meta) {
+        puts("(null)");
+        return;
+    }
+
+    puts(meta->doc);
+
+    for (struct MetaOvl const* ovl = meta->overloads; ovl->params; ovl++) {
+        printf("   %s %s(", ty_str[ovl->ret], meta->name);
+
+        struct MetaOvlPrm const* prm = ovl->params;
+        printf("%s %s", ty_str[prm->ty], prm->name);
+        while ((++prm)->name) printf(", %s %s", ty_str[prm->ty], prm->name);
+
+        printf(")\n");
+    }
+}
+
 static Scope repl_scope = {0};
 
-char** compgen_words(char* line, size_t point) {
-    size_t len = 0;
+char** compgen_words(char* line, sz point) {
+    sz len = 0;
     char c;
     while (point && ( '_' == (c = line[point-1-len])
             || ('0' <= c && c <= '9')
@@ -123,123 +148,108 @@ void repl(char* histfn) {
     }
     line_compgen(compgen_words, compgen_clean);
 
-    char* line;
+    char const* line;
     while (printf(">> "), line = line_read()) {
         sz len = strlen(line);
-        while (' ' == line[len-1]) line[--len] = '\0';
+        char cpy[len+2];
+        memcpy(cpy+1, line, len+1);
+        cpy[0] = ' ';
 
-        if ('?' == line[0]) {
-            switch (line[1]) {
-                case '\0':
-                    scope_show(&repl_scope);
-                    break;
+        switch (line[0]) {
+            // shorthand for assigning to _ and print/format _
+            case '?':
+                switch (line[1]) {
+                    case '?':
+                        if ('\0' == line[2]) scope_show(&exts_scope);
+                        else show_meta(cpy+3, len-2);
+                        continue;
 
-                case '?':
-                    switch (line[2]) {
-                        case '\0':
-                            scope_show(&exts_scope);
-                            break;
-
-                        default:
-                            {
-                                static char const* const ty_str[] = {[BUF]= "Buf", [NUM]= "Num", [FLT]= "Flt", [LST]= "Lst", [FUN]= "Fun", [SYM]= "Sym", [ANY]= "Any"};
-
-                                Meta* meta = exts_lookup(mksym(line+2));
-                                if (!meta) {
-                                    puts("(null)");
-                                    break;
-                                }
-
-                                puts(meta->doc);
-
-                                for (struct MetaOvl const* ovl = meta->overloads; ovl->params; ovl++) {
-                                    printf("   %s %s(", ty_str[ovl->ret], meta->name);
-
-                                    struct MetaOvlPrm const* prm = ovl->params;
-                                    printf("%s %s", ty_str[prm->ty], prm->name);
-                                    while ((++prm)->name) printf(", %s %s", ty_str[prm->ty], prm->name);
-
-                                    printf(")\n");
-                                }
-                            }
-                    }
-                    break;
-
-                case '%': {
-                    Obj const* it = scope_get(&repl_scope, mksym(line+2));
-                    if (it) switch (it->ty) {
-                        case BUF: printf("\"%.*s\"\n", (int)it->as.buf.len, it->as.buf.ptr); break;
-                        case NUM: printf("%ld\n", it->as.num.val); break;
-                        case FLT: printf("%Lf\n", it->as.flt.val); break;
-                        case SYM: printf(":%s\n", it->as.sym.txt); break;
-                        default: printf("%p\n", it->as.lst.ptr);
-                    } else puts("(null)");
-                } break;
-
-                case '&': {
-                    Obj const* it = scope_get(&repl_scope, mksym(line+2));
-                    if (it) obj_show_depnts(it, 0);
-                    else puts("(null)");
-                } break;
-
-                default:
-                    obj_show(scope_get(&repl_scope, mksym(line+1)), 0);
-            }
-        } // if '?'
-
-        else if ('.' == line[0]) {
-            if (0 == strcmp(".exit", line)) goto exit_no_hist;
-            if (0 == strcmp(".quit", line)) break;
-
-            if (0 == strcmp(".help", line))
-                puts(
-                    "cli commands:\n"
-                    "  ?[name]\n"
-                    "  ?%[name]\n"
-                    "  ??[name]\n"
-                    "  .exit\n"
-                    "  .quit\n"
-                    "  .help\n"
-                    "  .sleep[sec]\n"
-                    "  .source <file>\n"
-                    "  .tokens <script>\n"
-                );
-
-            else if (0 == memcmp(".sleep", line, 6)) {
-                unsigned int sec = 0;
-                char const* a = line+6;
-                for (; ' ' == *a || '\t' == *a; ++a);
-                for (; '0' <= *a && *a <= '9'; ++a) sec = sec*10 + (*a & 0xf);
-                sleep(sec);
-            }
-
-            else if (0 == memcmp(".source ", line, 8)) {
-                char* filename = line+8;
-                FILE *f = fopen(filename, "rb");
-                if (!f) continue;
-                fseek(f, 0, SEEK_END);
-                size_t len = ftell(f);
-                char* script = NULL;
-                if (len) {
-                    fseek(f, 0, SEEK_SET);
-                    script = malloc(len);
-                    if (script) {
-                        fread(script, len, 1, f);
-                        script[len-1] = '\0';
-                    }
+                    case '\0':
+                        scope_show(&repl_scope);
+                        continue;
                 }
-                fclose(f);
-                if (script) lang_process(filename, script, &repl_scope);
-                else printf("could not read file '%s'\n", filename);
-            }
 
-            else if (0 == memcmp(".tokens ", line, 8)) {
-                char* script = line+8;
-                lang_show_tokens("<repl_line>", script);
-            }
-        } // if '.'
+                // fallthrough
+            case '%':
+                cpy[0] = '_';
+                cpy[1] = '=';
+                break;
 
-        else lang_process("<repl_line>", line, &repl_scope);
+            // REPL commands
+            case '.':
+                if (0 == strcmp(".exit", line)) goto exit_no_hist;
+                if (0 == strcmp(".quit", line)) break;
+
+                if (0 == strcmp(".help", line))
+                    puts(
+                        "cli commands:\n"
+                        "  ?[name]\n"
+                        "  ?%[name]\n"
+                        "  ??[name]\n"
+                        "  .exit\n"
+                        "  .quit\n"
+                        "  .help\n"
+                        "  .sleep[sec]\n"
+                        "  .source <file>\n"
+                        "  .tokens <script>\n"
+                    );
+
+                else if (0 == memcmp(".sleep", line, 6)) {
+                    unsigned int sec = 0;
+                    char const* a = line+6;
+                    for (; ' ' == *a || '\t' == *a; ++a);
+                    for (; '0' <= *a && *a <= '9'; ++a) sec = sec*10 + (*a & 0xf);
+                    sleep(sec);
+                }
+
+                else if (0 == memcmp(".source ", line, 8)) {
+                    char const* filename = line+8;
+                    FILE *f = fopen(filename, "rb");
+                    if (!f) continue;
+                    fseek(f, 0, SEEK_END);
+                    size_t len = ftell(f);
+                    char* script = NULL;
+                    if (len) {
+                        fseek(f, 0, SEEK_SET);
+                        script = malloc(len);
+                        if (script) {
+                            fread(script, len, 1, f);
+                            script[len-1] = '\0';
+                        }
+                    }
+                    fclose(f);
+                    if (script) lang_process(filename, script, &repl_scope);
+                    else printf("could not read file '%s'\n", filename);
+                }
+
+                else if (0 == memcmp(".tokens ", line, 8)) {
+                    char const* script = line+8;
+                    lang_show_tokens("<repl_line>", script);
+                }
+
+                // case '.'
+                continue;
+
+        } // switch (line[0])
+
+        lang_process("<repl_line>", cpy, &repl_scope);
+
+        switch (line[0]) {
+            case '?':
+                obj_show(scope_get(&repl_scope, mksym("_")), 0);
+                break;
+
+            case '%': {
+                Obj const* it = scope_get(&repl_scope, mksym("_"));
+                switch (it->ty) {
+                    case BUF: printf("\"%.*s\"\n", (int)it->as.buf.len, it->as.buf.ptr); break;
+                    case NUM: printf("%ld\n", it->as.num.val); break;
+                    case FLT: printf("%Lf\n", it->as.flt.val); break;
+                    case SYM: printf(":%s\n", it->as.sym.txt); break;
+                    default: printf("%p\n", it->as.lst.ptr);
+                }
+            } break;
+        }
     } // while ">> " line_read
 
     {
