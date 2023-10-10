@@ -1,12 +1,5 @@
 #include "base.h"
 
-#ifdef TRACE_ALLOCS
-void* __trace_allocs_r;
-void* __trace_allocs_p;
-size_t __trace_allocs_c;
-size_t __trace_allocs_s;
-#endif
-
 void notify_default(char const* s) { printf("INFO: %s\n", s); }
 void notify_null(char const* s) { (void)s; }
 void (*notify)(char const* s) = notify_default;
@@ -181,3 +174,74 @@ bool obj_update(Obj* self) {
     self->cycle = _static_curr_cycle;
     return _update_depnts(self);
 }
+
+#ifdef TRACE_ALLOCS
+#undef malloc
+#undef free
+#undef calloc
+#undef realloc
+#include <unistd.h>
+
+static void __trace_allocs_puts(char const* s) {
+    write(STDERR_FILENO, s, strlen(s));
+}
+static void __trace_allocs_putp(void* p) {
+    char s[19]; s[18] = '\0';
+    s[0] = '0'; s[1] = 'x';
+    uintptr_t n = (uintptr_t)p;
+    for (short k = 7; 0 <= k; k--) {
+        char h = n>>4&15, l = n&15;
+        s[2+2*k+0] = (9 < h ? 'A'-10 : '0') + h;
+        s[2+2*k+1] = (9 < l ? 'A'-10 : '0') + l;
+        n>>= 8;
+    }
+    __trace_allocs_puts(s);
+}
+static void __trace_allocs_putn(size_t n) {
+    char s[21]; s[20] = '\0';
+    short k = 20;
+    do {
+        s[--k] = '0' + n%10;
+        n/= 10;
+    } while (n);
+    while (k) s[--k] = ' ';
+    __trace_allocs_puts(s);
+}
+static void __trace_allocs_putw(size_t r) {
+    char s[r+1]; s[r] = '\0';
+    while (r) s[--r] = ' ';
+    __trace_allocs_puts(s);
+}
+#define __trace_allocs_putva_1(__t, __v)      __trace_allocs_put##__t(__v)
+#define __trace_allocs_putva_2(__t, __v, ...) __trace_allocs_put##__t(__v); __trace_allocs_putva_1(__VA_ARGS__)
+#define __trace_allocs_putva_3(__t, __v, ...) __trace_allocs_put##__t(__v); __trace_allocs_putva_2(__VA_ARGS__)
+#define __trace_allocs_putva_4(__t, __v, ...) __trace_allocs_put##__t(__v); __trace_allocs_putva_3(__VA_ARGS__)
+#define __trace_allocs_putva_5(__t, __v, ...) __trace_allocs_put##__t(__v); __trace_allocs_putva_4(__VA_ARGS__)
+#define __trace_allocs_putva_6(__t, __v, ...) __trace_allocs_put##__t(__v); __trace_allocs_putva_5(__VA_ARGS__)
+#define __trace_allocs_putva_7(__t, __v, ...) __trace_allocs_put##__t(__v); __trace_allocs_putva_6(__VA_ARGS__)
+#define __trace_allocs_putva_8(__t, __v, ...) __trace_allocs_put##__t(__v); __trace_allocs_putva_7(__VA_ARGS__)
+#define __trace_allocs_putva(__n, ...) do { __trace_allocs_putva_##__n(__VA_ARGS__); } while (0)
+
+void* __trace_allocs_malloc(char const* const info, size_t const s) {
+    void* const r = malloc(s);
+    __trace_allocs_putva(6, s,"malloc ", n,s, s," = ", p,r, w,23, s,info);
+    return r;
+}
+
+void  __trace_allocs_free(char const* const info, void* const p) {
+    free(p);
+    __trace_allocs_putva(4, s,"free ", p,p, w,48, s,info);
+}
+
+void* __trace_allocs_calloc(char const* const info, size_t const c, size_t const s) {
+    void* const r = calloc(c, s);
+    __trace_allocs_putva(8, s,"calloc ", n,c, s," ", n,s, s," = ", p,r, w,2, s,info);
+    return r;
+}
+
+void* __trace_allocs_realloc(char const* const info, void* const p, size_t const s) {
+    void* const r = realloc(p, s);
+    __trace_allocs_putva(8, s,"realloc ", p,p, s," ", n,s, s," = ", p,r, w,3, s,info);
+    return r;
+}
+#endif // TRACE_ALLOCS
