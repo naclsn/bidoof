@@ -67,6 +67,8 @@ bool exts_load(char const* filename) {
             Sym const key = mksym(meta->name);
             Obj* value = &meta->obj;
 
+            // FIXME: expectedly crashes when putting at a key that already
+            // exists (it tries to delete/free the existing value)
             if (!scope_put(&exts_scope, key, value)) {
                 notify("OOM");
                 return false;

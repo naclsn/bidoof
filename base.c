@@ -38,7 +38,7 @@ void obj_show(Obj const* self, int indent) {
                 obj_show(self->as.lst.ptr[k], indent+1);
                 printf(", \n");
             }
-            printf("}");
+            printf("%*.s}", indent*3, "");
             break;
 
         case SYM:

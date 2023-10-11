@@ -307,6 +307,8 @@ bool _update_free_lst(Obj* self) {
     return true;
 }
 
+Obj* _parse_expr(Pars* self, Scope* scope, bool atomic);
+
 #define tok_is_str(__t) ('"' == (__t).ptr[0])
 #define tok_is_num(__t) ('\'' == (__t).ptr[0]  \
             || ('0' <= (__t).ptr[0] && (__t).ptr[0] <= '9')  \
@@ -315,6 +317,90 @@ bool _update_free_lst(Obj* self) {
 #define tok_is_sym(__t) (':' == (__t).ptr[0])
 #define tok_is_var(__t) ('_' == (__t).ptr[0] || ('a' <= (__t).ptr[0] && (__t).ptr[0] <= 'z'))
 #define tok_is(__cstr, __t) (0 == strncmp(__cstr, (__t).ptr, (__t).len))
+
+// XXX: temporary / can be better
+#define tok_is_unop(__t) (tok_is("+", __t) || tok_is("-", __t) || tok_is("!", __t) || tok_is("~", __t))
+#define tok_is_binop(__t) (tok_is("+", __t) || tok_is("-", __t) || tok_is("*", __t) || tok_is("/", __t) || tok_is("**", __t))
+
+short _precedence(Slice const op) {
+    (void)op;
+    return 1;
+}
+
+Obj* _parse_math_expr(Pars* self, Scope* scope) {
+    if (tok_is_unop(self->t)) {
+        if (!_lex(self)) fail("expected operand for unary operator");
+
+        // TODO: get_unop_fun(..)
+        Obj* f = scope_get(&exts_scope, mksym("Abs"));
+        if (!f) fail("NIY: function for this operator");
+
+        Obj* arg = _parse_math_expr(self, scope);
+        if (!arg) fail("in operand for unary operator");
+
+        Obj* r = calloc(1, sizeof(Obj) + 1*sizeof(Obj*));
+        if (!r) fail("OOM");
+
+        r->argc = 1;
+        r->argv[0] = arg;
+
+        if (!obj_call(f, r)) {
+            free(r);
+            fail("could not call function for unary operator");
+        }
+
+        return r;
+    }
+
+    return _parse_expr(self, scope, false);
+}
+
+Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
+    Obj* rhs = _parse_math_expr(self, scope);
+    Slice const nop = self->t;
+
+    bool tail = tok_is(")", nop);
+    // if tail then:  left [lastOp] right ")"
+
+    if (!tail) {
+        if (!tok_is_binop(nop)) fail("expected binary operator");
+        if (!_lex(self)) fail("expected operand for binary operator");
+    }
+
+    // TODO: get_binop_prec(..)
+    bool nfirst = !tail && _precedence(op) < _precedence(self->t);
+    // if nfirst
+    //     then:  left [lastOp] (right [nextOp] ...)
+    //     else:  (left [lastOp] right) [nextOp] ...
+
+    if (!tail && nfirst) {
+        rhs = _parse_math(self, scope, rhs, nop);
+        if (!rhs) fail("in rhs");
+    }
+
+    // TODO: get_binop_fun(..)  (-- for `op`)
+    Obj* f = scope_get(&exts_scope, mksym("Add"));
+    if (!f) fail("NIY: function for this operator");
+
+    Obj* r = calloc(1, sizeof(Obj) + 2*sizeof(Obj*));
+    if (!r) fail("OOM");
+
+    r->argc = 2;
+    r->argv[0] = lhs;
+    r->argv[1] = rhs;
+
+    if (!obj_call(f, r)) {
+        free(r);
+        fail("could not call function for binary operator");
+    }
+
+    if (!tail && !nfirst) {
+        r = _parse_math(self, scope, r, nop);
+        if (!r) fail("in lhs");
+    }
+
+    return r;
+}
 
 Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     if (!_lex(self)) return NULL;
@@ -371,6 +457,28 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
             //       -> no, the result effectively depends on it (TODO)
             //       when you eventually come back to it, also do make argv a dyarr, thanks
             r = rr;
+        }
+    }
+
+    else if (tok_is("(=", self->t)) {
+        sz before = self->i;
+
+        if (!_lex(self)) fail("expected math expression");
+
+        Obj* first = _parse_math_expr(self, scope);
+        if (!first) fail("in math expression rhs");
+
+        if (tok_is_binop(self->t)) {
+            Slice const op = self->t;
+            if (!_lex(self)) fail("expected operand for binary operator");
+            r = _parse_math(self, scope, first, op);
+            if (!r) fail("in math expression lhs");
+        } else r = first;
+
+        if (!tok_is(")", self->t)) {
+            self->i = before;
+            // XXX(cleanup): r
+            fail("missing closing parenthesis");
         }
     }
 
@@ -557,6 +665,8 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         r = scope_get(scope, slice2sym(self->t));
         if (!r) fail("unknown variable");
     }
+
+    // TODO: else fail
 
     if (atomic) return r;
 

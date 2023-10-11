@@ -4,6 +4,6 @@
 /^realloc/ { delete ptr[$2]; ptr[$5] = $3; split($0, a, "// "); nfo[$5] = a[2]; next }
 END { if (length(ptr)) {
     print "not freed:"
-    for (k in ptr) print k " (" ptr[k] " B) last seen " nfo[k]
+    for (k in ptr) printf "%s (%4d B) last seen %s\n", k, ptr[k], nfo[k]
     exit 1
 } }

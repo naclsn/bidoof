@@ -1,4 +1,0 @@
-text = "coucou this be test text"
-words = Split text " "
-# segfaults:
-codepointss = Map Utf8Decode words
