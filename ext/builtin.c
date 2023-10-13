@@ -437,38 +437,25 @@ bool _ReverseL(Lst* self, Lst const* const under) {
     return true;
 }
 
-ctor_simple(3, Slice
+ctor_simple(2, Slice
         , "[begin:end], defaults are begin=0 and end=length; either can be negative"
         , (3, BUF, _Slice3, BUF, under, NUM, begin, NUM, end)
         , (2, BUF, _Slice2, BUF, under, NUM, begin)
-        , (1, BUF, _Slice1, BUF, under)
         );
 bool _Slice3(Buf* self, Buf const* const under, Num const* const begin, Num const* const end) {
-    sz pbegin, pend;
-    if (begin->val < 0) {
-        if (under->len < (sz)-begin->val) failf(64, "slice begin (%zu) outside buffer (%zu)", begin->val, under->len);
-        pbegin = under->len + begin->val;
-    } else {
-        if (under->len <= (sz)begin->val) failf(64, "slice begin (%zu) outside buffer (%zu)", begin->val, under->len);
-        pbegin = begin->val;
-    }
-    if (end->val < 0) {
-        if (under->len < (sz)-end->val) failf(64, "slice end (%zu) outside buffer (%zu)", end->val, under->len);
-        pend = under->len + end->val;
-    } else {
-        if (under->len <= (sz)end->val) failf(64, "slice end (%zu) outside buffer (%zu)", end->val, under->len);
-        pend = end->val;
-    }
+    self->len = 0;
+    if (destroyed(self)) return true;
+    sz pbegin = begin->val < 0 ? under->len + begin->val : (sz)begin->val;
+    if (under->len < pbegin) failf(64, "slice begin (%ld) outside buffer (%zu)", begin->val, under->len);
+    sz pend = end->val < 0 ? under->len + end->val : (sz)end->val;
+    if (under->len < pend) failf(64, "slice end (%ld) outside buffer (%zu)", end->val, under->len);
     if (pend < pbegin) failf(75, "slice length would be negative [%zu:%zu]", pbegin, pend);
     self->ptr = under->ptr + pbegin;
     self->len = pend - pbegin;
     return true;
 }
 bool _Slice2(Buf* self, Buf const* const under, Num const* const begin) {
-    return _Slice3(self, under, begin, &(Num){.val= under->len-1});
-}
-bool _Slice1(Buf* self, Buf const* const under) {
-    return _Slice2(self, under, &(Num){0});
+    return _Slice3(self, under, begin, &(Num){.val= under->len});
 }
 
 ctor_simple(2, Split
