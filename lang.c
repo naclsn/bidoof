@@ -45,8 +45,8 @@
 // <math> ::
 //     = <unop> <expr>
 //     | <expr> <binop> <expr>
-//     | <expr> '?' <expr> ':' <expr>
-//     | <expr> '[' <expr> [':' [<expr>]] ']'
+//     //| <expr> '?' <expr> ':' <expr>
+//     | <expr> '[' <expr> ['..' [<expr>]] ']'
 // <unop> ::= '+' '-' '!' '~'
 // <binop> ::= '+' '-' '*' '/' '%' '//' '**' '==' '!=' '>' '<' '>=' '<=' '<=>' '&' '|' '^' '<<' '>>'
 //
@@ -76,6 +76,7 @@ typedef struct Pars {
     return 0;             \
 } while (1)
 
+// TODO: maybe change it for void
 bool _lex(Pars* self) {
 #define AT              (self->s + self->i)
 #define IN(__lo, __hi)  (__lo <= c && c <= __hi)
@@ -102,6 +103,7 @@ bool _lex(Pars* self) {
             // fallthrough
         case ')':
         case '{': case '}':
+        case '[': case ']':
         case ',': case ';':
             self->t.len++;
             self->i++;
@@ -117,6 +119,7 @@ bool _lex(Pars* self) {
         case '=':
         case '*': case '/':
         case '&': case '|': case '^':
+        case '.':
             if ('!' != c && AT[1] == c) {
                 self->t.len++;
                 self->i++;
@@ -168,6 +171,7 @@ bool _lex(Pars* self) {
             }
             if (10 == base && '.' == c) {
                 unsigned ddigits = 0;
+                if ('.' == AT[0] && '.' == AT[1]) return true; // eg. `[0..]`
                 do {
                     c = self->s[++self->t.len, ++self->i];
                     is_digit = IN('0', '9');
@@ -361,7 +365,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic);
 static inline Obj* _math_unary(Slice const op) {
     char const* name = "OopsyUnary";
     switch (op.ptr[0]) {
-        case '+': name = "Posite"; break; // ??
+        case '+': name = "Id"; break;
         case '-': name = "Negate"; break;
         case '!': name = "BoolNegate"; break;
         case '~': name = "BinNegate"; break;
@@ -415,7 +419,47 @@ Obj* _parse_math_expr(Pars* self, Scope* scope) {
         return r;
     }
 
-    return _parse_expr(self, scope, false);
+    Obj* r = _parse_expr(self, scope, false);
+    if (!r) return NULL;
+
+    if (tok_is("[", self->t)) {
+        _lex(self);
+
+        Obj* st = _parse_math_expr(self, scope);
+        Obj* ed = NULL;
+        if (!st) fail("in indexing operator");
+
+        Obj* rr;
+        Obj* ff;
+
+        if (tok_is("..", self->t)) {
+            _lex(self);
+            ff = scope_get(&exts_scope, mksym("Slice"));
+            if (!tok_is("]", self->t)) {
+                ed = _parse_math_expr(self, scope);
+                if (!ed) fail("in indexing operator end");
+            }
+        } else ff = scope_get(&exts_scope, mksym("At"));
+        if (!tok_is("]", self->t)) fail("missing closing bracket");
+
+        rr = calloc(1, sizeof(Obj) + (!ed? 2 :3)*sizeof(Obj*));
+        if (!rr) fail("OOM");
+
+        rr->argc = !ed? 2 :3 ;
+        rr->argv[0] = r;
+        rr->argv[1] = st;
+        if (ed) rr->argv[2] = ed;
+
+        if (!obj_call(ff, rr)) {
+            fail("could not call function for indexing operator");
+        }
+
+        _lex(self);
+
+        r = rr;
+    }
+
+    return r;
 }
 
 Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
@@ -438,6 +482,10 @@ Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
     if (!tail && nfirst) {
         rhs = _parse_math(self, scope, rhs, nop);
         if (!rhs) fail("in rhs");
+    }
+
+    if (FLT == lhs->ty || FLT == rhs->ty) {
+        // TODO: promotion to Flt
     }
 
     Obj* f = _math_binary(op);
@@ -619,19 +667,19 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         } else {
             sz k = 0;
             ival = 0;
-            if ('0' == self->t.ptr[k]) switch (self->t.ptr[k+1]) {
+            if ('0' == self->t.ptr[0] && 1 < self->t.len) switch (self->t.ptr[1]) {
                 case 'b':
-                    for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
+                    for (k = 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
                         ival = (ival << 1) | (self->t.ptr[k] & 0xf);
                     break;
 
                 case 'o':
-                    for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
+                    for (k = 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
                         ival = (ival <<3 ) | (self->t.ptr[k] & 0xf);
                     break;
 
                 case 'x':
-                    for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k]) {
+                    for (k = 2; k < self->t.len; k++) if ('_' != self->t.ptr[k]) {
                         u8 it = 0b100000 | self->t.ptr[k];
                         ival = (ival << 4) | ((it & 0xf) + ('9'<it)*9);
                     }
@@ -644,7 +692,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                 for (; k < self->t.len && '.' != self->t.ptr[k]; k++) if ('_' != self->t.ptr[k])
                     ival = ival*10 + (self->t.ptr[k] & 0xf);
 
-                if ('.' == self->t.ptr[k]) {
+                if (k < self->t.len && '.' == self->t.ptr[k]) {
                     floating = true;
                     fval = 0;
                     for (sz f = self->t.len-1; f > k; f--) if ('_' != self->t.ptr[f])
@@ -749,6 +797,8 @@ bool _parse_script(Pars* self, Scope* scope) {
         _lex(self);
     }
 
+    if (!tok_is("", self->t)) fail("unexpected token");
+
     return true;
 }
 
@@ -763,7 +813,7 @@ bool lang_process(char const* name, char const* script, Scope* scope) {
 
 void lang_show_tokens(char const* name, char const* script) {
     Pars p = {.n= name, .s= script, .i= 0};
-    while (_lex(&p)) {
+    while (_lex(&p) && !tok_is("", p.t)) {
         char m[21+p.t.len];
         sprintf(m, "token <<%.*s>> (a %s)",
                 (int)p.t.len, p.t.ptr,
