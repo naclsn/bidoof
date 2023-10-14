@@ -44,7 +44,7 @@ bool _Base64Decode(Buf* self, Buf const* const source) {
         failf(53, "length (%zu) is not a multiple of 4", source->len);
     for (sz k = 0; k < source->len; k++)
         if (66 == from64[source->ptr[k]])
-            failf(49, "invalid character at %zu '%#4X'", k, source->ptr[k]);
+            failf(49, "invalid character 0x%02X at index %zu (/%zu)", source->ptr[k], k, source->len);
     if (2 < source->len && '=' == source->ptr[source->len-3])
         fail("invalid padding");
 
