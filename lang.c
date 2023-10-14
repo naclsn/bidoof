@@ -125,7 +125,7 @@ bool _lex(Pars* self) {
                 self->i++;
             }
             // fallthrough
-        case '+': case '-':
+        case '+':
         case '%':
         case '~':
         case '#':
@@ -142,6 +142,13 @@ bool _lex(Pars* self) {
             self->i+= self->t.len;
         } return true;
 
+        case '-':
+            self->t.len++;
+            self->i++;
+            c = *AT;
+            if ('.' == c) fail("expected digits");
+            if (!IN('0', '9')) return true;
+            // fall through
         case '0':
             if ('0' == c) {
                 self->t.len++;
@@ -351,7 +358,7 @@ bool _update_free_lst(Obj* self) {
 Obj* _parse_expr(Pars* self, Scope* scope, bool atomic);
 
 #define tok_is_str(__t) ('"' == (__t).ptr[0])
-#define tok_is_num(__t) ('\''== (__t).ptr[0] || ('0' <= (__t).ptr[0] && (__t).ptr[0] <= '9'))
+#define tok_is_num(__t) ('\''== (__t).ptr[0] || ('0' <= (__t).ptr[0] && (__t).ptr[0] <= '9') || ('-' == (__t).ptr[0] && 1 < (__t).len))
 #define tok_is_fun(__t) ('A' <= (__t).ptr[0] && (__t).ptr[0] <= 'Z')
 #define tok_is_sym(__t) (':' == (__t).ptr[0])
 #define tok_is_var(__t) ('_' == (__t).ptr[0] || ('a' <= (__t).ptr[0] && (__t).ptr[0] <= 'z'))
@@ -394,6 +401,7 @@ short _precedence(Slice const op) {
         case '*': return 1 == op.len ? 12 : 13;
         case '/': return 12;
     }
+    printf("op: <<%.*s>>\n", (int)op.len, op.ptr);
     return 99;
 }
 
@@ -464,17 +472,24 @@ Obj* _parse_math_expr(Pars* self, Scope* scope) {
 
 Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
     Obj* rhs = _parse_math_expr(self, scope);
-    Slice const nop = self->t;
+    Slice nop = self->t;
 
     bool tail = tok_is(")", nop);
     // if tail then:  left [lastOp] right ")"
 
     if (!tail) {
-        if (!tok_is_binop(nop)) fail("expected binary operator");
-        if (!_lex(self)) fail("expected operand for binary operator");
+        bool isbinop = tok_is_binop(self->t);
+        // goal is to identify eg. `(= 1-2-3)` and break the <<-3>> token in two
+        bool isnnum = !isbinop && '-' == *self->t.ptr;
+        if (!isbinop && !isnnum) fail("expected binary operator");
+        if (isnnum) {
+            nop.len = 1;
+            self->t.ptr++;
+            self->t.len--;
+        } else _lex(self);
     }
 
-    bool nfirst = !tail && _precedence(op) < _precedence(self->t);
+    bool nfirst = !tail && _precedence(op) < _precedence(nop);
     // if nfirst
     //     then:  left [lastOp] (right [nextOp] ...)
     //     else:  (left [lastOp] right) [nextOp] ...
@@ -569,9 +584,16 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         Obj* first = _parse_math_expr(self, scope);
         if (!first) fail("in math expression lhs");
 
-        if (tok_is_binop(self->t)) {
-            Slice const op = self->t;
-            _lex(self);
+        bool isbinop = tok_is_binop(self->t);
+        // goal is to identify eg. `(= 1-2)` and break the <<-2>> token in two
+        bool isnnum = !isbinop && '-' == *self->t.ptr;
+        if (isbinop || isnnum) {
+            Slice op = self->t;
+            if (isnnum) {
+                op.len = 1;
+                self->t.ptr++;
+                self->t.len--;
+            } else _lex(self);
 
             r = _parse_math(self, scope, first, op);
             if (!r) fail("in math expression rhs");
@@ -651,13 +673,11 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         _lex(self);
     }
 
-    else if (tok_is_num(self->t) || tok_is("-", self->t)) {
+    else if (tok_is_num(self->t)) {
         i64 ival;
         f64 fval;
         bool negative = '-' == self->t.ptr[0];
         bool floating = false;
-
-        if (negative) _lex(self);
 
         if ('\'' == self->t.ptr[0]) {
             u32 val = self->t.ptr[1];
@@ -665,7 +685,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                 fail("invalid escape sequence");
             ival = val;
         } else {
-            sz k = 0;
+            sz k = negative;
             ival = 0;
             if ('0' == self->t.ptr[0] && 1 < self->t.len) switch (self->t.ptr[1]) {
                 case 'b':
