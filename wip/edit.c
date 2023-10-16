@@ -11,6 +11,8 @@
 
 typedef struct uGuiEditor {
     dyarr(dyarr(char)) lines;
+    size_t top;
+    struct { size_t ln, col; } cur;
 } uGuiEditor;
 void ugui_editor_set(GuiState* st, uGuiEditor* self, char const* text);
 char* ugui_editor_get(GuiState* st, uGuiEditor* self);
@@ -138,23 +140,73 @@ char* ugui_editor_get(GuiState* st, uGuiEditor* self) {
 }
 
 void _ugui_editor_key(uGuiEditor* self, unsigned key) {
-    if (KEY_RETURN == key) {
-        void* niw = dyarr_push(&self->lines);
-        if (!niw) return;
-        memset(niw, 0, sizeof(dyarr(char)));
-    } else if (KEY_BACKSPACE == key) {
-        if (!dyarr_pop(&self->lines.ptr[self->lines.len-1]) && 1 < self->lines.len)
-            dyarr_pop(&self->lines);
-    } else if (' ' <= key && key <= '~') {
-        char* cc = dyarr_push(&self->lines.ptr[self->lines.len-1]);
-        if (!cc) return;
-        *cc = key | 0b100000;
+    switch (key) {
+        case KEY_RETURN: {
+                void* niw = dyarr_insert(&self->lines, self->cur.ln+1, 1);
+                if (!niw) return;
+                memset(niw, 0, sizeof(dyarr(char)));
+                self->cur.col = 0;
+                self->cur.ln++;
+            } break;
+
+        case KEY_BACKSPACE:
+            if (self->cur.col) {
+                self->cur.col--;
+                dyarr_remove(&self->lines.ptr[self->cur.ln], self->cur.col, 1);
+            } else if (!self->lines.ptr[self->cur.ln].len) {
+                dyarr_remove(&self->lines, self->cur.ln, 1);
+                if (self->lines.len < self->cur.ln) self->cur.ln--;
+            }
+            break;
+        case KEY_DELETE:
+            if (self->cur.col < self->lines.ptr[self->cur.ln].len)
+                dyarr_remove(&self->lines.ptr[self->cur.ln], self->cur.col, 1);
+            break;
+
+        case KEY_LEFT: if (self->cur.col) --self->cur.col; break;
+        case KEY_RIGHT: if (self->cur.col < self->lines.ptr[self->cur.ln].len) ++self->cur.col; break;
+        case KEY_UP: if (self->cur.ln && self->lines.ptr[--self->cur.ln].len < self->cur.col) self->cur.col = self->lines.ptr[self->cur.ln].len; break;
+        case KEY_DOWN: if (self->cur.ln < self->lines.len-1 && self->lines.ptr[++self->cur.ln].len < self->cur.col) self->cur.col = self->lines.ptr[self->cur.ln].len; break;
+        case KEY_HOME: self->cur.col = 0; break;
+        case KEY_END: self->cur.col = self->lines.ptr[self->cur.ln].len; break;
+
+        default:
+            if (' ' <= key && key <= '~') {
+                char* cc = dyarr_insert(&self->lines.ptr[self->cur.ln], self->cur.col, 1);
+                if (!cc) return;
+                *cc = key | 0b100000;
+                self->cur.col++;
+            }
     }
 }
 
 void ugui_editor(GuiState* st, uGuiEditor* self) {
-    (void)st;
-    glColor3f(.88, .88, .88);
-    for (size_t k = 0; k < self->lines.len; k++)
-        text_draw(self->lines.ptr[k].ptr, self->lines.ptr[k].len, 8, 8+9*k);
+    if (GUI_REDRAWING == st->state) {
+        GuiRect const r = rect_pad(st->layout->rect, -8, -8);
+        glColor3f(.44, .44, .44);
+        glRecti(r.x, r.y, r.x+r.width, r.y+r.height);
+
+        glEnable(GL_SCISSOR_TEST);
+        //glScissor(r.x, r.y, r.width, r.height);
+        {
+            GLint xx = r.x*st->scale;
+            GLint yy = (st->rect.height-r.y-r.height)*st->scale;
+            GLsizei ww = r.width*st->scale;
+            GLsizei hh = r.height*st->scale;
+            glScissor(xx, yy, ww, hh);
+        }
+
+        glColor3f(.88, .88, .88);
+        for (size_t k = self->top; k < self->lines.len && 9*k < r.height; k++)
+            text_draw(self->lines.ptr[k].ptr, self->lines.ptr[k].len, r.x, r.y + 9*k);
+
+        glColor3f(.72, .88, 0);
+        {
+            GLint xx = r.x + 8*self->cur.col;
+            GLint yy = r.y + 9*(self->cur.ln-self->top);
+            glRecti(xx-1, yy-1, xx+2, yy+9);
+        }
+
+        glDisable(GL_SCISSOR_TEST);
+    }
 }
