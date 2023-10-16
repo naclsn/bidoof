@@ -14,21 +14,21 @@ typedef struct uGuiEditor {
 } uGuiEditor;
 void ugui_editor_set(GuiState* st, uGuiEditor* self, char const* text);
 char* ugui_editor_get(GuiState* st, uGuiEditor* self);
+void _ugui_editor_key(uGuiEditor* self, unsigned key);
 void ugui_editor(GuiState* st, uGuiEditor* self);
 
 static GuiState gst = {.scale= 2.4};
+static uGuiEditor ged = {0};
 void my_gui_logic(Frame* f) {
     gui_begin(&gst);
     {
-        static uGuiEditor ed = {0};
-
         static bool first = true;
         if (first) {
-            ugui_editor_set(&gst, &ed, "this is some text\nmade of lines\nand characters\n");
+            ugui_editor_set(&gst, &ged, "this is some text\nmade of lines\nand characters\n");
             first = false;
         }
 
-        ugui_editor(&gst, &ed);
+        ugui_editor(&gst, &ged);
 
         static GuiMenu alt = {
             .count= 1,
@@ -40,7 +40,7 @@ void my_gui_logic(Frame* f) {
         if (MENU_SELECTED == alt.state) {
             switch (alt.pick) {
                 case 0: { // "Save"
-                    char* txt = ugui_editor_get(&gst, &ed);
+                    char* txt = ugui_editor_get(&gst, &ged);
                     printf("txt:\n```\n%s```\n\n", txt);
                     free(txt);
                 } break;
@@ -64,6 +64,12 @@ void resize(Frame* f, int w, int h) { gui_event_reshape(&gst, w, h, gst.scale); 
 
 void keydown(Frame* f, unsigned key) {
     if (KEY_ESC == key) frame_close(f);
+    //st->state = GUI_KEY_EVENT_BUBBLE;
+    //my_gui_logic(f);
+
+    _ugui_editor_key(&ged, key);
+    gst.state = GUI_REDRAWING;
+    frame_redraw(f);
 }
 
 void mousedown(Frame* f, int button, int x, int y) { (void)x; (void)y; gui_event_mousedown(&gst, button); my_gui_logic(f); }
@@ -107,10 +113,14 @@ void ugui_editor_set(GuiState* st, uGuiEditor* self, char const* text) {
         if ('\n' == c) nl = true;
         else {
             if (nl) {
-                memset(dyarr_push(&self->lines), 0, sizeof(dyarr(char)));
+                void* niw = dyarr_push(&self->lines);
+                if (!niw) return;
+                memset(niw, 0, sizeof(dyarr(char)));
                 nl = false;
             }
-            *dyarr_push(&self->lines.ptr[self->lines.len-1]) = c;
+            char* cc = dyarr_push(&self->lines.ptr[self->lines.len-1]);
+            if (!cc) return;
+            *cc = c;
         }
     } // while text
 }
@@ -118,17 +128,33 @@ void ugui_editor_set(GuiState* st, uGuiEditor* self, char const* text) {
 char* ugui_editor_get(GuiState* st, uGuiEditor* self) {
     (void)st;
     dyarr(char) r = {0};
-    for (size_t i = 0; i < self->lines.len; i++) {
-        for (size_t j = 0; j < self->lines.ptr[i].len; j++)
-            *dyarr_push(&r) = self->lines.ptr[i].ptr[j];
-        *dyarr_push(&r) = '\n';
-    }
+    for (size_t i = 0; i < self->lines.len; i++)
+        for (size_t j = 0; j < self->lines.ptr[i].len + 1; j++) {
+            char* cc = dyarr_push(&r);
+            if (!cc) return r.ptr;
+            *cc = j == self->lines.ptr[i].len ? '\n' : self->lines.ptr[i].ptr[j];
+        }
     return r.ptr;
 }
 
-void ugui_editor(GuiState* st, uGuiEditor* self) {
-    glColor3f(.88, .88, .88);
-    for (size_t k = 0; k < self->lines.len; k++)
-        text_draw(self->lines.ptr[k].ptr, self->lines.ptr[k].len, 8, 8+8*k);
+void _ugui_editor_key(uGuiEditor* self, unsigned key) {
+    if (KEY_RETURN == key) {
+        void* niw = dyarr_push(&self->lines);
+        if (!niw) return;
+        memset(niw, 0, sizeof(dyarr(char)));
+    } else if (KEY_BACKSPACE == key) {
+        if (!dyarr_pop(&self->lines.ptr[self->lines.len-1]) && 1 < self->lines.len)
+            dyarr_pop(&self->lines);
+    } else if (' ' <= key && key <= '~') {
+        char* cc = dyarr_push(&self->lines.ptr[self->lines.len-1]);
+        if (!cc) return;
+        *cc = key | 0b100000;
+    }
 }
 
+void ugui_editor(GuiState* st, uGuiEditor* self) {
+    (void)st;
+    glColor3f(.88, .88, .88);
+    for (size_t k = 0; k < self->lines.len; k++)
+        text_draw(self->lines.ptr[k].ptr, self->lines.ptr[k].len, 8, 8+9*k);
+}

@@ -16,10 +16,12 @@ LRESULT CALLBACK _WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     if (self && hWnd == self->hWnd) switch (uMsg) {
         case WM_PAINT: {
-            _event(render, self);
-            SwapBuffers(self->hDC);
             PAINTSTRUCT ps;
             BeginPaint(hWnd, &ps);
+            if (ps.rcPaint.right - ps.rcPaint.left || ps.rcPaint.bottom - ps.rcPaint.top) {
+                _event(render, self);
+                SwapBuffers(self->hDC);
+            }
             EndPaint(hWnd, &ps);
         } return 0;
 
@@ -113,6 +115,7 @@ void frame_loop(Frame* self) {
 }
 
 void frame_redraw(Frame* self) {
+    InvalidateRect(self->hWnd, NULL, TRUE);
     PostMessage(self->hWnd, WM_PAINT, 0, 0);
 }
 

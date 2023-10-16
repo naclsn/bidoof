@@ -368,7 +368,7 @@ void gui_menu(GuiState* st, GuiMenu* self) {
         case MENU_RESTING:
             break;
 
-        case MENU_OPENED:
+        case MENU_OPENED: {
             bool is_in = rect_in(self->box.rect, st->mouse.x, st->mouse.y);
             if (GUI_MOUSE_EVENT_BUBBLE == st->state) {
                 if (!is_in) {
@@ -399,7 +399,7 @@ void gui_menu(GuiState* st, GuiMenu* self) {
                 gui_layout_splits_pop(st, &self->splits);
             }
             gui_layout_fixed_pop(st, &self->box);
-            break;
+        } break;
 
         case MENU_SELECTED:
             if (GUI_MOUSE_EVENT_BUBBLE == st->state) return;
