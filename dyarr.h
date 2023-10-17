@@ -34,9 +34,9 @@ static inline bool _dyarr_resize(void** ptr, size_t* cap, void* nptr, size_t nca
 #define dyarr_at(__da, __k)  (0 <= (__k) && (__k) < (__da)->len ? &(__da)->ptr[(__k)] : NULL)
 
 // NULL if OOM, else pointer to the new sub-array (at k, of size n)
-#define dyarr_insert(__da, __k, __n)  ((__n)+(__da)->len < (__da)->cap || dyarr_resize((__da), (__n)+(__da)->len) ? memmove((__k)+(__n)+(__da)->ptr, (__k)+(__da)->ptr, (__da)->len-(__k)), (__da)->len+= (__n), (__k)+(__da)->ptr : NULL)
+#define dyarr_insert(__da, __k, __n)  ((__n)+(__da)->len < (__da)->cap || dyarr_resize((__da), (__n)+(__da)->len) ? memmove((__k)+(__n)+(__da)->ptr, (__k)+(__da)->ptr, ((__da)->len-(__k))*sizeof*(__da)->ptr), (__da)->len+= (__n), (__k)+(__da)->ptr : NULL)
 
 // (doesn't check bounds)
-#define dyarr_remove(__da, __k, __n)  memmove((__k)+(__da)->ptr, (__k)+(__n)+(__da)->ptr, ((__da)->len-= (__n)) - (__k))
+#define dyarr_remove(__da, __k, __n)  memmove((__k)+(__da)->ptr, (__k)+(__n)+(__da)->ptr, (((__da)->len-=(__n))-(__k))*sizeof*(__da)->ptr)
 
 #endif // __DYARR_H__

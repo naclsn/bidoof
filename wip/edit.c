@@ -16,7 +16,7 @@ typedef struct uGuiEditor {
 } uGuiEditor;
 void ugui_editor_set(GuiState* st, uGuiEditor* self, char const* text);
 char* ugui_editor_get(GuiState* st, uGuiEditor* self);
-void _ugui_editor_key(uGuiEditor* self, unsigned key);
+void _ugui_editor_key(GuiState* st, uGuiEditor* self, unsigned key);
 void ugui_editor(GuiState* st, uGuiEditor* self);
 
 static GuiState gst = {.scale= 2.4};
@@ -69,9 +69,12 @@ void keydown(Frame* f, unsigned key) {
     //st->state = GUI_KEY_EVENT_BUBBLE;
     //my_gui_logic(f);
 
-    _ugui_editor_key(&ged, key);
-    gst.state = GUI_REDRAWING;
-    frame_redraw(f);
+    //_ugui_editor_key(&ged, key);
+    //gst.state = GUI_REDRAWING;
+    //frame_redraw(f);
+
+    _ugui_editor_key(&gst, &ged, key);
+    my_gui_logic(f);
 }
 
 void mousedown(Frame* f, int button, int x, int y) { (void)x; (void)y; gui_event_mousedown(&gst, button); my_gui_logic(f); }
@@ -139,28 +142,38 @@ char* ugui_editor_get(GuiState* st, uGuiEditor* self) {
     return r.ptr;
 }
 
-void _ugui_editor_key(uGuiEditor* self, unsigned key) {
+void _ugui_editor_key(GuiState* st, uGuiEditor* self, unsigned key) {
     switch (key) {
         case KEY_RETURN: {
                 void* niw = dyarr_insert(&self->lines, self->cur.ln+1, 1);
                 if (!niw) return;
                 memset(niw, 0, sizeof(dyarr(char)));
-                self->cur.col = 0;
                 self->cur.ln++;
+                size_t ends_len = self->lines.ptr[self->cur.ln-1].len - self->cur.col;
+                void* ends_niw = dyarr_insert(&self->lines.ptr[self->cur.ln], 0, ends_len);
+                if (!ends_niw) break;
+                memcpy(ends_niw, self->lines.ptr[self->cur.ln-1].ptr + self->cur.col, ends_len);
+                self->lines.ptr[self->cur.ln-1].len-= ends_len;
+                self->cur.col = 0;
             } break;
 
         case KEY_BACKSPACE:
             if (self->cur.col) {
                 self->cur.col--;
                 dyarr_remove(&self->lines.ptr[self->cur.ln], self->cur.col, 1);
-            } else if (!self->lines.ptr[self->cur.ln].len) {
+            } else if (!self->lines.ptr[self->cur.ln].len && 1 < self->lines.len) {
                 dyarr_remove(&self->lines, self->cur.ln, 1);
-                if (self->lines.len < self->cur.ln) self->cur.ln--;
+                if (self->cur.ln) --self->cur.ln;
+                self->cur.col = self->lines.ptr[self->cur.ln].len;
             }
             break;
         case KEY_DELETE:
             if (self->cur.col < self->lines.ptr[self->cur.ln].len)
                 dyarr_remove(&self->lines.ptr[self->cur.ln], self->cur.col, 1);
+            else if (!self->lines.ptr[self->cur.ln].len && 1 < self->lines.len) {
+                dyarr_remove(&self->lines, self->cur.ln, 1);
+                if (self->lines.len == self->cur.ln) --self->cur.ln;
+            }
             break;
 
         case KEY_LEFT: if (self->cur.col) --self->cur.col; break;
@@ -170,6 +183,9 @@ void _ugui_editor_key(uGuiEditor* self, unsigned key) {
         case KEY_HOME: self->cur.col = 0; break;
         case KEY_END: self->cur.col = self->lines.ptr[self->cur.ln].len; break;
 
+        case KEY_PAGEUP: if (self->top) --self->top; break;
+        case KEY_PAGEDOWN: if (self->top < self->lines.len-1) ++self->top; break;
+
         default:
             if (' ' <= key && key <= '~') {
                 char* cc = dyarr_insert(&self->lines.ptr[self->cur.ln], self->cur.col, 1);
@@ -178,6 +194,8 @@ void _ugui_editor_key(uGuiEditor* self, unsigned key) {
                 self->cur.col++;
             }
     }
+
+    st->needs_redraw = true;
 }
 
 void ugui_editor(GuiState* st, uGuiEditor* self) {
@@ -197,11 +215,11 @@ void ugui_editor(GuiState* st, uGuiEditor* self) {
         }
 
         glColor3f(.88, .88, .88);
-        for (size_t k = self->top; k < self->lines.len && 9*k < r.height; k++)
-            text_draw(self->lines.ptr[k].ptr, self->lines.ptr[k].len, r.x, r.y + 9*k);
+        for (size_t k = 0; k < self->lines.len && 9*k < r.height; k++)
+            text_draw(self->lines.ptr[self->top+k].ptr, self->lines.ptr[self->top+k].len, r.x, r.y + 9*k);
 
-        glColor3f(.72, .88, 0);
-        {
+        if (self->top <= self->cur.ln) {
+            glColor3f(.72, .88, 0);
             GLint xx = r.x + 8*self->cur.col;
             GLint yy = r.y + 9*(self->cur.ln-self->top);
             glRecti(xx-1, yy-1, xx+2, yy+9);
