@@ -23,6 +23,8 @@ void frame_redraw(Frame* self);
 void frame_close(Frame* self);
 void frame_destroy(Frame* self);
 
+unsigned frame_key2char(unsigned key);
+
 #define extends_FrameBase struct {                                   \
     int width;                                                       \
     int height;                                                      \

@@ -64,6 +64,11 @@ void render(Frame* f) {
 
 void resize(Frame* f, int w, int h) { gui_event_reshape(&gst, w, h, gst.scale); frame_redraw(f); }
 
+void mousedown(Frame* f, int button, int x, int y) { (void)x; (void)y; gui_event_mousedown(&gst, button); my_gui_logic(f); }
+void mouseup(Frame* f, int button, int x, int y) { (void)x; (void)y; gui_event_mouseup(&gst, button); my_gui_logic(f); }
+void mousewheel(Frame* f, int delta, int x, int y) { (void)x; (void)y; gui_event_reshape(&gst, f->width, f->height, gst.scale * (delta < 0 ? 0.9f : 1.1f)); my_gui_logic(f); }
+void mousemove(Frame* f, int x, int y) { gui_event_mousemove(&gst, x, y); my_gui_logic(f); }
+
 void keydown(Frame* f, unsigned key) {
     if (KEY_ESC == key) frame_close(f);
     //st->state = GUI_KEY_EVENT_BUBBLE;
@@ -73,14 +78,17 @@ void keydown(Frame* f, unsigned key) {
     //gst.state = GUI_REDRAWING;
     //frame_redraw(f);
 
-    _ugui_editor_key(&gst, &ged, key);
+    //_ugui_editor_key(&gst, &ged, key);
+    //my_gui_logic(f);
+
+    gui_event_keydown(&gst, key);
     my_gui_logic(f);
 }
 
-void mousedown(Frame* f, int button, int x, int y) { (void)x; (void)y; gui_event_mousedown(&gst, button); my_gui_logic(f); }
-void mouseup(Frame* f, int button, int x, int y) { (void)x; (void)y; gui_event_mouseup(&gst, button); my_gui_logic(f); }
-void mousewheel(Frame* f, int delta, int x, int y) { (void)x; (void)y; gui_event_reshape(&gst, f->width, f->height, gst.scale * (delta < 0 ? 0.9f : 1.1f)); my_gui_logic(f); }
-void mousemove(Frame* f, int x, int y) { gui_event_mousemove(&gst, x, y); my_gui_logic(f); }
+void keyup(Frame* f, unsigned key) {
+    gui_event_keyup(&gst, key);
+    my_gui_logic(f);
+}
 
 int main(void) {
     Frame f = {
@@ -91,11 +99,12 @@ int main(void) {
             .closing= frame_close,
             .render= render,
             .resize= resize,
-            .keydown= keydown,
             .mousedown= mousedown,
             .mouseup= mouseup,
-            .mousewheel= mousewheel,
             .mousemove= mousemove,
+            .mousewheel= mousewheel,
+            .keydown= keydown,
+            .keyup= keyup,
         },
     };
 
@@ -143,6 +152,12 @@ char* ugui_editor_get(GuiState* st, uGuiEditor* self) {
 }
 
 void _ugui_editor_key(GuiState* st, uGuiEditor* self, unsigned key) {
+    printf("- captured event! key%s: %u, mod:%s%s -\n",
+            st->keyboard.down ? "down" : "up",
+            st->keyboard.key,
+            st->keyboard.mod.shift ? " shift" : "",
+            st->keyboard.mod.ctrl ? " ctrl" : "");
+
     switch (key) {
         case KEY_RETURN: {
                 void* niw = dyarr_insert(&self->lines, self->cur.ln+1, 1);
@@ -227,4 +242,9 @@ void ugui_editor(GuiState* st, uGuiEditor* self) {
 
         glDisable(GL_SCISSOR_TEST);
     }
+
+    else if (GUI_KEY_EVENT_BUBBLE == st->state)
+        st->event_captured = self;
+    else if (GUI_KEY_EVENT_CAPTURED == st->state && self == st->event_captured && st->keyboard.down)
+        _ugui_editor_key(st, self, st->keyboard.key);
 }

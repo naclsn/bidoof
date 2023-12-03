@@ -139,6 +139,8 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
 #define export_names(...)  \
     char const* const names[] = {__VA_ARGS__, NULL}
 
+
+
 #define destroyed(__self) (!frommember(__self, Obj, as)->update)
 #define getdata(__self) (frommember(__self, Obj, as)->data)
 

@@ -57,6 +57,15 @@ typedef struct GuiState {
             GUI_MOUSE_UP_MIDDLE = MOUSE_MIDDLE+3,
         } button;
     } mouse;
+
+    struct {
+        unsigned key;
+        bool down;
+        struct {
+            bool shift;
+            bool ctrl;
+        } mod;
+    } keyboard;
 } GuiState;
 
 void gui_begin(GuiState* st);
@@ -68,6 +77,8 @@ void gui_event_reshape(GuiState* st, int w, int h, float scale);
 void gui_event_mousedown(GuiState* st, int button);
 void gui_event_mouseup(GuiState* st, int button);
 void gui_event_mousemove(GuiState* st, int x, int y);
+void gui_event_keydown(GuiState* st, unsigned key);
+void gui_event_keyup(GuiState* st, unsigned key);
 
 typedef struct GuiLayoutFixed {
     _extends_GuiLayoutBase;
@@ -221,6 +232,40 @@ void gui_event_mousemove(GuiState* st, int x, int y) {
     st->mouse.x = x/st->scale;
     st->mouse.y = y/st->scale;
     //st->state = GUI_MOUSE_EVENT_BUBBLE;
+}
+void _gui_event_keychange(GuiState* st, unsigned key, bool down) {
+    switch (key) {
+#ifdef KEY_SHIFT
+        case KEY_SHIFT:
+#else
+        case KEY_LSHIFT:
+# if KEY_RSHIFT != KEY_LSHIFT
+        case KEY_RSHIFT:
+# endif
+#endif
+            st->keyboard.mod.shift = down;
+            break;
+#ifdef KEY_CTRL
+        case KEY_CTRL:
+#else
+        case KEY_LCTRL:
+# if KEY_RCTRL != KEY_LCTRL
+        case KEY_RCTRL:
+# endif
+#endif
+            st->keyboard.mod.ctrl = down;
+            break;
+        default:
+            st->keyboard.key = key;
+            st->keyboard.down = down;
+            st->state = GUI_KEY_EVENT_BUBBLE;
+    }
+}
+void gui_event_keydown(GuiState* st, unsigned key) {
+    _gui_event_keychange(st, key, true);
+}
+void gui_event_keyup(GuiState* st, unsigned key) {
+    _gui_event_keychange(st, key, false);
 }
 
 void _gui_layout_push(GuiState* st, void* layout) {

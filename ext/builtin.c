@@ -161,6 +161,7 @@ bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
     for (sz k = 0; k < from->len; k++) {
         Obj num = {.ty= NUM, .as.num.val= from->ptr[k]};
         Obj* pnum = &num;
+        // XXX: alloca in a loop
         inline_call_assign(res, predf, 1, &pnum);
             if (NUM != res->ty) fail("predicat result should be a number");
             if (0 != res->as.num.val) self->val++;
@@ -174,6 +175,7 @@ bool _CountL(Num* self, Lst const* const from, Fun const* const pred) {
     if (destroyed(self)) return true;
     Obj* predf = frommember(pred, Obj, as);
     for (sz k = 0; k < from->len; k++) {
+        // XXX: alloca in a loop
         inline_call_assign(res, predf, 1, &from->ptr[k]);
             if (NUM != res->ty) fail("predicat result should be a number");
             if (0 != res->as.num.val) self->val++;

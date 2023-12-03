@@ -58,6 +58,7 @@ void line_compgen(char** (*words)(char* line, size_t point), void (*clean)(char*
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <signal.h>
 
 static char** (*_compgen_words)(char* line, size_t point) = NULL;
 static void (*_compgen_clean)(char** words) = NULL;
@@ -142,15 +143,13 @@ char* line_read(void) {
         return free(_hist_ls[0]), _hist_ls[0] = s;
     } // if not tty
 
-    {
-        struct termios raw = term;
-        raw.c_iflag&=~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
-        raw.c_oflag&=~(OPOST);
-        raw.c_lflag&=~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-        raw.c_cflag&=~(CSIZE | PARENB);
-        raw.c_cflag|= (CS8);
-        tcsetattr(STDIN_FILENO, TCSANOW, &raw);
-    }
+    struct termios term_raw = term;
+    term_raw.c_iflag&=~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+    term_raw.c_oflag&=~(OPOST);
+    term_raw.c_lflag&=~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+    term_raw.c_cflag&=~(CSIZE | PARENB);
+    term_raw.c_cflag|= (CS8);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_raw);
 
     if (_hist_at) for (s = _hist_ls[_hist_at]; s[i]; i++) putchar(s[i]);
     else if (!_hist_ls[0] || _hist_ls[0][0]) {
@@ -488,6 +487,12 @@ char* line_read(void) {
                     for (; k != j; k++) putchar(' ');
                     for (; k != i; k--) putchar('\b');
                 }
+                break;
+
+            case CTRL('Z'):
+                tcsetattr(STDIN_FILENO, TCSANOW, &term);
+                raise(SIGTSTP);
+                tcsetattr(STDIN_FILENO, TCSANOW, &term_raw);
                 break;
 
             default:

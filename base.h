@@ -30,11 +30,11 @@ void notify_default(char const* s);
 void notify_null(char const* s);
 extern void (*notify)(char const* s);
 // TODO: remove maybe
-#define notify_printf(__sz, __fmt, ...) do {  \
-        char* m = alloca(__sz);               \
-        sprintf(m, __fmt, __VA_ARGS__);       \
-        notify(m);                            \
-    } while (false)                           \
+#define notify_printf(__sz, __fmt, ...) do {    \
+        char* m = alloca(__sz);                 \
+        snprintf(m, __sz, __fmt, __VA_ARGS__);  \
+        notify(m);                              \
+    } while (false)                             \
 
 typedef uint8_t u8;
 typedef uint16_t u16;

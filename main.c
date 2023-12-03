@@ -32,7 +32,7 @@ int parse_args(char* prog, int argc, char** argv) {
         char* arg = *argv;
         if ('-' == arg[0]) switch (arg[1]) {
             case 'h':
-                printf("Usage: %s ...\n", prog);
+                printf("Usage: %s [-l <lib>] ...\n", prog);
                 return 1;
 
             case 'l':

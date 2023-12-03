@@ -1,7 +1,7 @@
 CFLAGS += -Wall -Wextra -Werror -std=c99 #-Wfatal-errors
 OUT ?= build
 NAME ?= bidoof
-EXTS ?= builtin encodings views
+EXTS ?= builtin encodings views archives
 
 ifeq ($(OS), Windows_NT)
   as-exe = $(1).exe
