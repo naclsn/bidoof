@@ -1,4 +1,4 @@
-CFLAGS += -Wall -Wextra -Werror -std=c99 #-Wfatal-errors
+CFLAGS += -std=c99 -Wall -Wextra -Werror #-Wfatal-errors
 OUT ?= build
 NAME ?= bidoof
 EXTS ?= archives builtin encodings views

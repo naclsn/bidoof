@@ -39,6 +39,16 @@ extern void* __trace_allocs_realloc(char const* const info, void* const p, size_
 #define _FOR_TYNM_7(__n, __macro, __ty, __nm, ...)  __macro((__n-7), __n, __ty, __nm) _FOR_TYNM_6(__n, __macro, __VA_ARGS__)
 #define _FOR_TYNM_8(__n, __macro, __ty, __nm, ...)  __macro((__n-8), __n, __ty, __nm) _FOR_TYNM_7(__n, __macro, __VA_ARGS__)
 #define _FOR_TYNM_9(__n, __macro, __ty, __nm, ...)  __macro((__n-9), __n, __ty, __nm) _FOR_TYNM_8(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_10(__n, __macro, __ty, __nm, ...)  __macro((__n-10), __n, __ty, __nm) _FOR_TYNM_9(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_11(__n, __macro, __ty, __nm, ...)  __macro((__n-11), __n, __ty, __nm) _FOR_TYNM_10(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_12(__n, __macro, __ty, __nm, ...)  __macro((__n-12), __n, __ty, __nm) _FOR_TYNM_11(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_13(__n, __macro, __ty, __nm, ...)  __macro((__n-13), __n, __ty, __nm) _FOR_TYNM_12(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_14(__n, __macro, __ty, __nm, ...)  __macro((__n-14), __n, __ty, __nm) _FOR_TYNM_13(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_15(__n, __macro, __ty, __nm, ...)  __macro((__n-15), __n, __ty, __nm) _FOR_TYNM_14(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_16(__n, __macro, __ty, __nm, ...)  __macro((__n-16), __n, __ty, __nm) _FOR_TYNM_15(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_17(__n, __macro, __ty, __nm, ...)  __macro((__n-17), __n, __ty, __nm) _FOR_TYNM_16(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_18(__n, __macro, __ty, __nm, ...)  __macro((__n-18), __n, __ty, __nm) _FOR_TYNM_17(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_19(__n, __macro, __ty, __nm, ...)  __macro((__n-19), __n, __ty, __nm) _FOR_TYNM_18(__n, __macro, __VA_ARGS__)
 #define _FOR_TYNM(__n, __macro, ...)  _FOR_TYNM_##__n(__n, __macro, __VA_ARGS__)
 
 void notify_default(char const* s);

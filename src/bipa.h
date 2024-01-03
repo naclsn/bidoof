@@ -11,6 +11,8 @@
 ///  - writing a byte: `bi->arr.ptr[bi->at++] = *it`
 ///  - reading a byte: `*it = pa->buf->ptr[pa->at++]`
 
+/// TODO: _free, ie for each types
+
 #include "base.h"
 
 typedef struct BufBuilder {
@@ -28,13 +30,15 @@ typedef struct BufParser {
 #define _hidump_kw(__c) "\x1b[34m" __c "\x1b[m"
 #define _hidump_ty(__c) "\x1b[32m" __c "\x1b[m"
 #define _hidump_nb(__c) "\x1b[33m" __c "\x1b[m"
-#define _hidump_nx(__c) "\x1b[35m" __c "\x1b[m"
+#define _hidump_st(__c) "\x1b[36m" __c "\x1b[m"
+#define _hidump_ex(__c) "\x1b[35m" __c "\x1b[m"
 #define _hidump_id(__c) __c
 #else // BIPA_HIDUMP
 #define _hidump_kw(__c) __c
 #define _hidump_ty(__c) __c
 #define _hidump_nb(__c) __c
-#define _hidump_nx(__c) __c
+#define _hidump_st(__c) __c
+#define _hidump_ex(__c) __c
 #define _hidump_id(__c) __c
 #endif // BIPA_HIDUMP
 
@@ -44,19 +48,19 @@ typedef struct BufParser {
 #define _parse(__ty, ...)    _CALL(_parse_##__ty, __VA_ARGS__)
 
 #define _typename_u8() uint8_t
-#define _dump_u8()  printf(_hidump_nb("%hhu") _hidump_nx("u8"), *it);
-#define _build_u8() uint8_t* p = dyarr_push(&bi->arr);  \
+#define _dump_u8()  printf(_hidump_nb("%hhu") _hidump_ex("u8"), *it);
+#define _build_u8() { uint8_t* p = dyarr_push(&bi->arr);  \
                     if (!p) goto fail;  \
-                    *p = *it;
+                    *p = *it; }
 #define _parse_u8() if (pa->buf->len == pa->at) goto fail;  \
                     *it = pa->buf->ptr[pa->at++];
 
 #define _typename_u16le() uint16_t
 #define _typename_u32le() uint32_t
 #define _typename_u64le() uint64_t
-#define _dump_u16le()   printf(_hidump_nb("%hu") _hidump_nx("u16le"), *it);
-#define _dump_u32le()   printf(_hidump_nb("%u" ) _hidump_nx("u32le"), *it);
-#define _dump_u64le()   printf(_hidump_nb("%lu") _hidump_nx("u64le"), *it);
+#define _dump_u16le()   printf(_hidump_nb("%hu") _hidump_ex("u16le"), *it);
+#define _dump_u32le()   printf(_hidump_nb("%u" ) _hidump_ex("u32le"), *it);
+#define _dump_u64le()   printf(_hidump_nb("%lu") _hidump_ex("u64le"), *it);
 #define _build_u16le()  if (bi->arr.cap <= bi->arr.len+1 &&                    \
                             !dyarr_resize(&bi->arr,                            \
                                 bi->arr.cap ? bi->arr.cap*2 : 16)) goto fail;  \
@@ -104,9 +108,9 @@ typedef struct BufParser {
 #define _typename_u16be() uint16_t
 #define _typename_u32be() uint32_t
 #define _typename_u64be() uint64_t
-#define _dump_u16be()   printf(_hidump_nb("%hu") _hidump_nx("u16be"), *it);
-#define _dump_u32be()   printf(_hidump_nb("%u" ) _hidump_nx("u32be"), *it);
-#define _dump_u64be()   printf(_hidump_nb("%lu") _hidump_nx("u64be"), *it);
+#define _dump_u16be()   printf(_hidump_nb("%hu") _hidump_ex("u16be"), *it);
+#define _dump_u32be()   printf(_hidump_nb("%u" ) _hidump_ex("u32be"), *it);
+#define _dump_u64be()   printf(_hidump_nb("%lu") _hidump_ex("u64be"), *it);
 #define _build_u16be()  if (bi->arr.cap <= bi->arr.len+1 &&                     \
                             !dyarr_resize(&bi->arr,                             \
                                 bi->arr.cap ? bi->arr.cap*2 : 16)) goto fail;   \
@@ -151,28 +155,66 @@ typedef struct BufParser {
                             | pa->buf->ptr[pa->at]<<56;                         \
                         pa->at+= 8;
 
-/// TODO: cstr/lstr
+#define _typename_cstr(__sentinel) uint8_t*
+#define _dump_cstr(__sentinel) printf(_hidump_st("%.*s") _hidump_ex("\\x%02X"), (int)((uint8_t*)strchr((char*)*it, (__sentinel)) - *it), *it, (int)__sentinel);
+#define _build_cstr(__sentinel) {                                      \
+        uint8_t s = (__sentinel);                                      \
+        size_t len = (uint8_t*)strchr((char*)*it, s) - *it;            \
+        while (bi->arr.cap <= bi->arr.len+len+1)                       \
+            if (!dyarr_resize(&bi->arr,                                \
+                        bi->arr.cap ? bi->arr.cap*2 : 16)) goto fail;  \
+        memcpy(bi->arr.ptr+bi->arr.len, *it, len);                     \
+        bi->arr.len+= len;                                             \
+        bi->arr.ptr[bi->arr.len++] = s;                                \
+    }
+#define _parse_cstr(__sentinel) {                                          \
+        uint8_t* from = pa->buf->ptr+pa->at;                               \
+        uint8_t* found = memchr(from, (__sentinel), pa->buf->len-pa->at);  \
+        if (!found) goto fail;                                             \
+        size_t len = found-from;                                           \
+        *it = malloc(len);                                                 \
+        if (!*it) goto fail;                                               \
+        memcpy(*it, from, len);                                            \
+        pa->at+= len+1;                                                    \
+    }
+
+#define _typename_lstr(__length) uint8_t*
+#define _dump_lstr(__length) printf(_hidump_st("%.*s") _hidump_ex("-"), (int)(__length), *it);
+#define _build_lstr(__length) {                                        \
+        size_t len = (__length);                                       \
+        while (bi->arr.cap <= bi->arr.len+len+1)                       \
+            if (!dyarr_resize(&bi->arr,                                \
+                        bi->arr.cap ? bi->arr.cap*2 : 16)) goto fail;  \
+        memcpy(bi->arr.ptr+bi->arr.len, *it, len);                     \
+        bi->arr.len+= len;                                             \
+    }
+#define _parse_lstr(__length) {                     \
+        uint8_t* from = pa->buf->ptr+pa->at;        \
+        size_t len = (__length);                    \
+        if (pa->buf->len < pa->at+len) goto fail;   \
+        *it = malloc(len);                          \
+        if (!*it) goto fail;                        \
+        memcpy(*it, from, len);                     \
+        pa->at+= len;                               \
+    }
 
 #define _struct_fields_typename_one(__k, __n, __ty, __nm) _typename __ty __nm;
 
-#define _struct_fields_dump_one(__k, __n, __ty, __nm)   \
-    {                                                   \
-        printf("." _hidump_id(#__nm) "= ");             \
-        _typename __ty const* const it = &self->__nm;   \
-        _dump __ty                                      \
-        printf(",\n%*.s", (depth+(__k+1!=__n))*2, "");  \
+#define _struct_fields_dump_one(__k, __n, __ty, __nm) {  \
+        printf("." _hidump_id(#__nm) "= ");              \
+        _typename __ty const* const it = &self->__nm;    \
+        _dump __ty                                       \
+        printf(",\n%*.s", (depth+(__k+1!=__n))*2, "");   \
     }
 
-#define _struct_fields_build_one(__k, __n, __ty, __nm)  \
-    {                                                   \
-        _typename __ty const* const it = &self->__nm;   \
-        _build __ty                                     \
+#define _struct_fields_build_one(__k, __n, __ty, __nm) {  \
+        _typename __ty const* const it = &self->__nm;     \
+        _build __ty                                       \
     }
 
-#define _struct_fields_parse_one(__k, __n, __ty, __nm)  \
-    {                                                   \
-        _typename __ty* const it = &self->__nm;         \
-        _parse __ty                                     \
+#define _struct_fields_parse_one(__k, __n, __ty, __nm) {  \
+        _typename __ty* const it = &self->__nm;           \
+        _parse __ty                                       \
     }
 
 #define bipa_struct(__tname, __n_fields, ...)                                       \
