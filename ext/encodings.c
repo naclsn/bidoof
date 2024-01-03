@@ -5,7 +5,7 @@
 /// Thus: `SomeDecode (SomeEncode source) == source`;
 /// but *not necessarily*: `SomeEncode (SomeDecode source) == source`
 
-#include "../helper.h"
+#include "../src/helper.h"
 
 export_names
     ( "Base64Decode"

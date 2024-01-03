@@ -24,7 +24,7 @@ void obj_show(Obj const* self, int indent) {
             break;
 
         case FLT:
-            printf("%Lf", self->as.flt.val);
+            printf("%lf", self->as.flt.val);
             break;
 
         case LST:

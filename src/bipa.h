@@ -1,3 +1,6 @@
+#ifndef __BIPA_H__
+#define __BIPA_H__
+
 /// in an (array, typename, while), the while is an expression with:
 ///  - `self` the encompassing struct
 ///  - `k` the iteration number
@@ -8,10 +11,7 @@
 ///  - writing a byte: `bi->arr.ptr[bi->at++] = *it`
 ///  - reading a byte: `*it = pa->buf->ptr[pa->at++]`
 
-#include <stdint.h>
-#include <stdio.h>
-
-#include "../dyarr.h"
+#include "base.h"
 
 typedef struct BufBuilder {
     dyarr(u8) arr;
@@ -287,3 +287,5 @@ typedef struct BufParser {
 #define _dump_array(__tname, _) bipa_dump_##__tname(it);
 #define _build_array(__tname, _) if (!bipa_build_##__tname(it, bi)) goto fail;
 #define _parse_array(__tname, __while) for (size_t k = 0; __while; k++) if (!bipa_parse_one_##__tname(it, pa)) goto fail;
+
+#endif // __BIPA_H__

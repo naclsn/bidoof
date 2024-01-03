@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "../helper.h"
+#include "../src/helper.h"
 
 #define freenul(__v) free(__v), __v = NULL;
 

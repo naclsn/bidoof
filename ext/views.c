@@ -3,7 +3,7 @@
 #include <pthread.h>
 #include <unistd.h> // ZZZ: sleep
 
-#include "../helper.h"
+#include "../src/helper.h"
 
 export_names("ViewTxt");
 

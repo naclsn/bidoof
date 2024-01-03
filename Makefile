@@ -1,7 +1,7 @@
 CFLAGS += -Wall -Wextra -Werror -std=c99 #-Wfatal-errors
 OUT ?= build
 NAME ?= bidoof
-EXTS ?= builtin encodings views archives
+EXTS ?= archives builtin encodings views
 
 ifeq ($(OS), Windows_NT)
   as-exe = $(1).exe
@@ -22,13 +22,13 @@ test: $(call as-test,lang)
 $(OUT):
 	$(MD) '$(OUT)'
 
-$(OUT)/$(call as-exe,$(NAME)): *.[ch]
+$(OUT)/$(call as-exe,$(NAME)): src/*.[ch]
 	$(CC) $^ -o '$@' -DEXTS_NAMES='$(foreach ext,$(EXTS),"$(call as-lib,$(ext))",)' $(CFLAGS)
 
-$(OUT)/$(call as-lib,%): ext/%.c helper.h base.[ch]
+$(OUT)/$(call as-lib,%): ext/%.c src/helper.h src/base.[ch]
 	$(CC) $^ -o '$@' -fPIC -shared $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
 
-$(OUT)/$(call as-exe,test-%): %.c
+$(OUT)/$(call as-exe,test-%): src/%.c
 	$(CC) $^ -o '$@' -DASR_TEST_BUILD
 	'$@'
 

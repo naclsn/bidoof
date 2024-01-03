@@ -244,7 +244,7 @@ void repl(char* histfn) {
                 switch (it->ty) {
                     case BUF: printf("\"%.*s\"\n", (int)it->as.buf.len, it->as.buf.ptr); break;
                     case NUM: printf("%ld\n", it->as.num.val); break;
-                    case FLT: printf("%Lf\n", it->as.flt.val); break;
+                    case FLT: printf("%lf\n", it->as.flt.val); break;
                     case SYM: printf(":%s\n", it->as.sym.txt); break;
                     default: printf("%p\n", it->as.lst.ptr);
                 }
