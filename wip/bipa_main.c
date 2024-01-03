@@ -1,27 +1,18 @@
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
-#define u8 uint8_t
-#define u16 uint16_t
-#define u32 uint32_t
-#define sz size_t
-typedef struct Buf { sz len; u8* ptr; } Buf;
+#define BIPA_HIDUMP
+#include "../src/bipa.h"
 
-#define _BIPA_HIDUMP
-#include "bipa.h"
-
-bipa_struct(local_file_header,
+bipa_struct(local_file_header, 2,
     (u16le), compression_method,
     (u16le), last_mod_file_time
 )
-bipa_struct(data_descriptor,
+bipa_struct(data_descriptor, 2,
     (u32le), crc_32,
     (u32le), compressed_size
 )
 bipa_array(local_file_headers, (struct, local_file_header))
-bipa_struct(local_file,
+bipa_struct(local_file, 2,
     (u16le), local_file_count,
     (array, local_file_headers, k < self->local_file_count), local_file_headers
     //(struct, data_descriptor), data_descriptor
@@ -47,7 +38,7 @@ int main(void) {
     };
     struct local_file dst;
 
-    printf("src: "); bipa_dump_local_file(&src); printf("\n");
+    printf("src:\n"); bipa_dump_local_file(&src, 0); printf("\n");
 
     BufBuilder builder = {0};
     bipa_build_local_file(&src, &builder);
@@ -60,5 +51,5 @@ int main(void) {
 
     free(builder.arr.ptr);
 
-    printf("dst: "); bipa_dump_local_file(&dst); printf("\n");
+    printf("dst:\n"); bipa_dump_local_file(&dst, 0); printf("\n");
 }

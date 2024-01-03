@@ -1,16 +1,5 @@
 #include "base.h"
 
-#define _UNPACK(...) __VA_ARGS__
-#define _CALL(__macro, ...) __macro(__VA_ARGS__)
-
-#define _FOR_TYNM_1(__macro, __ty1, __nm1)                                                                 __macro(0, __ty1, __nm1)
-#define _FOR_TYNM_2(__macro, __ty1, __nm1, __ty2, __nm2)                              _FOR_TYNM_1(__macro, __ty1, __nm1) __macro(1, __ty2, __nm2)
-#define _FOR_TYNM_3(__macro, __ty1, __nm1, __ty2, __nm2, __ty3, __nm3)                _FOR_TYNM_2(__macro, __ty1, __nm1, __ty2, __nm2) __macro(2, __ty3, __nm3)
-#define _FOR_TYNM_4(__macro, __ty1, __nm1, __ty2, __nm2, __ty3, __nm3, __ty4, __nm4)  _FOR_TYNM_3(__macro, __ty1, __nm1, __ty2, __nm2, __ty3, __nm3) __macro(3, __ty4, __nm4)
-#define _FOR_TYNM(__n, __macro, ...)  _FOR_TYNM_##__n(__macro, __VA_ARGS__)
-
-
-
 #define _link_name_par_1(__ty1, __nm1)                                            __ty1
 #define _link_name_par_2(__ty1, __nm1, __ty2, __nm2)                              __ty1##_##__ty2
 #define _link_name_par_3(__ty1, __nm1, __ty2, __nm2, __ty3, __nm3)                __ty1##_##__ty2##_##__ty3
@@ -33,9 +22,9 @@
 #define ty_for_FUN Fun
 #define ty_for_SYM Sym
 
-#define _link_uf_pars(__k, __ty, __nm)  , ty_for_##__ty const* const __nm
+#define _link_uf_pars(__k, __n, __ty, __nm)  , ty_for_##__ty const* const __nm
 #define link_uf_pars(__n_par, __ret, __ufname, ...)  \
-    ty_for_##__ret* self _FOR_TYNM_##__n_par(_link_uf_pars, __VA_ARGS__)
+    ty_for_##__ret* self _FOR_TYNM(__n_par, _link_uf_pars, __VA_ARGS__)
 
 #define as_for_ANY(__o) (__o)
 #define as_for_BUF(__o) (&(__o)->as.buf)
@@ -45,9 +34,9 @@
 #define as_for_FUN(__o) (&(__o)->as.fun)
 #define as_for_SYM(__o) (&(__o)->as.sym)
 
-#define _link_uf_args(__k, __ty, __nm)  , as_for_##__ty(self->argv[__k])
+#define _link_uf_args(__k, __n, __ty, __nm)  , as_for_##__ty(self->argv[__k])
 #define link_uf_args(__n_par, __ret, __ufname, ...)  \
-    as_for_##__ret(self) _FOR_TYNM_##__n_par(_link_uf_args, __VA_ARGS__)
+    as_for_##__ret(self) _FOR_TYNM(__n_par, _link_uf_args, __VA_ARGS__)
 
 
 
@@ -63,9 +52,9 @@
 
 
 
-#define _typecheck_args(__k, __ty, __nm)  && (__ty == ANY || __ty == res->argv[__k]->ty)
+#define _typecheck_args(__k, __n, __ty, __nm)  && (__ty == ANY || __ty == res->argv[__k]->ty)
 #define typecheck_args(__name, __n_par, __ret, __ufname, ...)                      \
-    if (__n_par == res->argc _FOR_TYNM_##__n_par(_typecheck_args, __VA_ARGS__)) {  \
+    if (__n_par == res->argc _FOR_TYNM(__n_par, _typecheck_args, __VA_ARGS__)) {   \
         res->update = link_name(__name, __n_par, __ret, __ufname, __VA_ARGS__);    \
         res->ty = __ret;                                                           \
     }
@@ -76,11 +65,11 @@
 
 
 
-#define _document_pars(__k, __ty, __nm)  {.ty= __ty, .name= #__nm},
+#define _document_pars(__k, __n, __ty, __nm)  {.ty= __ty, .name= #__nm},
 #define document_pars(__n_par, __ret, __ufname, ...) {        \
         .ret= __ret,                                          \
         .params= (struct MetaOvlPrm[]){                       \
-            _FOR_TYNM_##__n_par(_document_pars, __VA_ARGS__)  \
+            _FOR_TYNM(__n_par, _document_pars, __VA_ARGS__)   \
             {0}                                               \
         }                                                     \
     }

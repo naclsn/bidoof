@@ -24,26 +24,24 @@ typedef struct BufParser {
     //bool end;
 } BufParser;
 
-#ifdef _BIPA_HIDUMP
+#ifdef BIPA_HIDUMP
 #define _hidump_kw(__c) "\x1b[34m" __c "\x1b[m"
 #define _hidump_ty(__c) "\x1b[32m" __c "\x1b[m"
 #define _hidump_nb(__c) "\x1b[33m" __c "\x1b[m"
 #define _hidump_nx(__c) "\x1b[35m" __c "\x1b[m"
 #define _hidump_id(__c) __c
-#else // _BIPA_HIDUMP
+#else // BIPA_HIDUMP
 #define _hidump_kw(__c) __c
 #define _hidump_ty(__c) __c
 #define _hidump_nb(__c) __c
 #define _hidump_nx(__c) __c
 #define _hidump_id(__c) __c
-#endif // _BIPA_HIDUMP
+#endif // BIPA_HIDUMP
 
-#define _expand(__m, ...) __m(__VA_ARGS__)
-
-#define _typename(__ty, ...) _expand(_typename_##__ty, __VA_ARGS__)
-#define _dump(__ty, ...) _expand(_dump_##__ty, __VA_ARGS__)
-#define _build(__ty, ...) _expand(_build_##__ty, __VA_ARGS__)
-#define _parse(__ty, ...) _expand(_parse_##__ty, __VA_ARGS__)
+#define _typename(__ty, ...) _CALL(_typename_##__ty, __VA_ARGS__)
+#define _dump(__ty, ...)     _CALL(_dump_##__ty, __VA_ARGS__)
+#define _build(__ty, ...)    _CALL(_build_##__ty, __VA_ARGS__)
+#define _parse(__ty, ...)    _CALL(_parse_##__ty, __VA_ARGS__)
 
 #define _typename_u8() uint8_t
 #define _dump_u8()  printf(_hidump_nb("%hhu") _hidump_nx("u8"), *it);
@@ -155,59 +153,56 @@ typedef struct BufParser {
 
 /// TODO: cstr/lstr
 
-#define bipa_struct(__tname, __ty1, __nm1, __ty2, __nm2)                            \
+#define _struct_fields_typename_one(__k, __n, __ty, __nm) _typename __ty __nm;
+
+#define _struct_fields_dump_one(__k, __n, __ty, __nm)   \
+    {                                                   \
+        printf("." _hidump_id(#__nm) "= ");             \
+        _typename __ty const* const it = &self->__nm;   \
+        _dump __ty                                      \
+        printf(",\n%*.s", (depth+(__k+1!=__n))*2, "");  \
+    }
+
+#define _struct_fields_build_one(__k, __n, __ty, __nm)  \
+    {                                                   \
+        _typename __ty const* const it = &self->__nm;   \
+        _build __ty                                     \
+    }
+
+#define _struct_fields_parse_one(__k, __n, __ty, __nm)  \
+    {                                                   \
+        _typename __ty* const it = &self->__nm;         \
+        _parse __ty                                     \
+    }
+
+#define bipa_struct(__tname, __n_fields, ...)                                       \
     struct __tname {                                                                \
-        _typename __ty1 __nm1;                                                      \
-        _typename __ty2 __nm2;                                                      \
+        _FOR_TYNM(__n_fields, _struct_fields_typename_one, __VA_ARGS__)             \
     };                                                                              \
-    void bipa_dump_##__tname(struct __tname const* const self) {                    \
-        printf(_hidump_kw("struct") " " _hidump_ty(#__tname) " {");                 \
-        bool _f = true;                                                             \
-        do {                                                                        \
-            if (_f) _f = false; else printf(", ");                                  \
-            printf("." _hidump_id(#__nm1) "= ");                                    \
-            _typename __ty1 const* const it = &self->__nm1;                         \
-            _dump __ty1                                                             \
-        } while (0);                                                                \
-        do {                                                                        \
-            if (_f) _f = false; else printf(", ");                                  \
-            printf("." _hidump_id(#__nm2) "= ");                                    \
-            _typename __ty2 const* const it = &self->__nm2;                         \
-            _dump __ty2                                                             \
-        } while (0);                                                                \
+    void bipa_dump_##__tname(struct __tname const* const self, int const depth) {   \
+        (void)depth;                                                                \
+        printf(_hidump_kw("struct") " " _hidump_ty(#__tname) " {\n%*.s",            \
+                (depth+1)*2, "");                                                   \
+        _FOR_TYNM(__n_fields, _struct_fields_dump_one, __VA_ARGS__)                 \
         printf("}");                                                                \
     }                                                                               \
     static inline bool                                                              \
     bipa_build_##__tname(struct __tname const* const self, BufBuilder* const bi) {  \
-        do {                                                                        \
-            _typename __ty1 const* const it = &self->__nm1;                         \
-            _build __ty1                                                            \
-        } while (0);                                                                \
-        do {                                                                        \
-            _typename __ty2 const* const it = &self->__nm2;                         \
-            _build __ty2                                                            \
-        } while (0);                                                                \
+        _FOR_TYNM(__n_fields, _struct_fields_build_one, __VA_ARGS__)                \
         return true;                                                                \
     fail: return false;                                                             \
     }                                                                               \
     static inline bool                                                              \
     bipa_parse_##__tname(struct __tname* const self, BufParser* const pa) {         \
         size_t at_before = pa->at;                                                  \
-        do {                                                                        \
-            _typename __ty1* const it = &self->__nm1;                               \
-            _parse __ty1                                                            \
-        } while (0);                                                                \
-        do {                                                                        \
-            _typename __ty2* const it = &self->__nm2;                               \
-            _parse __ty2                                                            \
-        } while (0);                                                                \
+        _FOR_TYNM(__n_fields, _struct_fields_parse_one, __VA_ARGS__)                \
         return true;                                                                \
     fail:                                                                           \
         pa->at = at_before;                                                         \
         return false;                                                               \
     }
 #define _typename_struct(__tname) struct __tname
-#define _dump_struct(__tname) bipa_dump_##__tname(it);
+#define _dump_struct(__tname) bipa_dump_##__tname(it, depth+1);
 #define _build_struct(__tname) if (!bipa_build_##__tname(it, bi)) goto fail;
 #define _parse_struct(__tname) if (!bipa_parse_##__tname(it, pa)) goto fail;
 
@@ -254,13 +249,14 @@ typedef struct BufParser {
         _typename __of* ptr;                                                        \
         size_t len, cap;                                                            \
     };                                                                              \
-    void bipa_dump_##__tname(struct __tname const* const self) {                    \
-        printf(_hidump_kw("array") " " _hidump_ty(#__tname) " [");                  \
-        bool _f = true;                                                             \
+    void bipa_dump_##__tname(struct __tname const* const self, int const depth) {   \
+        (void)depth;                                                                \
+        printf(_hidump_kw("array") " " _hidump_ty(#__tname) " [\n%*.s",             \
+                (depth+1)*2, "");                                                   \
         for (size_t k = 0; k < self->len; k++) {                                    \
-            if (_f) _f = false; else printf(", ");                                  \
             _typename __of const* const it = self->ptr + k;                         \
             _dump __of                                                              \
+            printf(",\n%*.s", (depth+(k+1!=self->len))*2, "");                      \
         }                                                                           \
         printf("]");                                                                \
     }                                                                               \
@@ -284,7 +280,7 @@ typedef struct BufParser {
         return false;                                                               \
     }
 #define _typename_array(__tname, _) struct __tname
-#define _dump_array(__tname, _) bipa_dump_##__tname(it);
+#define _dump_array(__tname, _) bipa_dump_##__tname(it, depth+1);
 #define _build_array(__tname, _) if (!bipa_build_##__tname(it, bi)) goto fail;
 #define _parse_array(__tname, __while) for (size_t k = 0; __while; k++) if (!bipa_parse_one_##__tname(it, pa)) goto fail;
 

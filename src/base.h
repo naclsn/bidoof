@@ -26,6 +26,21 @@ extern void* __trace_allocs_realloc(char const* const info, void* const p, size_
 
 #define frommember(__it, __type, __member)  (  (__type*)( ((char*)__it) - offsetof(__type, __member) )  )
 
+// usefull macros used in helper.h and bipa.h
+#define _UNPACK(...) __VA_ARGS__
+#define _CALL(__macro, ...) __macro(__VA_ARGS__)
+
+#define _FOR_TYNM_1(__n, __macro, __ty, __nm)       __macro((__n-1), __n, __ty, __nm)
+#define _FOR_TYNM_2(__n, __macro, __ty, __nm, ...)  __macro((__n-2), __n, __ty, __nm) _FOR_TYNM_1(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_3(__n, __macro, __ty, __nm, ...)  __macro((__n-3), __n, __ty, __nm) _FOR_TYNM_2(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_4(__n, __macro, __ty, __nm, ...)  __macro((__n-4), __n, __ty, __nm) _FOR_TYNM_3(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_5(__n, __macro, __ty, __nm, ...)  __macro((__n-5), __n, __ty, __nm) _FOR_TYNM_4(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_6(__n, __macro, __ty, __nm, ...)  __macro((__n-6), __n, __ty, __nm) _FOR_TYNM_5(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_7(__n, __macro, __ty, __nm, ...)  __macro((__n-7), __n, __ty, __nm) _FOR_TYNM_6(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_8(__n, __macro, __ty, __nm, ...)  __macro((__n-8), __n, __ty, __nm) _FOR_TYNM_7(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM_9(__n, __macro, __ty, __nm, ...)  __macro((__n-9), __n, __ty, __nm) _FOR_TYNM_8(__n, __macro, __VA_ARGS__)
+#define _FOR_TYNM(__n, __macro, ...)  _FOR_TYNM_##__n(__n, __macro, __VA_ARGS__)
+
 void notify_default(char const* s);
 void notify_null(char const* s);
 extern void (*notify)(char const* s);
