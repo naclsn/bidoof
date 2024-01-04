@@ -20,6 +20,7 @@ bipa_struct(local_file_header, 10
 )
 //bipa_struct(encryption_header, 1, (u8), _)
 bipa_struct(data_descriptor, 3
+    // header signature: 0x08074b50 - "[..] with or without this signature marking data descriptors"
     , (u32le), crc_32
     , (u32le), compressed_size
     , (u32le), uncompressed_size
@@ -116,4 +117,69 @@ int main_lstr(void) {
     return 0;
 }
 
-int main(void) { return main_lstr(); }
+bipa_union(test_union, 4
+        , (void), (u8, 42, nothing)
+        , (u16le), (u8, 48, ushort)
+        , (u32le), (u8, 49, uint)
+        , (u64le), (u8, 50, ulong)
+        )
+
+int main_union(void) {
+    struct test_union src = {
+        .val.uint= 42,
+        //.tag= test_union_tag_uint,
+        .tag= test_union_tag_nothing,
+    };
+    struct test_union res;
+
+    puts("src:"); bipa_dump_test_union(&src, 0); puts("");
+
+    BufBuilder builder = {0};
+    bipa_build_test_union(&src, &builder);
+    Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};
+    puts("buf:"); xxd(&b); puts("");
+    BufParser parser = {.buf= &b};
+    bipa_parse_test_union(&res, &parser);
+    free(b.ptr);
+
+    puts("res:"); bipa_dump_test_union(&res, 0); puts("");
+
+    return 0;
+}
+
+bipa_union(maybe, 2
+        , (u64le), (u32le, 0x08074b50, yes)
+        , (u64le), (void, 0, no)
+        )
+
+int main_maybe(void) {
+    struct maybe src = {
+        .val= {9876543210},
+        //.tag= maybe_tag_yes,
+        .tag= maybe_tag_no,
+    };
+    struct maybe res;
+
+    puts("src:"); bipa_dump_maybe(&src, 0); puts("");
+
+    BufBuilder builder = {0};
+    bipa_build_maybe(&src, &builder);
+    Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};
+    puts("buf:"); xxd(&b); puts("");
+    BufParser parser = {.buf= &b};
+    bipa_parse_maybe(&res, &parser);
+    free(b.ptr);
+
+    puts("res:"); bipa_dump_maybe(&res, 0); puts("");
+
+    return 0;
+}
+
+int main(void) {
+    return 0
+    //+ main_cstr()
+    //+ main_lstr()
+    //+ main_union()
+    + main_maybe()
+    ;
+}

@@ -22,9 +22,9 @@
 #define ty_for_FUN Fun
 #define ty_for_SYM Sym
 
-#define _link_uf_pars(__k, __n, __ty, __nm)  , ty_for_##__ty const* const __nm
+#define _link_uf_pars(__k, __n, __inv, __ty, __nm)  , ty_for_##__ty const* const __nm
 #define link_uf_pars(__n_par, __ret, __ufname, ...)  \
-    ty_for_##__ret* self _FOR_TYNM(__n_par, _link_uf_pars, __VA_ARGS__)
+    ty_for_##__ret* self _FOR_TYNM(__n_par, _link_uf_pars, 0, __VA_ARGS__)
 
 #define as_for_ANY(__o) (__o)
 #define as_for_BUF(__o) (&(__o)->as.buf)
@@ -34,9 +34,9 @@
 #define as_for_FUN(__o) (&(__o)->as.fun)
 #define as_for_SYM(__o) (&(__o)->as.sym)
 
-#define _link_uf_args(__k, __n, __ty, __nm)  , as_for_##__ty(self->argv[__k])
+#define _link_uf_args(__k, __n, __inv, __ty, __nm)  , as_for_##__ty(self->argv[__k])
 #define link_uf_args(__n_par, __ret, __ufname, ...)  \
-    as_for_##__ret(self) _FOR_TYNM(__n_par, _link_uf_args, __VA_ARGS__)
+    as_for_##__ret(self) _FOR_TYNM(__n_par, _link_uf_args, 0, __VA_ARGS__)
 
 
 
@@ -52,11 +52,11 @@
 
 
 
-#define _typecheck_args(__k, __n, __ty, __nm)  && (__ty == ANY || __ty == res->argv[__k]->ty)
-#define typecheck_args(__name, __n_par, __ret, __ufname, ...)                      \
-    if (__n_par == res->argc _FOR_TYNM(__n_par, _typecheck_args, __VA_ARGS__)) {   \
-        res->update = link_name(__name, __n_par, __ret, __ufname, __VA_ARGS__);    \
-        res->ty = __ret;                                                           \
+#define _typecheck_args(__k, __n, __inv, __ty, __nm)  && (__ty == ANY || __ty == res->argv[__k]->ty)
+#define typecheck_args(__name, __n_par, __ret, __ufname, ...)                         \
+    if (__n_par == res->argc _FOR_TYNM(__n_par, _typecheck_args, 0, __VA_ARGS__)) {   \
+        res->update = link_name(__name, __n_par, __ret, __ufname, __VA_ARGS__);       \
+        res->ty = __ret;                                                              \
     }
 
 #define typecheck_overloads_1(__name, __par1)                                                     _CALL(typecheck_args, __name, _UNPACK __par1)
@@ -65,13 +65,13 @@
 
 
 
-#define _document_pars(__k, __n, __ty, __nm)  {.ty= __ty, .name= #__nm},
-#define document_pars(__n_par, __ret, __ufname, ...) {        \
-        .ret= __ret,                                          \
-        .params= (struct MetaOvlPrm[]){                       \
-            _FOR_TYNM(__n_par, _document_pars, __VA_ARGS__)   \
-            {0}                                               \
-        }                                                     \
+#define _document_pars(__k, __n, __inv, __ty, __nm)  {.ty= __ty, .name= #__nm},
+#define document_pars(__n_par, __ret, __ufname, ...) {          \
+        .ret= __ret,                                            \
+        .params= (struct MetaOvlPrm[]){                         \
+            _FOR_TYNM(__n_par, _document_pars, 0, __VA_ARGS__)  \
+            {0}                                                 \
+        }                                                       \
     }
 
 #define document_overloads_1(__par1)                                        _CALL(document_pars, _UNPACK __par1)
