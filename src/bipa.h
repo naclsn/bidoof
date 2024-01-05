@@ -1,17 +1,69 @@
 #ifndef __BIPA_H__
 #define __BIPA_H__
 
+// TODO: (still missing) sNNle and -be, fNNle and -be
+
+/// public macros:
+///  - bipa_struct(typename, fields count, ... fields type/name pairs)
+///  - bipa_union(typename, kinds count, ... kinds type/(tag type, tag value, name) pairs)
+///  - bipa_array(typename, item type)
+///
+/// types for fields can be:
+///  - integral types: (eg. u8, u- or sNNle or -be up to 64 bits little/big endian, f32le/be and f64le/be)
+///  - string types: `(cstr, sentinel byte)` or `(lstr, length expression)`
+///  - struct types: `(struct, typename)` where typename is a `bipa_struct(typename, ...)`
+///  - union types: `(union, typename)` where ...
+///  - array types: `(array, typename, while)` where ...
+///
 /// in an (array, typename, while), the while is an expression with:
 ///  - `self` the encompassing struct
 ///  - `k` the iteration number
 ///  - `it` the array itself (so `it->ptr[k-1]` the last parsed item, `it->ptr[k]` is not parsed yet)
-/// a `build` or `parse` macro is a sequence of statements with:
+///
+/// using one of the public macros will generate the associated functions:
+///  - void bipa_dump_typename(const* self, int depth)
+///  - static inline bool bipa_build_typename(const* self, BufBuilder* bi)
+///  - static inline bool bipa_parse_typename(* self, BufParser* pa)
+///  - void bipa_free_typename(const* self)
+///
+/// short example:
+/// ```c
+/// bipa_struct(bidoof, 3
+///     , (cstr, '\0'), name
+///     , (u32le), age
+///     )
+///
+/// bipa_union(maybe_bidoof, 2
+///     , (struct, bidoof), (u8, '*', some)
+///     , (void), (void, 0, none)
+///     )
+///
+/// // will match a buffer starting with a '*' character
+/// // and parse a `bidoof` right after, that is a '\0'-
+/// // terminated str followed by a 32bits little endian
+/// bipa_parse_maybe_bidoof(&res, &pa);
+/// if (maybe_bidoof_tag_some == res.tag)
+///     res.val.some;
+/// ```
+///
+/// pro tip: define BIPA_HIDUMP to use ANSI-escape coloration with bipa_dump_xyz
+///
+/// ---
+///
+/// internal types are defined with a set of macro:
+///  - _typename_xyz(...)
+///  - _dump_xyz(...)
+///  - _build_xyz(...)
+///  - _parse_xyz(...)
+///  - _free_xyz(...)
+/// the arguments to the macro are the ones given when using it in a type
+/// eg `(array, typename, while)` the `typename, while`
+///
+/// a `_build` or `_parse` macro is a sequence of statements with:
 ///  - `it` is the source (resp. destination) pointer
 ///  - `bi` (resp. `pa`) is the builder (parser)
 ///  - writing a byte: `bi->arr.ptr[bi->at++] = *it`
 ///  - reading a byte: `*it = pa->buf->ptr[pa->at++]`
-
-/// TODO: _free, ie for each types
 
 #include "base.h"
 
@@ -22,8 +74,6 @@ typedef struct BufBuilder {
 typedef struct BufParser {
     Buf const* buf;
     sz at;
-    //bool fail;
-    //bool end;
 } BufParser;
 
 #ifdef BIPA_HIDUMP
@@ -46,11 +96,13 @@ typedef struct BufParser {
 #define _dump(__ty, ...)     _CALL(_dump_##__ty, __VA_ARGS__)
 #define _build(__ty, ...)    _CALL(_build_##__ty, __VA_ARGS__)
 #define _parse(__ty, ...)    _CALL(_parse_##__ty, __VA_ARGS__)
+#define _free(__ty, ...)     _CALL(_free_##__ty, __VA_ARGS__)
 
 #define _typename_void() bool
 #define _dump_void()  (void)it; printf(_hidump_kw("void"));
 #define _build_void() (void)it;
 #define _parse_void() (void)it;
+#define _free_void()  (void)it;
 
 #define _typename_u8() uint8_t
 #define _dump_u8()  printf(_hidump_nb("%hhu") _hidump_ex("u8"), *it);
@@ -59,6 +111,7 @@ typedef struct BufParser {
                     *p = *it; }
 #define _parse_u8() if (pa->buf->len == pa->at) goto fail;  \
                     *it = pa->buf->ptr[pa->at++];
+#define _free_u8()  (void)it;
 
 #define _typename_u16le() uint16_t
 #define _typename_u32le() uint32_t
@@ -109,6 +162,9 @@ typedef struct BufParser {
                             | (uint64_t)pa->buf->ptr[pa->at+6]<<48             \
                             | (uint64_t)pa->buf->ptr[pa->at+7]<<56;            \
                         pa->at+= 8;
+#define _free_u16le() (void)it;
+#define _free_u32le() (void)it;
+#define _free_u64le() (void)it;
 
 #define _typename_u16be() uint16_t
 #define _typename_u32be() uint32_t
@@ -159,15 +215,23 @@ typedef struct BufParser {
                             | (uint64_t)pa->buf->ptr[pa->at+1]<<48             \
                             | (uint64_t)pa->buf->ptr[pa->at]<<56;              \
                         pa->at+= 8;
+#define _free_u16be() (void)it;
+#define _free_u32be() (void)it;
+#define _free_u64be() (void)it;
 
 #define _typename_cstr(__sentinel) uint8_t*
-#define _dump_cstr(__sentinel) {                                  \
-        uint8_t s = (__sentinel);                                 \
-        for (size_t k = 0; s != (*it)[k]; k++) {                  \
-            if (!(k & 0xf)) printf("\n%*.s", (depth+2)*2-1, "");  \
-            printf(" " _hidump_st("%02X"), (*it)[k]);             \
-        }                                                         \
-        printf(_hidump_ex(" \\x%02X"), s);                        \
+#define _dump_cstr(__sentinel) {                                   \
+        uint8_t s = (__sentinel);                                  \
+        size_t len = 0;                                            \
+        for (size_t k = 0; s != (*it)[k]; k++) len++;              \
+        printf(_hidump_kw("cstr")                                  \
+                "(" _hidump_nb("%zu") _hidump_ex("+1") ")", len);  \
+        for (size_t k = 0; k < len; k++) {                         \
+            if (!(k & 0xf)) printf("\n%*.s", (depth+2)*2-1, "");   \
+            printf(" " _hidump_st("%02X"), (*it)[k]);              \
+        }                                                          \
+        if (!(len & 0xf)) printf("\n%*.s", (depth+2)*2-1, "");     \
+        printf(_hidump_ex(" %02X"), s);                            \
     }
 #define _build_cstr(__sentinel) {                                  \
         uint8_t s = (__sentinel);                                  \
@@ -184,19 +248,21 @@ typedef struct BufParser {
         uint8_t* found = memchr(from, (__sentinel), pa->buf->len-pa->at);  \
         if (!found) goto fail;                                             \
         size_t len = found-from;                                           \
-        *it = malloc(len);                                                 \
+        *it = malloc(len+1);                                               \
         if (!*it) goto fail;                                               \
-        memcpy(*it, from, len);                                            \
+        memcpy(*it, from, len+1);                                          \
         pa->at+= len+1;                                                    \
     }
+#define _free_cstr(__sentinel) free(*it);
 
 #define _typename_lstr(__length) uint8_t*
-#define _dump_lstr(__length) {                                    \
-        size_t len = (__length);                                  \
-        for (size_t k = 0; k < len; k++) {                        \
-            if (!(k & 0xf)) printf("\n%*.s", (depth+2)*2-1, "");  \
-            printf(" " _hidump_st("%02X"), (*it)[k]);             \
-        }                                                         \
+#define _dump_lstr(__length) {                                      \
+        size_t len = (__length);                                    \
+        printf(_hidump_kw("lstr") "(" _hidump_nb("%zu") ")", len);  \
+        for (size_t k = 0; k < len; k++) {                          \
+            if (!(k & 0xf)) printf("\n%*.s", (depth+2)*2-1, "");    \
+            printf(" " _hidump_st("%02X"), (*it)[k]);               \
+        }                                                           \
     }
 #define _build_lstr(__length) {                                    \
         size_t len = (__length);                                   \
@@ -215,6 +281,7 @@ typedef struct BufParser {
         memcpy(*it, from, len);                    \
         pa->at+= len;                              \
     }
+#define _free_lstr(__sentinel) free(*it);
 
 #define _struct_fields_typename_one(__k, __n, __inv, __ty, __nm) _typename __ty __nm;
 
@@ -233,6 +300,11 @@ typedef struct BufParser {
 #define _struct_fields_parse_one(__k, __n, __inv, __ty, __nm) {  \
         _typename __ty* const it = &self->__nm;                  \
         _parse __ty                                              \
+    }
+
+#define _struct_fields_free_one(__k, __n, __inv, __ty, __nm) {  \
+        _typename __ty const* const it = &self->__nm;           \
+        _free __ty                                              \
     }
 
 #define bipa_struct(__tname, __n_fields, ...)                                       \
@@ -260,11 +332,15 @@ typedef struct BufParser {
     fail:                                                                           \
         pa->at = at_before;                                                         \
         return false;                                                               \
+    }                                                                               \
+    void bipa_free_##__tname(struct __tname const* const self) {                    \
+        _FOR_TYNM(__n_fields, _struct_fields_free_one, 0, __VA_ARGS__)              \
     }
 #define _typename_struct(__tname) struct __tname
-#define _dump_struct(__tname) bipa_dump_##__tname(it, depth+1);
-#define _build_struct(__tname) if (!bipa_build_##__tname(it, bi)) goto fail;
-#define _parse_struct(__tname) if (!bipa_parse_##__tname(it, pa)) goto fail;
+#define _dump_struct(__tname)   bipa_dump_##__tname(it, depth+1);
+#define _build_struct(__tname)  if (!bipa_build_##__tname(it, bi)) goto fail;
+#define _parse_struct(__tname)  if (!bipa_parse_##__tname(it, pa)) goto fail;
+#define _free_struct(__tname)   bipa_free_##__tname(it);
 
 #define _union_getvar_name(__tty, __tva, __nm)     __nm
 #define _union_getvar_tagtype(__tty, __tva, __nm)  __tty
@@ -322,6 +398,13 @@ typedef struct BufParser {
         self->tag = _k_kinds;                                   \
     } break;
 
+#define _union_kinds_free_one(__k, __n, __tname, __ty, __nm)  \
+    case _XJOIN(__tname##_tag_, _union_getvar_name __nm): {   \
+        _typename __ty const* const it =                      \
+            &self->val._union_getvar_name __nm;               \
+        _free __ty                                            \
+    } break;
+
 #define bipa_union(__tname, __n_kinds, ...)                                         \
     struct __tname {                                                                \
         union {                                                                     \
@@ -358,48 +441,17 @@ typedef struct BufParser {
         fail: pa->at = at_before;                                                   \
         }                                                                           \
         return false;                                                               \
+    }                                                                               \
+    void bipa_free_##__tname(struct __tname const* const self) {                    \
+        switch (self->tag) {                                                        \
+            _FOR_TYNM(__n_kinds, _union_kinds_free_one, __tname, __VA_ARGS__)       \
+        }                                                                           \
     }
 #define _typename_union(__tname) struct __tname
-#define _dump_union(__tname) bipa_dump_##__tname(it, depth+1);
-#define _build_union(__tname) if (!bipa_build_##__tname(it, bi)) goto fail;
-#define _parse_union(__tname) if (!bipa_parse_##__tname(it, pa)) goto fail;
-
-#define bipa_option(__tname, __of)                                                  \
-    struct __tname {                                                                \
-        _typename __of val;                                                         \
-        bool has;                                                                   \
-    };                                                                              \
-    void bipa_dump_##__tname(struct __tname const* const self, int const depth) {   \
-        (void)depth;                                                                \
-        printf(_hi_dump_kw("option") " " _hidump_ty(#__tname) " ");                 \
-        if (self->has) {                                                            \
-            _typename __of const* const it = &self->val;                            \
-            _dump __of                                                              \
-        } else printf(_hidump_kw("nil"));                                           \
-    }                                                                               \
-    static inline bool                                                              \
-    bipa_build_##__tname(struct __tname const* const self, BufBuilder* const bi) {  \
-        if (self->has) {                                                            \
-            _typename __of const* const it = &self->val;                            \
-            _build __of                                                             \
-        } else (void)0;                                                             \
-        return true;                                                                \
-    fail: return false;                                                             \
-    }                                                                               \
-    static inline bool                                                              \
-    bipa_parse_has_##__tname(struct __tname* const self, BufParser* const pa) {     \
-        size_t at_before = pa->at;                                                  \
-        _typename __of* const it = dyarr_push(self);                                \
-        _parse __of                                                                 \
-        return true;                                                                \
-    fail:                                                                           \
-        pa->at = at_before;                                                         \
-        return false;                                                               \
-    }
-#define _typename_option(__tname) struct __tname
-#define _dump_option(__tname, _) bipa_dump_##__tname(it, depth+1);
-#define _build_option(__tname, _) if (!bipa_build_##__tname(it, bi)) goto fail;
-#define _parse_option(__tname, __if) if (__if) if (!bipa_parse_has_##__tname(it, pa)) goto fail;
+#define _dump_union(__tname)    bipa_dump_##__tname(it, depth+1);
+#define _build_union(__tname)   if (!bipa_build_##__tname(it, bi)) goto fail;
+#define _parse_union(__tname)   if (!bipa_parse_##__tname(it, pa)) goto fail;
+#define _free_union(__tname)    bipa_free_##__tname(it);
 
 #define bipa_array(__tname, __of)                                                   \
     struct __tname {                                                                \
@@ -435,10 +487,20 @@ typedef struct BufParser {
     fail:                                                                           \
         pa->at = at_before;                                                         \
         return false;                                                               \
+    }                                                                               \
+    void bipa_free_##__tname(struct __tname const* const self) {                    \
+        for (size_t k = 0; k < self->len; k++) {                                    \
+            _typename __of const* const it = self->ptr + k;                         \
+            _free __of                                                              \
+        }                                                                           \
+        free(self->ptr);                                                            \
     }
-#define _typename_array(__tname, _) struct __tname
-#define _dump_array(__tname, _) bipa_dump_##__tname(it, depth+1);
-#define _build_array(__tname, _) if (!bipa_build_##__tname(it, bi)) goto fail;
-#define _parse_array(__tname, __while) for (size_t k = 0; __while; k++) if (!bipa_parse_one_##__tname(it, pa)) goto fail;
+#define _typename_array(__tname, __while) struct __tname
+#define _dump_array(__tname, __while)   bipa_dump_##__tname(it, depth+1);
+#define _build_array(__tname, __while)  if (!bipa_build_##__tname(it, bi)) goto fail;
+#define _parse_array(__tname, __while)  it->ptr = NULL;                                       \
+                                        for (size_t k = it->len = it->cap = 0; __while; k++)  \
+                                            if (!bipa_parse_one_##__tname(it, pa)) goto fail;
+#define _free_array(__tname, __while)   bipa_free_##__tname(it);
 
 #endif // __BIPA_H__

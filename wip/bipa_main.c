@@ -70,52 +70,36 @@ void xxd(Buf const* const b) {
     }
 }
 
+#define roundtrip(__tname, ...) do {                             \
+        puts("# roundtrip for a " #__tname);                     \
+        struct __tname const src = __VA_ARGS__;                  \
+                                                                 \
+        puts("src:"); bipa_dump_##__tname(&src, 0); puts("");    \
+                                                                 \
+        BufBuilder builder = {0};                                \
+        bipa_build_##__tname(&src, &builder);                    \
+        Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};  \
+        puts("buf:"); xxd(&b); puts("");                         \
+                                                                 \
+        struct __tname res;                                      \
+        BufParser parser = {.buf= &b};                           \
+        bipa_parse_##__tname(&res, &parser);                     \
+        free(b.ptr);                                             \
+                                                                 \
+        puts("res:"); bipa_dump_##__tname(&res, 0); puts("");    \
+                                                                 \
+        bipa_free_##__tname(&res);                               \
+        puts("");                                                \
+    } while (0)
+
 bipa_struct(test_cstr, 1
         , (cstr, '\0'), data
         )
-
-int main_cstr(void) {
-    struct test_cstr src = {.data= (u8*)"hi :3"};
-    struct test_cstr res;
-
-    puts("src:"); bipa_dump_test_cstr(&src, 0); puts("");
-
-    BufBuilder builder = {0};
-    bipa_build_test_cstr(&src, &builder);
-    Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};
-    puts("buf:"); xxd(&b); puts("");
-    BufParser parser = {.buf= &b};
-    bipa_parse_test_cstr(&res, &parser);
-    free(b.ptr);
-
-    puts("res:"); bipa_dump_test_cstr(&res, 0); puts("");
-
-    return 0;
-}
 
 bipa_struct(test_lstr, 2
         , (u16be), length
         , (lstr, self->length), data
         )
-
-int main_lstr(void) {
-    struct test_lstr src = {.length= 5, .data= (u8*)"hi :3"};
-    struct test_lstr res;
-
-    puts("src:"); bipa_dump_test_lstr(&src, 0); puts("");
-
-    BufBuilder builder = {0};
-    bipa_build_test_lstr(&src, &builder);
-    Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};
-    puts("buf:"); xxd(&b); puts("");
-    BufParser parser = {.buf= &b};
-    bipa_parse_test_lstr(&res, &parser);
-    free(b.ptr);
-
-    puts("res:"); bipa_dump_test_lstr(&res, 0); puts("");
-
-    return 0;
-}
 
 bipa_union(test_union, 4
         , (void), (u8, 42, nothing)
@@ -124,62 +108,41 @@ bipa_union(test_union, 4
         , (u64le), (u8, 50, ulong)
         )
 
-int main_union(void) {
-    struct test_union src = {
-        .val.uint= 42,
-        //.tag= test_union_tag_uint,
-        .tag= test_union_tag_nothing,
-    };
-    struct test_union res;
-
-    puts("src:"); bipa_dump_test_union(&src, 0); puts("");
-
-    BufBuilder builder = {0};
-    bipa_build_test_union(&src, &builder);
-    Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};
-    puts("buf:"); xxd(&b); puts("");
-    BufParser parser = {.buf= &b};
-    bipa_parse_test_union(&res, &parser);
-    free(b.ptr);
-
-    puts("res:"); bipa_dump_test_union(&res, 0); puts("");
-
-    return 0;
-}
-
-bipa_union(maybe, 2
+bipa_union(maybe_u64, 2
         , (u64le), (u32le, 0x08074b50, yes)
         , (u64le), (void, 0, no)
         )
 
-int main_maybe(void) {
-    struct maybe src = {
-        .val= {9876543210},
-        //.tag= maybe_tag_yes,
-        .tag= maybe_tag_no,
-    };
-    struct maybe res;
-
-    puts("src:"); bipa_dump_maybe(&src, 0); puts("");
-
-    BufBuilder builder = {0};
-    bipa_build_maybe(&src, &builder);
-    Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};
-    puts("buf:"); xxd(&b); puts("");
-    BufParser parser = {.buf= &b};
-    bipa_parse_maybe(&res, &parser);
-    free(b.ptr);
-
-    puts("res:"); bipa_dump_maybe(&res, 0); puts("");
-
-    return 0;
-}
+bipa_array(test_lines, (cstr, '\n'))
+bipa_struct(test_text, 2
+        , (u32be), line_count
+        , (array, test_lines, k < self->line_count), lines
+        )
 
 int main(void) {
-    return 0
-    //+ main_cstr()
-    //+ main_lstr()
-    //+ main_union()
-    + main_maybe()
-    ;
+    if(1) roundtrip(test_cstr, {.data= (u8*)"hi :3"});
+    if(1) roundtrip(test_lstr, {.length= 5, .data= (u8*)"hi :3"});
+    if(1) roundtrip(test_union, {
+        .val.uint= 42,
+        //.tag= test_union_tag_uint,
+        .tag= test_union_tag_nothing,
+    });
+    if(1) roundtrip(maybe_u64, {
+        .val= {9876543210},
+        //.tag= maybe_tag_yes,
+        .tag= maybe_u64_tag_no,
+    });
+    if(1) roundtrip(test_text, {
+        .line_count= 4,
+        .lines= {
+            .len= 4,
+            .ptr= (u8*[]){
+                (u8*)"one\n",
+                (u8*)"two\n",
+                (u8*)"three\n",
+                (u8*)"need a line thats like x16 chars\n",
+            },
+        },
+    });
+    return 0;
 }
