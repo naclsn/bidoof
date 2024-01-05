@@ -1,8 +1,6 @@
 #ifndef __BIPA_H__
 #define __BIPA_H__
 
-// TODO: (still missing) sNNle and -be, fNNle and -be
-
 /// public macros:
 ///  - bipa_struct(typename, fields count, ... fields type/name pairs)
 ///  - bipa_union(typename, kinds count, ... kinds type/(tag type, tag value, name) pairs)
@@ -14,6 +12,8 @@
 ///  - struct types: `(struct, typename)` where typename is a `bipa_struct(typename, ...)`
 ///  - union types: `(union, typename)` where ...
 ///  - array types: `(array, typename, while)` where ...
+/// TODO: (still missing) sNNle and -be, fNNle and -be,
+///       basically you only have unsigned ints
 ///
 /// in an (array, typename, while), the while is an expression with:
 ///  - `self` the encompassing struct

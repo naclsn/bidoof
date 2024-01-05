@@ -52,6 +52,16 @@ extern void* __trace_allocs_realloc(char const* const info, void* const p, size_
 #define _FOR_TYNM_17(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-17), __n, __inv, __ty, __nm) _FOR_TYNM_16(__n, __macro, __inv, __VA_ARGS__)
 #define _FOR_TYNM_18(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-18), __n, __inv, __ty, __nm) _FOR_TYNM_17(__n, __macro, __inv, __VA_ARGS__)
 #define _FOR_TYNM_19(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-19), __n, __inv, __ty, __nm) _FOR_TYNM_18(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_20(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-20), __n, __inv, __ty, __nm) _FOR_TYNM_19(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_21(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-21), __n, __inv, __ty, __nm) _FOR_TYNM_20(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_22(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-22), __n, __inv, __ty, __nm) _FOR_TYNM_21(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_23(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-23), __n, __inv, __ty, __nm) _FOR_TYNM_22(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_24(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-24), __n, __inv, __ty, __nm) _FOR_TYNM_23(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_25(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-25), __n, __inv, __ty, __nm) _FOR_TYNM_24(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_26(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-26), __n, __inv, __ty, __nm) _FOR_TYNM_25(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_27(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-27), __n, __inv, __ty, __nm) _FOR_TYNM_26(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_28(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-28), __n, __inv, __ty, __nm) _FOR_TYNM_27(__n, __macro, __inv, __VA_ARGS__)
+#define _FOR_TYNM_29(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n-29), __n, __inv, __ty, __nm) _FOR_TYNM_28(__n, __macro, __inv, __VA_ARGS__)
 #define _FOR_TYNM(__n, __macro, __inv, ...)  _FOR_TYNM_##__n(__n, __macro, __inv, __VA_ARGS__)
 
 void notify_default(char const* s);

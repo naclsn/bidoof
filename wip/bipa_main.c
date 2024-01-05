@@ -3,65 +3,89 @@
 #define BIPA_HIDUMP
 #include "../src/bipa.h"
 
-bipa_struct(local_file_header, 10
-    // header signature: 0x04034b50
-    , (u16le), version_needed_to_extract
-    , (u16le), general_purpose_bit_flag
-    , (u16le), compression_method
-    , (u16le), last_mod_file_time
-    , (u16le), last_mod_file_date
-    , (u32le), crc_32
-    , (u32le), compressed_size
-    , (u32le), uncompressed_size
-    , (u16le), file_name_length
-    , (u16le), extra_field_length
-    //, (lstr, self->file_name_length), file_name
-    //, (lstr, self->extra_field_length), extra_field
-)
-//bipa_struct(encryption_header, 1, (u8), _)
-bipa_struct(data_descriptor, 3
-    // header signature: 0x08074b50 - "[..] with or without this signature marking data descriptors"
-    , (u32le), crc_32
-    , (u32le), compressed_size
-    , (u32le), uncompressed_size
-)
-bipa_struct(local_file, 2
-    , (struct, local_file_header), local_file_header
-    //, (struct, encryption_header), encryption_header // only if encrypted
-    //, (lstr, self->local_file_header.compressed_size), file_data
-    , (struct, data_descriptor), data_descriptor // "when it was not possible to seek in the output"
-)
+bipa_union(local_file_header_signature, 1, (void), (u32le, 0x04034b50, _))
+bipa_struct(local_file_header, 13
+        , (union, local_file_header_signature), _
+        , (u16le), version_needed_to_extract
+        , (u16le), general_purpose_bit_flag
+        , (u16le), compression_method
+        , (u16le), last_mod_file_time
+        , (u16le), last_mod_file_date
+        , (u32le), crc_32
+        , (u32le), compressed_size
+        , (u32le), uncompressed_size
+        , (u16le), file_name_length
+        , (u16le), extra_field_length
+        , (lstr, self->file_name_length), file_name
+        , (lstr, self->extra_field_length), extra_field
+        )
 
+//bipa_struct(encryption_header, 1, (u8), _)
+
+// "[..] with or without this signature marking data descriptors"
+bipa_union(data_descriptor_maybe_signature, 2, (void), (u32le, 0x08074b50, yes), (void), (void, 0, no))
+bipa_struct(data_descriptor, 4
+        , (union, data_descriptor_maybe_signature), _
+        , (u32le), crc_32
+        , (u32le), compressed_size
+        , (u32le), uncompressed_size
+        )
+
+bipa_struct(local_file, 2
+        , (struct, local_file_header), local_file_header
+        //, (struct, encryption_header), encryption_header // only if encrypted
+        , (lstr, self->local_file_header.compressed_size), file_data
+        //, (struct, data_descriptor), data_descriptor // only if some random bit
+        )
 bipa_array(local_files, (struct, local_file))
 
-bipa_struct(central_directory_header, 16
-    // header signature: 0x02014b50
-    , (u16le), version_made_by
-    , (u16le), version_needed_to_extract
-    , (u16le), general_purpose_bit_flag
-    , (u16le), compression_method
-    , (u16le), last_mod_file_time
-    , (u16le), last_mod_file_date
-    , (u32le), crc_32
-    , (u32le), compressed_size
-    , (u32le), uncompressed_size
-    , (u16le), file_name_length
-    , (u16le), extra_field_length
-    , (u16le), file_comment_length
-    , (u16le), disk_number_start
-    , (u16le), internal_file_attributes
-    , (u32le), external_file_attributes
-    , (u32le), relative_offset_of_local_header
-    //, (lstr, self->file_name_length), file_name
-    //, (lstr, self->extra_field_length), extra_field
-    //, (lstr, self->file_comment_length), file_comment
-)
+bipa_union(central_directory_header_signature, 1, (void), (u32le, 0x02014b50, _))
+bipa_struct(central_directory_header, 20
+        , (union, central_directory_header_signature), _
+        , (u16le), version_made_by
+        , (u16le), version_needed_to_extract
+        , (u16le), general_purpose_bit_flag
+        , (u16le), compression_method
+        , (u16le), last_mod_file_time
+        , (u16le), last_mod_file_date
+        , (u32le), crc_32
+        , (u32le), compressed_size
+        , (u32le), uncompressed_size
+        , (u16le), file_name_length
+        , (u16le), extra_field_length
+        , (u16le), file_comment_length
+        , (u16le), disk_number_start
+        , (u16le), internal_file_attributes
+        , (u32le), external_file_attributes
+        , (u32le), relative_offset_of_local_header
+        , (lstr, self->file_name_length), file_name
+        , (lstr, self->extra_field_length), extra_field
+        , (lstr, self->file_comment_length), file_comment
+        )
 bipa_array(central_directory_headers, (struct, central_directory_header))
-bipa_struct(digital_signature, 1
-    // header signature: 0x05054b50
-    , (u16le), size_of_data
-    //, (lstr, self->size_of_data), signature_data
-)
+
+bipa_struct(extra_field_header, 2
+        , (u16le), id
+        , (u16le), size
+        )
+bipa_struct(extra_field, 2
+        , (struct, extra_field_header), header
+        , (lstr, self->header.size), data
+        )
+bipa_array(extra_fields, (struct, extra_field));
+bipa_struct(extra_fields_wrap, 1 , (array, extra_fields, pa->at < pa->buf->len), w);
+
+bipa_union(digital_signature_header_signature, 1, (void), (u32le, 0x05054b50, _))
+bipa_struct(digital_signature, 3
+        , (union, digital_signature_header_signature), _
+        , (u16le), size_of_data
+        , (lstr, self->size_of_data), signature_data
+        )
+
+bipa_struct(zip_file, 2
+        , (array, local_files, !memcmp(pa->buf->ptr+pa->at, "\x50\x4b\x03\x04", 4)), local_files
+        , (array, central_directory_headers, !memcmp(pa->buf->ptr+pa->at, "\x50\x4b\x01\x02", 4)), central_directory_headers
+        )
 
 void xxd(Buf const* const b) {
     for (sz k = 0; k < b->len; k++) {
@@ -70,79 +94,47 @@ void xxd(Buf const* const b) {
     }
 }
 
-#define roundtrip(__tname, ...) do {                             \
-        puts("# roundtrip for a " #__tname);                     \
-        struct __tname const src = __VA_ARGS__;                  \
-                                                                 \
-        puts("src:"); bipa_dump_##__tname(&src, 0); puts("");    \
-                                                                 \
-        BufBuilder builder = {0};                                \
-        bipa_build_##__tname(&src, &builder);                    \
-        Buf b = {.len= builder.arr.len, .ptr= builder.arr.ptr};  \
-        puts("buf:"); xxd(&b); puts("");                         \
-                                                                 \
-        struct __tname res;                                      \
-        BufParser parser = {.buf= &b};                           \
-        bipa_parse_##__tname(&res, &parser);                     \
-        free(b.ptr);                                             \
-                                                                 \
-        puts("res:"); bipa_dump_##__tname(&res, 0); puts("");    \
-                                                                 \
-        bipa_free_##__tname(&res);                               \
-        puts("");                                                \
-    } while (0)
+int main(int argc, char** argv) {
+    char const* fn = argv[1];
+    if (argc < 2 || !fn || !*fn) fn = "aa.zip"; //return puts("missing file name");
 
-bipa_struct(test_cstr, 1
-        , (cstr, '\0'), data
-        )
+    Buf b;
+    {
+        FILE* f = fopen(fn, "rb");
+        if (!f) return printf("could not open file %s\n", fn);
 
-bipa_struct(test_lstr, 2
-        , (u16be), length
-        , (lstr, self->length), data
-        )
+        fseek(f, 0, SEEK_END);
+        b.len = ftell(f);
+        b.ptr = malloc(b.len);
+        if (!b.ptr) return puts("lol oom? really?");
+        fseek(f, 0, SEEK_SET);
+        printf("(read %zub)\n", fread(b.ptr, 1, b.len, f));
+        fclose(f);
+    }
 
-bipa_union(test_union, 4
-        , (void), (u8, 42, nothing)
-        , (u16le), (u8, 48, ushort)
-        , (u32le), (u8, 49, uint)
-        , (u64le), (u8, 50, ulong)
-        )
+    //xxd(&b);
 
-bipa_union(maybe_u64, 2
-        , (u64le), (u32le, 0x08074b50, yes)
-        , (u64le), (void, 0, no)
-        )
+    BufParser p = {.buf= &b};
+    struct zip_file res;
+    bipa_parse_zip_file(&res, &p);
 
-bipa_array(test_lines, (cstr, '\n'))
-bipa_struct(test_text, 2
-        , (u32be), line_count
-        , (array, test_lines, k < self->line_count), lines
-        )
+    puts("res:");
+    bipa_dump_zip_file(&res, 0);
+    puts("\n---\n");
 
-int main(void) {
-    if(1) roundtrip(test_cstr, {.data= (u8*)"hi :3"});
-    if(1) roundtrip(test_lstr, {.length= 5, .data= (u8*)"hi :3"});
-    if(1) roundtrip(test_union, {
-        .val.uint= 42,
-        //.tag= test_union_tag_uint,
-        .tag= test_union_tag_nothing,
-    });
-    if(1) roundtrip(maybe_u64, {
-        .val= {9876543210},
-        //.tag= maybe_tag_yes,
-        .tag= maybe_u64_tag_no,
-    });
-    if(1) roundtrip(test_text, {
-        .line_count= 4,
-        .lines= {
-            .len= 4,
-            .ptr= (u8*[]){
-                (u8*)"one\n",
-                (u8*)"two\n",
-                (u8*)"three\n",
-                (u8*)"need a line thats like x16 chars\n",
-            },
-        },
-    });
+    for (size_t k = 0; k < res.central_directory_headers.len; k++) {
+        struct central_directory_header const* it = res.central_directory_headers.ptr+k;
+        BufParser ex_p = {.buf= &(Buf const){.len= it->extra_field_length, .ptr= it->extra_field}};
+        struct extra_fields_wrap fields;
+        bipa_parse_extra_fields_wrap(&fields, &ex_p);
+        printf("%.*s extra fields:\n", (int)it->file_name_length, it->file_name);
+        bipa_dump_extra_fields_wrap(&fields, 0);
+        puts("");
+        bipa_free_extra_fields_wrap(&fields);
+    }
+
+    bipa_free_zip_file(&res);
+
+    free(b.ptr);
     return 0;
 }
