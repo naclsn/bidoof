@@ -459,7 +459,10 @@ typedef struct BufParser {
         size_t len, cap;                                                            \
     };                                                                              \
     void bipa_dump_##__tname(struct __tname const* const self, int const depth) {   \
-        (void)depth;                                                                \
+        if (!self->len) {                                                           \
+            printf(_hidump_kw("array") " " _hidump_ty(#__tname) " []");             \
+            return;                                                                 \
+        }                                                                           \
         printf(_hidump_kw("array") " " _hidump_ty(#__tname) " [\n%*.s",             \
                 (depth+1)*2, "");                                                   \
         for (size_t k = 0; k < self->len; k++) {                                    \

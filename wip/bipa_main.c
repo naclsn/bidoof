@@ -30,12 +30,16 @@ bipa_struct(data_descriptor, 4
         , (u32le), compressed_size
         , (u32le), uncompressed_size
         )
+// only if bit 3 of the general purpose bit flags
+// "The correct values are put in the data descriptor immediately following the compressed data."
+// TODO: but then how that works? how do I find the data_descriptor if it is past the file_data?
+bipa_array(maybe_data_descriptor, (struct, data_descriptor))
 
-bipa_struct(local_file, 2
+bipa_struct(local_file, 3
         , (struct, local_file_header), local_file_header
         //, (struct, encryption_header), encryption_header // only if encrypted
         , (lstr, self->local_file_header.compressed_size), file_data
-        //, (struct, data_descriptor), data_descriptor // only if some random bit
+        , (array, maybe_data_descriptor, k==! (0b1000 & self->local_file_header.general_purpose_bit_flag)), data_descriptor
         )
 bipa_array(local_files, (struct, local_file))
 
@@ -82,9 +86,23 @@ bipa_struct(digital_signature, 3
         , (lstr, self->size_of_data), signature_data
         )
 
-bipa_struct(zip_file, 2
+bipa_union(end_of_central_dir_signature, 1, (void), (u32le, 0x06054b50, _))
+bipa_struct(end_of_central_directory_record, 9
+      , (union, end_of_central_dir_signature), _
+      , (u16le), number_of_this_disk
+      , (u16le), number_of_the_disk_with_the_start_of_the_central_directory
+      , (u16le), total_number_of_entries_in_the_central_directory_on_this_disk
+      , (u16le), total_number_of_entries_in_the_central_directory
+      , (u32le), size_of_the_central_directory
+      , (u32le), offset_of_start_of_central_directory_with_respect_to_the_starting_disk_number
+      , (u16le), zip_file_comment_length
+      , (lstr, self->zip_file_comment_length), zip_file_comment
+      )
+
+bipa_struct(zip_file, 3
         , (array, local_files, !memcmp(pa->buf->ptr+pa->at, "\x50\x4b\x03\x04", 4)), local_files
         , (array, central_directory_headers, !memcmp(pa->buf->ptr+pa->at, "\x50\x4b\x01\x02", 4)), central_directory_headers
+        , (struct, end_of_central_directory_record), end_of_central_directory_record
         )
 
 void xxd(Buf const* const b) {
@@ -117,14 +135,15 @@ int main(int argc, char** argv) {
     BufParser p = {.buf= &b};
     struct zip_file res;
     bipa_parse_zip_file(&res, &p);
+    printf("(parsed %zu/%zub)\n", p.at, b.len);
 
     puts("res:");
     bipa_dump_zip_file(&res, 0);
     puts("\n---\n");
 
-    for (size_t k = 0; k < res.central_directory_headers.len; k++) {
+    if (0) for (size_t k = 0; k < res.central_directory_headers.len; k++) {
         struct central_directory_header const* it = res.central_directory_headers.ptr+k;
-        BufParser ex_p = {.buf= &(Buf const){.len= it->extra_field_length, .ptr= it->extra_field}};
+        BufParser ex_p = {.buf= &(Buf){.len= it->extra_field_length, .ptr= it->extra_field}};
         struct extra_fields_wrap fields;
         bipa_parse_extra_fields_wrap(&fields, &ex_p);
         printf("%.*s extra fields:\n", (int)it->file_name_length, it->file_name);
