@@ -1,6 +1,7 @@
 // TODO(whole file): cleanup on failure; whenever parsing fails
 //                   it throws away a bunch of allocated stuff
 
+//#include "asrtest.h"
 #include "exts.h"
 #include "lang.h"
 
@@ -111,7 +112,7 @@ bool _lex(Pars* self) {
 
         case '<': case '>':
         case '!':
-            if (AT[1] == '=') {
+            if ('=' == AT[1]) {
                 self->t.len++;
                 self->i++;
             }
@@ -856,16 +857,15 @@ void lang_show_tokens(char const* name, char const* script) {
     else _print_location(&p, "ERROR");
 }
 
-/*
 #ifdef ASR_TEST_BUILD
 Obj* scope_get(Scope* self, Sym const key) { return NULL; }
-Obj* obj_call(Obj* self, u8 argc, Obj** argv) { return NULL; }
+bool obj_call(Obj* self, Obj* res) { return NULL; }
+void obj_destroy(Obj* self) { }
 bool scope_put(Scope* self, Sym const key, Obj* value) { return false; }
 Scope exts_scope = {0};
 void notify_default(char const* s) { }
 void (*notify)(char const* s) = notify_default;
-ASR_MAIN {
-    ASR_MAIN_RETURN;
-}
+ASR_MAIN(
+    puts("u wish");
+)
 #endif // ASR_TEST_BUILD
-*/
