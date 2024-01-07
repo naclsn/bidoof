@@ -249,7 +249,7 @@ void repl(char* histfn) {
                     case NUM: printf("%ld\n", it->as.num.val); break;
                     case FLT: printf("%lf\n", it->as.flt.val); break;
                     case SYM: printf(":%s\n", it->as.sym.txt); break;
-                    default: printf("%p\n", it->as.lst.ptr);
+                    default: printf("%p\n", (void*)it->as.lst.ptr);
                 }
             } break;
         }

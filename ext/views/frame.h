@@ -25,7 +25,7 @@ void frame_destroy(Frame* self);
 
 unsigned frame_key2char(unsigned key);
 
-#define extends_FrameBase struct {                                   \
+#define extends_FrameBase                                            \
     int width;                                                       \
     int height;                                                      \
     char const* title;                                               \
@@ -44,7 +44,6 @@ unsigned frame_key2char(unsigned key);
         void (*mousewheel)(Frame* self, int delta, int x, int y);    \
         void (*mousemove)(Frame* self, int x, int y);                \
     } events;                                                        \
-}
 
 #define _event_frame(__frame, ...) __frame
 #define _event(__name, ...) do                            \

@@ -1,6 +1,6 @@
 #include <GL/glx.h>
 
-struct Frame { extends_FrameBase;
+struct Frame { extends_FrameBase
     Display* dpy;
     Window win;
     GLXContext glc;

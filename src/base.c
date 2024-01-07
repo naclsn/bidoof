@@ -46,7 +46,8 @@ void obj_show(Obj const* self, int indent) {
             break;
 
         case FUN:
-            printf("%p", (void*)self->as.fun.call);
+            //printf("%p", (void*)self->as.fun.call);
+            printf("(function)");
             break;
 
         default:
@@ -74,12 +75,12 @@ void obj_show_depnts(Obj const* self, int curdepth) {
 bool obj_call(Obj* self, Obj* res) {
     if (!self->as.fun.call(self, res)) return false;
 
-    for (sz k = 0; k < res->argc; k++) {
-        Obj* on = res->argv[k];
+    for (sz k = 0; k < res->args.len; k++) {
+        Obj* on = res->args.ptr[k];
 
         struct Depnt* tail = malloc(sizeof *tail);
         if (!tail) {
-            for (; 0 < k; k--) obj_remdep(res, res->argv[k-1]);
+            for (; 0 < k; k--) obj_remdep(res, res->args.ptr[k-1]);
             return false;
         }
 
@@ -131,8 +132,8 @@ void obj_destroy(Obj* self) {
 
     // for each deps, remove self from its depnts
     // then delete dep if it has no depnts anymore
-    for (sz k = 0; k < self->argc; k++) {
-        Obj* dep = self->argv[k];
+    for (sz k = 0; k < self->args.len; k++) {
+        Obj* dep = self->args.ptr[k];
         if (obj_remdep(self, dep) && 0 == dep->keepalive) {
             obj_destroy(dep);
             free(dep);

@@ -114,10 +114,10 @@ bool _Base64Encode(Buf* self, Buf const* const source) {
             | (source->ptr[i+2] << (8*0))
             ;
 
-        self->ptr[j+0] = to64[(n >> (6*3)) & 0b111111];
-        self->ptr[j+1] = to64[(n >> (6*2)) & 0b111111];
-        self->ptr[j+2] = to64[(n >> (6*1)) & 0b111111];
-        self->ptr[j+3] = to64[(n >> (6*0)) & 0b111111];
+        self->ptr[j+0] = to64[(n >> (6*3)) & 63];
+        self->ptr[j+1] = to64[(n >> (6*2)) & 63];
+        self->ptr[j+2] = to64[(n >> (6*1)) & 63];
+        self->ptr[j+3] = to64[(n >> (6*0)) & 63];
     }
 
     if (0 != pad) {
@@ -130,10 +130,10 @@ bool _Base64Encode(Buf* self, Buf const* const source) {
             | 0
             ;
 
-        self->ptr[j+0] = to64[(n >> (6*3)) & 0b111111];
-        self->ptr[j+1] = to64[(n >> (6*2)) & 0b111111];
-        self->ptr[j+2] = to64[(n >> (6*1)) & 0b111111];
-        self->ptr[j+3] = to64[(n >> (6*0)) & 0b111111];
+        self->ptr[j+0] = to64[(n >> (6*3)) & 63];
+        self->ptr[j+1] = to64[(n >> (6*2)) & 63];
+        self->ptr[j+2] = to64[(n >> (6*1)) & 63];
+        self->ptr[j+3] = to64[(n >> (6*0)) & 63];
 
         self->ptr[self->len-1] = '=';
         if (2 == pad) self->ptr[self->len-2] = '=';
@@ -233,19 +233,19 @@ bool _Utf8Decode(Lst* self, Buf const* const source) {
     for (sz k = 0; k < source->len; k++) {
         u32 u = source->ptr[k];
 
-        if (0 == (0b10000000 & u))
+        if (0 == (128 & u))
             ;
-        else if (0 == (0b00100000 & u) && k+1 < source->len) {
+        else if (0 == (32 & u) && k+1 < source->len) {
             u8 x = source->ptr[++k];
-            u = ((u & 0b00011111) << 6) | (x & 0b00111111);
+            u = ((u & 31) << 6) | (x & 63);
         }
-        else if (0 == (0b00010000 & u) && k+2 < source->len) {
+        else if (0 == (16 & u) && k+2 < source->len) {
             u8 x = source->ptr[++k], y = source->ptr[++k];
-            u = ((u & 0b00001111) << 12) | ((x & 0b00111111) << 6) | (y & 0b00111111);
+            u = ((u & 15) << 12) | ((x & 63) << 6) | (y & 63);
         }
-        else if (0 == (0b00001000 & u) && k+3 < source->len) {
+        else if (0 == (8 & u) && k+3 < source->len) {
             u8 x = source->ptr[++k], y = source->ptr[++k], z = source->ptr[++k];
-            u = ((u & 0b00000111) << 18) | ((x & 0b00111111) << 12) | ((y & 0b00111111) << 6) | (z & 0b00111111);
+            u = ((u & 7) << 18) | ((x & 63) << 12) | ((y & 63) << 6) | (z & 63);
         }
         else failf(92, "unexpected byte 0x%02X or end of stream at index %zu (/%zu)", u, k, source->len);
 
@@ -292,23 +292,23 @@ bool _Utf8Encode(Buf* self, Lst const* const source) {
             *at = __val;                \
         } while (false)
 
-        if (val < 0b10000000) _push(val);
+        if (val < 128) _push(val);
         else {
-            u8 x = val & 0b00111111;
+            u8 x = val & 63;
             val>>= 6;
-            if (val < 0b00100000) _push(0b11000000 | val);
+            if (val < 32) _push(192 | val);
             else {
-                u8 y = val & 0b00111111;
+                u8 y = val & 63;
                 val>>= 6;
-                if (val < 0b00010000) _push(0b11100000 | val);
+                if (val < 16) _push(224 | val);
                 else {
-                    u8 z = val & 0b00111111;
-                    _push(0b11110000 | (val >> 6));
-                    _push(0b10000000 | z);
+                    u8 z = val & 63;
+                    _push(240 | (val >> 6));
+                    _push(128 | z);
                 }
-                _push(0b10000000 | y);
+                _push(128 | y);
             }
-            _push(0b10000000 | x);
+            _push(128 | x);
         }
 
 #undef _push

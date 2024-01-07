@@ -114,9 +114,7 @@ typedef struct Obj {
     u16 cycle;
     u16 keepalive;
 
-    //dyarr(struct Obj*) args;
-    u8 argc;
-    struct Obj* argv[];
+    dyarr(struct Obj*) args;
 } Obj;
 
 typedef struct Meta {

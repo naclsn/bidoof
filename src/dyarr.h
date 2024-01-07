@@ -10,12 +10,14 @@ static inline size_t _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k,
 
 #define dyarr(__elty) struct { __elty* ptr; size_t len, cap; }
 
+/* sets it to zeros, doesn't actually free anything */
+#define dyarr_zero(__da)  ((__da)->len = (__da)->cap = 0, (__da)->ptr = NULL)
 /* clears it empty and free used memory */
-#define dyarr_clear(__da)  ((__da)->len = (__da)->cap = 0, free((__da)->ptr), (__da)->ptr = NULL)
+#define dyarr_clear(__da)  (free((__da)->ptr), dyarr_zero((__da)))
 /* resizes exactly to given, new size should not be 0 */
 #define dyarr_resize(__da, __rsz)  (trace_hint(), _dyarr_resize(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, (__rsz)))
 /* doubles the capacity if more memory is needed */
-#define dyarr_push(__da)  ((__da)->len < (__da)->cap || dyarr_resize((__da), (__da)->cap ? (__da)->cap * 2 : 16) ? &(__da)->ptr[(__da)->len++] : NULL)
+#define dyarr_push(__da)  ((__da)->len < (__da)->cap || dyarr_resize((__da), (__da)->cap ? (__da)->cap * 2 : 8) ? &(__da)->ptr[(__da)->len++] : NULL)
 /* NULL if empty */
 #define dyarr_pop(__da)  ((__da)->len ? &(__da)->ptr[--(__da)->len] : NULL)
 /* NULL (or rather 0) if OOM, else pointer to the new sub-array (at k, of size n) */

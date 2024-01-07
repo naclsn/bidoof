@@ -80,14 +80,14 @@ ctor_simple(1, Bind
         );
 bool _Bind_call(Obj* self, Obj* res) {
     (void)res;
-    Fun const* const fn = &self->argv[0]->as.fun;
-    Lst const* const args = &self->argv[1]->as.lst;
-    printf("fn: %p\n", fn->call);
+    Fun const* const fn = &self->args.ptr[0]->as.fun;
+    Lst const* const args = &self->args.ptr[1]->as.lst;
+    (void)fn; //printf("fn: %p\n", fn->call);
     printf("args: "); obj_show(frommember(args, Obj, as), 0); putchar('\n');
-    printf("argc: %u\n", res->argc);
-    for (u8 k = 0; k < res->argc; k++) {
+    printf("args.len: %zu\n", res->args.len);
+    for (u8 k = 0; k < res->args.len; k++) {
         printf("[%u]: ", k);
-        obj_show(res->argv[k], 0);
+        obj_show(res->args.ptr[k], 0);
         putchar('\n');
     }
     notify("NIY: bound function");
@@ -97,11 +97,12 @@ bool _Bind(Fun* self, Fun const* const fn, Lst const* const args) {
     (void)fn;
     (void)args;
     self->call = _Bind_call;
-    printf("fn: %p\n", fn->call);
+    //printf("fn: %p\n", fn->call);
     printf("args: "); obj_show(frommember(args, Obj, as), 0); putchar('\n');
     return true;
 }
 
+// TODO: to(re)do
 ctor_simple(1, Call
         , "call a function with the given args"
         , (2, ANY, _Call, FUN, fn, LST, args)
@@ -120,9 +121,9 @@ bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
         Obj* res = self->data;
         // XXX: yes but also no, to see if something was updated it will
         // probably be indicated by the cycle
-        bool changed = args->len != res->argc;
-        for (u8 k = 0; !changed && k < res->argc; k++)
-            changed = args->ptr[k] != res->argv[k];
+        bool changed = args->len != res->args.len;
+        for (u8 k = 0; !changed && k < res->args.len; k++)
+            changed = args->ptr[k] != res->args.ptr[k];
         if (!changed) {
             if (res->update && !res->update(res)) fail("..");
             self->ty = res->ty;
@@ -134,9 +135,9 @@ bool _Call(Obj* self, Fun const* const fn, Lst const* const args) {
         freenul(self->data);
     }
     Obj* fnf = frommember(fn, Obj, as);
-    Obj* res = calloc(1, sizeof(Obj) + args->len*sizeof(Obj*));
-    res->argc = args->len;
-    memcpy(&res->argv, args->ptr, args->len*sizeof(Obj*));
+    Obj* res = malloc(sizeof(Obj));
+    res->args.len = args->len;
+    memcpy(&res->args.ptr, args->ptr, args->len*sizeof(Obj*));
     if (!fn->call(fnf, res)) return free(res), false;
     if (res->update && !res->update(res)) {
         bool (*up)(Obj*) = res->update;
@@ -163,8 +164,8 @@ bool _CountB(Num* self, Buf const* const from, Fun const* const pred) {
         Obj* pnum = &num;
         // XXX: alloca in a loop
         inline_call_assign(res, predf, 1, &pnum);
-            if (NUM != res->ty) fail("predicat result should be a number");
-            if (0 != res->as.num.val) self->val++;
+            if (NUM != res.ty) fail("predicat result should be a number");
+            if (0 != res.as.num.val) self->val++;
         inline_call_failed(res);
             // TODO
         inline_call_cleanup(res);
@@ -177,8 +178,8 @@ bool _CountL(Num* self, Lst const* const from, Fun const* const pred) {
     for (sz k = 0; k < from->len; k++) {
         // XXX: alloca in a loop
         inline_call_assign(res, predf, 1, &from->ptr[k]);
-            if (NUM != res->ty) fail("predicat result should be a number");
-            if (0 != res->as.num.val) self->val++;
+            if (NUM != res.ty) fail("predicat result should be a number");
+            if (0 != res.as.num.val) self->val++;
         inline_call_failed(res);
             // TODO
         inline_call_cleanup(res);
@@ -267,6 +268,7 @@ bool _LenL(Num* self, Lst const* const from) {
     return true;
 }
 
+// TODO: to(re)do
 ctor_simple(1, Map
         , "create a new list with the result of applying the operation to each item of the input list"
         , (2, LST, _Map, FUN, op, LST, input)
@@ -294,8 +296,8 @@ bool _Map(Lst* self, Fun const* const op, Lst const* const input) {
     Obj* opf = frommember(op, Obj, as);
     for (sz k = 0; k < self->len; k++) {
         memset(self->ptr[k] = arr+k, 0, sizeof(Obj));
-        self->ptr[k]->argc = 1;
-        self->ptr[k]->argv[0] = input->ptr[k];
+        self->ptr[k]->args.len = 1;
+        self->ptr[k]->args.ptr[0] = input->ptr[k];
         if (!obj_call(opf, self->ptr[k])) fail(".."); // XXX(cleanup): all obj_destroy and free
     }
     return true;

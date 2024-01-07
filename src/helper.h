@@ -34,7 +34,7 @@
 #define as_for_FUN(__o) (&(__o)->as.fun)
 #define as_for_SYM(__o) (&(__o)->as.sym)
 
-#define _link_uf_args(__k, __n, __inv, __ty, __nm)  , as_for_##__ty(self->argv[__k])
+#define _link_uf_args(__k, __n, __inv, __ty, __nm)  , as_for_##__ty(self->args.ptr[__k])
 #define link_uf_args(__n_par, __ret, __ufname, ...)  \
     as_for_##__ret(self) _FOR_TYNM(__n_par, _link_uf_args, 0, __VA_ARGS__)
 
@@ -52,11 +52,11 @@
 
 
 
-#define _typecheck_args(__k, __n, __inv, __ty, __nm)  && (__ty == ANY || __ty == res->argv[__k]->ty)
-#define typecheck_args(__name, __n_par, __ret, __ufname, ...)                         \
-    if (__n_par == res->argc _FOR_TYNM(__n_par, _typecheck_args, 0, __VA_ARGS__)) {   \
-        res->update = link_name(__name, __n_par, __ret, __ufname, __VA_ARGS__);       \
-        res->ty = __ret;                                                              \
+#define _typecheck_args(__k, __n, __inv, __ty, __nm)  && (__ty == ANY || __ty == res->args.ptr[__k]->ty)
+#define typecheck_args(__name, __n_par, __ret, __ufname, ...)                            \
+    if (__n_par == res->args.len _FOR_TYNM(__n_par, _typecheck_args, 0, __VA_ARGS__)) {  \
+        res->update = link_name(__name, __n_par, __ret, __ufname, __VA_ARGS__);          \
+        res->ty = __ret;                                                                 \
     }
 
 #define typecheck_overloads_1(__name, __par1)                                                     _CALL(typecheck_args, __name, _UNPACK __par1)
@@ -133,28 +133,23 @@ static inline bool _no_make_also(Obj* fun, Obj* res) {
 #define destroyed(__self) (!frommember(__self, Obj, as)->update)
 #define getdata(__self) (frommember(__self, Obj, as)->data)
 
-#define inline_call_assign(__name, __f, __argc, __argv)          \
-    {                                                            \
-        u8 _argc = __argc;                                       \
-        Obj* __name = alloca(sizeof(Obj) + _argc*sizeof(Obj*));  \
-        memset(__name, 0, sizeof(Obj) + _argc*sizeof(Obj*));     \
-        __name->argc = _argc;                                    \
-        Obj** _argv = __argv;                                    \
-        memcpy(&__name->argv, _argv, _argc*sizeof(Obj*));        \
-                                                                 \
-        Obj* _f = __f;                                           \
-        bool (*_res_up)(Obj*) = NULL;                            \
-        if ( _f->as.fun.call(_f, __name)                         \
-                && (!(_res_up = __name->update)                  \
-                    || _res_up(__name)) ) {
+#define inline_call_assign(__name, __f, __argc, __argv)      \
+    {                                                        \
+        Obj __name = {.args= {.len= __argc, .ptr= __argv}};  \
+                                                             \
+        Obj* _f = __f;                                       \
+        bool (*_res_up)(Obj*) = NULL;                        \
+        if (_f->as.fun.call(_f, &__name)                     \
+                && (!(_res_up = __name.update)               \
+                    || _res_up(&__name)) ) {
 
-#define inline_call_failed(__name)                               \
+#define inline_call_failed(__name)                           \
         } else {
 
-#define inline_call_cleanup(__name)                              \
-        }                                                        \
-        __name->update = NULL;                                   \
-        if (_res_up) _res_up(__name);                            \
+#define inline_call_cleanup(__name)                          \
+        }                                                    \
+        __name.update = NULL;                                \
+        if (_res_up) _res_up(&__name);                       \
     }
 
 #define enum_symcvt(__enum_name, __var_name, __n, __sym, ...)       \

@@ -142,6 +142,24 @@ bool _lex(Pars* self) {
             self->i+= self->t.len;
         } return true;
 
+        case '\'': {
+            char const* end = AT;
+            do end = strchr(end+1, '\'');
+            while (end && '\\' == end[-1]);
+            if (!end) fail("missing closing simple quote");
+            self->t.len = end+1 - AT;
+            self->i+= self->t.len;
+        } return true;
+
+        case ':':
+            do c = self->s[++self->t.len, ++self->i];
+            while ('_' == c || IN('0', '9') || IN('A', 'Z') || IN('a', 'z'));
+            if (1 == self->t.len) fail("expected symbol name");
+            return true;
+
+        case '\0':
+            return true;
+
         case '-':
             self->t.len++;
             self->i++;
@@ -157,69 +175,51 @@ bool _lex(Pars* self) {
                     case 'b': base =  2; c = self->s[++self->t.len, ++self->i]; break;
                     case 'o': base =  8; c = self->s[++self->t.len, ++self->i]; break;
                     case 'x': base = 16; c = self->s[++self->t.len, ++self->i]; break;
-                    case '.': case '_':
-                    case '0'...'9': digits++; break;
                     default:
+                        if ('.' == c || '_' == c || IN('0', '9')) { digits++; break; }
                         if (IN('A', 'Z') || IN('a', 'z')) fail("expected digits or spacing");
                         return true;
                 }
             }
             // fall through
-        case '1'...'9': {
-            bool is_digit;
-            while ('_' == c
-                || (is_digit = (  2 == base && (IN('0', '1')) )
-                            || (  8 == base && (IN('0', '7')) )
-                            || ( 10 == base && (IN('0', '9')) )
-                            || ( 16 == base && (IN('0', '9') || IN('A', 'F') || IN('a', 'f')) )
-                    )) {
-                c = self->s[++self->t.len, ++self->i];
-                digits+= is_digit;
-            }
-            if (10 == base && '.' == c) {
-                unsigned ddigits = 0;
-                if ('.' == AT[0] && '.' == AT[1]) return true; // eg. `[0..]`
-                do {
+        default:
+            if (IN('1', '9')) {
+                bool is_digit;
+                while ('_' == c
+                    || (is_digit = (  2 == base && (IN('0', '1')) )
+                                || (  8 == base && (IN('0', '7')) )
+                                || ( 10 == base && (IN('0', '9')) )
+                                || ( 16 == base && (IN('0', '9') || IN('A', 'F') || IN('a', 'f')) )
+                        )) {
                     c = self->s[++self->t.len, ++self->i];
-                    is_digit = IN('0', '9');
-                    ddigits+= is_digit;
-                } while ('_' == c || is_digit);
-                if (!ddigits) fail("expected decimal digits");
+                    digits+= is_digit;
+                }
+                if (10 == base && '.' == c) {
+                    unsigned ddigits = 0;
+                    if ('.' == AT[0] && '.' == AT[1]) return true; // eg. `[0..]`
+                    do {
+                        c = self->s[++self->t.len, ++self->i];
+                        is_digit = IN('0', '9');
+                        ddigits+= is_digit;
+                    } while ('_' == c || is_digit);
+                    if (!ddigits) fail("expected decimal digits");
+                }
+                if (!digits) fail("expected digits");
+                // better report as syntax error, ~~even tho~~
+                // **because** it could be valid
+                if (IN('2', '9') || IN('A', 'Z') || IN('a', 'z')) fail("unexpected characters");
+                return true;
             }
-            if (!digits) fail("expected digits");
-            // better report as syntax error, ~~even tho~~
-            // **because** it could be valid
-            if (IN('2', '9') || IN('A', 'Z') || IN('a', 'z')) fail("unexpected characters");
-        } return true;
-
-        case '\'': {
-            char const* end = AT;
-            do end = strchr(end+1, '\'');
-            while (end && '\\' == end[-1]);
-            if (!end) fail("missing closing simple quote");
-            self->t.len = end+1 - AT;
-            self->i+= self->t.len;
-        } return true;
-
-        case 'A'...'Z':
-            do c = self->s[++self->t.len, ++self->i];
-            while (IN('0', '9') || IN('A', 'Z') || IN('a', 'z'));
-            return true;
-
-        case ':':
-            do c = self->s[++self->t.len, ++self->i];
-            while ('_' == c || IN('0', '9') || IN('A', 'Z') || IN('a', 'z'));
-            if (1 == self->t.len) fail("expected symbol name");
-            return true;
-
-        case '_':
-        case 'a'...'z':
-            do c = self->s[++self->t.len, ++self->i];
-            while ('_' == c || IN('0', '9') || IN('a', 'z'));
-            return true;
-
-        case '\0':
-            return true;
+            if (IN('A', 'Z')) {
+                do c = self->s[++self->t.len, ++self->i];
+                while (IN('0', '9') || IN('A', 'Z') || IN('a', 'z'));
+                return true;
+            }
+            if ('_' == c || IN('a', 'z')) {
+                do c = self->s[++self->t.len, ++self->i];
+                while ('_' == c || IN('0', '9') || IN('a', 'z'));
+                return true;
+            }
     } // switch c
 
     {
@@ -293,8 +293,8 @@ sz _escape(char const* ptr, sz len, u32* res) {
                 || !( AT_IN(2, '0', '9') || AT_IN(2, 'A', 'F') || AT_IN(2, 'a', 'f') )
                 ) return 0;
             else {
-                u8 hi = 0b100000 | ptr[1];
-                u8 lo = 0b100000 | ptr[2];
+                u8 hi = 32 | ptr[1];
+                u8 lo = 32 | ptr[2];
                 *res = ((lo & 0xf) + ('9'<lo)*9) | ( ((hi & 0xf) + ('9'<hi)*9) << 4 );
             }
             return 3;
@@ -303,7 +303,7 @@ sz _escape(char const* ptr, sz len, u32* res) {
             if (len < 5) return 0;
             for (sz k = 1; k < 5; k++) {
                 if (!( AT_IN(k, '0', '9') || AT_IN(k, 'A', 'F') || AT_IN(k, 'a', 'f') )) return 0;
-                u8 it = 0b100000 | ptr[k];
+                u8 it = 32 | ptr[k];
                 *res = (*res << 4) | ((it & 0xf) + ('9'<it)*9);
             }
             return 5;
@@ -312,24 +312,26 @@ sz _escape(char const* ptr, sz len, u32* res) {
             if (len < 9) return 0;
             for (sz k = 1; k < 9; k++) {
                 if (!( AT_IN(k, '0', '9') || AT_IN(k, 'A', 'F') || AT_IN(k, 'a', 'f') )) return 0;
-                u8 it = 0b100000 | ptr[k];
+                u8 it = 32 | ptr[k];
                 *res = (*res << 4) | ((it & 0xf) + ('9'<it)*9);
             }
             return 9;
 
-        case '0'...'7': // 3 oct digits byte
-            if (len <3
-                || !AT_IN(0, '0', '7')
-                || !AT_IN(1, '0', '7')
-                || !AT_IN(2, '0', '7')
-                ) return 0;
-            else {
-                u8 hi = ptr[0] & 0xf;
-                u8 mi = ptr[1] & 0xf;
-                u8 lo = ptr[2] & 0xf;
-                *res = lo | (mi <<3) | (hi <<3);
+        default: // 3 oct digits byte
+            if ('0' <= *ptr && *ptr <= '7') {
+                if (len <3
+                        || !AT_IN(0, '0', '7')
+                        || !AT_IN(1, '0', '7')
+                        || !AT_IN(2, '0', '7')
+                   ) return 0;
+                else {
+                    u8 hi = ptr[0] & 0xf;
+                    u8 mi = ptr[1] & 0xf;
+                    u8 lo = ptr[2] & 0xf;
+                    *res = lo | (mi <<3) | (hi <<3);
+                }
+                return 3;
             }
-            return 3;
     }
 
     return 0;
@@ -413,11 +415,11 @@ Obj* _parse_math_expr(Pars* self, Scope* scope) {
         Obj* arg = _parse_math_expr(self, scope);
         if (!arg) fail("in operand for unary operator");
 
-        Obj* r = calloc(1, sizeof(Obj) + 1*sizeof(Obj*));
+        Obj* r = malloc(sizeof(Obj));
         if (!r) fail("OOM");
 
-        r->argc = 1;
-        r->argv[0] = arg;
+        dyarr_zero(&r->args);
+        *dyarr_push(&r->args) = arg;
 
         if (!obj_call(f, r)) {
             free(r);
@@ -450,13 +452,13 @@ Obj* _parse_math_expr(Pars* self, Scope* scope) {
         } else ff = scope_get(&exts_scope, mksym("At"));
         if (!tok_is("]", self->t)) fail("missing closing bracket");
 
-        rr = calloc(1, sizeof(Obj) + (!ed? 2 :3)*sizeof(Obj*));
+        rr = malloc(sizeof(Obj));
         if (!rr) fail("OOM");
 
-        rr->argc = !ed? 2 :3 ;
-        rr->argv[0] = r;
-        rr->argv[1] = st;
-        if (ed) rr->argv[2] = ed;
+        dyarr_zero(&rr->args);
+        *dyarr_push(&rr->args) = r;
+        *dyarr_push(&rr->args) = st;
+        if (ed) *dyarr_push(&rr->args) = ed;
 
         if (!obj_call(ff, rr)) {
             fail("could not call function for indexing operator");
@@ -504,12 +506,12 @@ Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
     }
 
     Obj* f = _math_binary(op);
-    Obj* r = calloc(1, sizeof(Obj) + 2*sizeof(Obj*));
+    Obj* r = malloc(sizeof(Obj));
     if (!r) fail("OOM");
 
-    r->argc = 2;
-    r->argv[0] = lhs;
-    r->argv[1] = rhs;
+    dyarr_zero(&r->args);
+    *dyarr_push(&r->args) = lhs;
+    *dyarr_push(&r->args) = rhs;
 
     if (!obj_call(f, r)) {
         free(r);
@@ -545,11 +547,12 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
             if (!*arg) fail("in function argument");
         }
 
-        Obj* rr = calloc(1, sizeof(Obj) + args.len*sizeof(Obj*));
+        Obj* rr = malloc(sizeof(Obj));
         if (!rr) fail("OOM");
 
-        rr->argc = args.len;
-        memcpy(&rr->argv, args.ptr, args.len*sizeof(Obj*));
+        rr->args.ptr = args.ptr;
+        rr->args.len = args.len;
+        rr->args.cap = args.cap;
 
         if (!obj_call(r, rr)) {
             //obj_destroy(rr);
@@ -643,23 +646,23 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
                     bufptr[buflen++] = val & 0xff;
                 else {
                     // unicode to utf8
-                    if (val < 0b10000000) bufptr[buflen++] = val;
+                    if (val < 128) bufptr[buflen++] = val;
                     else {
-                        u8 x = val & 0b00111111;
+                        u8 x = val & 63;
                         val>>= 6;
-                        if (val < 0b00100000) bufptr[buflen++] = 0b11000000 | val;
+                        if (val < 32) bufptr[buflen++] = 192 | val;
                         else {
-                            u8 y = val & 0b00111111;
+                            u8 y = val & 63;
                             val>>= 6;
-                            if (val < 0b00010000) bufptr[buflen++] = 0b11100000 | val;
+                            if (val < 16) bufptr[buflen++] = 224 | val;
                             else {
-                                u8 z = val & 0b00111111;
-                                bufptr[buflen++] = 0b11110000 | (val >> 6);
-                                bufptr[buflen++] = 0b10000000 | z;
+                                u8 z = val & 63;
+                                bufptr[buflen++] = 240 | (val >> 6);
+                                bufptr[buflen++] = 128 | z;
                             }
-                            bufptr[buflen++] = 0b10000000 | y;
+                            bufptr[buflen++] = 128 | y;
                         }
-                        bufptr[buflen++] = 0b10000000 | x;
+                        bufptr[buflen++] = 128 | x;
                     }
                 } // if unicode
             } // if '\\'
@@ -701,7 +704,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
                 case 'x':
                     for (k = 2; k < self->t.len; k++) if ('_' != self->t.ptr[k]) {
-                        u8 it = 0b100000 | self->t.ptr[k];
+                        u8 it = 32 | self->t.ptr[k];
                         ival = (ival << 4) | ((it & 0xf) + ('9'<it)*9);
                     }
                     break;

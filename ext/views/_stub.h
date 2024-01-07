@@ -1,6 +1,7 @@
 #include <GL/gl.h>
 
-struct Frame { extends_FrameBase; };
+struct Frame { extends_FrameBase
+};
 
 #ifdef FRAME_IMPLEMENTATION
 bool frame_create(Frame* self) { (void)self; return false; }
