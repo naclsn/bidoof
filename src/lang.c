@@ -552,6 +552,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         memcpy(&rr->argv, args.ptr, args.len*sizeof(Obj*));
 
         if (!obj_call(r, rr)) {
+            //obj_destroy(rr);
             free(rr);
             self->t = funct;
             fail("could not call function");

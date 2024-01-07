@@ -10,16 +10,20 @@
 #include <string.h>
 
 #ifdef TRACE_ALLOCS
-extern void* __trace_allocs_malloc(char const* const info, size_t const s);
-extern void  __trace_allocs_free(char const* const info, void* const p);
-extern void* __trace_allocs_calloc(char const* const info, size_t const c, size_t const s);
-extern void* __trace_allocs_realloc(char const* const info, void* const p, size_t const s);
+extern void* __trace_allocs_malloc (char const* const call, size_t const s);
+extern void  __trace_allocs_free   (char const* const call, void* const p);
+extern void* __trace_allocs_calloc (char const* const call, size_t const c, size_t const s);
+extern void* __trace_allocs_realloc(char const* const call, void* const p, size_t const s);
+extern char const* __trace_hint;
 #define __trace_allocs_lnstr(__ln) #__ln
 #define __trace_allocs_stamp(__fn, __ln) __fn ":" __trace_allocs_lnstr(__ln)
-#define malloc(__s)        __trace_allocs_malloc (" // " __trace_allocs_stamp(__FILE__, __LINE__) ": malloc("  #__s           ")\n", (__s)       )
-#define free(__p)          __trace_allocs_free   (" // " __trace_allocs_stamp(__FILE__, __LINE__) ": free("    #__p           ")\n", (__p)       )
-#define calloc(__c, __s)   __trace_allocs_calloc (" // " __trace_allocs_stamp(__FILE__, __LINE__) ": calloc("  #__c ", " #__s ")\n", (__c), (__s))
-#define realloc(__p, __s)  __trace_allocs_realloc(" // " __trace_allocs_stamp(__FILE__, __LINE__) ": realloc(" #__p ", " #__s ")\n", (__p), (__s))
+#define trace_hint() __trace_hint = " // " __trace_allocs_stamp(__FILE__, __LINE__) ": "
+#define malloc(__s)        (!__trace_hint ? trace_hint() : 0, __trace_allocs_malloc ("malloc("  #__s           ")\n", (__s)       ))
+#define free(__p)          (!__trace_hint ? trace_hint() : 0, __trace_allocs_free   ("free("    #__p           ")\n", (__p)       ))
+#define calloc(__c, __s)   (!__trace_hint ? trace_hint() : 0, __trace_allocs_calloc ("calloc("  #__c ", " #__s ")\n", (__c), (__s)))
+#define realloc(__p, __s)  (!__trace_hint ? trace_hint() : 0, __trace_allocs_realloc("realloc(" #__p ", " #__s ")\n", (__p), (__s)))
+#else // TRACE_ALLOCS
+#define trace_hint() (void)0
 #endif // TRACE_ALLOCS
 
 #include "dyarr.h"
@@ -74,17 +78,17 @@ extern void (*notify)(char const* s);
         notify(m);                              \
     } while (false)                             \
 
-typedef uint8_t u8;
+typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
-typedef int8_t i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
-typedef float f32;
-typedef double f64;
-typedef size_t sz;
+typedef int8_t   i8;
+typedef int16_t  i16;
+typedef int32_t  i32;
+typedef int64_t  i64;
+typedef float    f32;
+typedef double   f64;
+typedef size_t   sz;
 
 typedef struct Buf { u8* ptr; sz len;                                 } Buf;
 typedef struct Num { i64 val;                                         } Num;
@@ -110,6 +114,7 @@ typedef struct Obj {
     u16 cycle;
     u16 keepalive;
 
+    //dyarr(struct Obj*) args;
     u8 argc;
     struct Obj* argv[];
 } Obj;

@@ -96,13 +96,13 @@ char** compgen_words(char* line, sz point) {
         : &repl_scope
         ;
 
-    char** r = calloc(search_in->count, sizeof(char*) + 1);
+    char** r = calloc(search_in->count + 1, sizeof(char*));
     if (r) {
         sz head = 0;
         for (sz k = 0; k < search_in->count; k++) {
             Sym* it = &search_in->items[k].key;
             if (0 == memcmp(it->txt, ptr, len)) {
-                char* word = malloc(20);
+                char* word = malloc(17);
                 if (!word) return r;
                 memcpy(word, it->txt+len, 16);
                 strcat(word, " ");
@@ -114,7 +114,10 @@ char** compgen_words(char* line, sz point) {
 }
 
 void compgen_clean(char** words) {
-    free(words);
+    if (words) {
+        for (char** it = words; *it; it++) free(*it);
+        free(words);
+    }
 }
 
 void repl(char* histfn) {

@@ -1,42 +1,41 @@
-#ifndef __DYARR_H__
-#define __DYARR_H__
-
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
-#define dyarr(__elty)  \
-    struct {  \
-        __elty* ptr;  \
-        size_t len, cap;  \
-    }
+static inline bool   _dyarr_resize(void* ptr, size_t isz, size_t* cap, size_t rsz);
+static inline size_t _dyarr_insert(void* ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n);
+static inline size_t _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n);
 
-static inline bool _dyarr_resize(void** ptr, size_t* cap, void* nptr, size_t ncap) {
-    if (!nptr) return false;
-    *ptr = nptr;
-    *cap = ncap;
-    return true;
+#ifndef dyarr
+#include <string.h>
+
+#define dyarr(__elty) struct { __elty* ptr; size_t len, cap; }
+
+/* clears it empty and free used memory */
+#define dyarr_clear(__da)  ((__da)->len = (__da)->cap = 0, free((__da)->ptr), (__da)->ptr = NULL)
+/* resizes exactly to given, new size should not be 0 */
+#define dyarr_resize(__da, __rsz)  (trace_hint(), _dyarr_resize(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, (__rsz)))
+/* doubles the capacity if more memory is needed */
+#define dyarr_push(__da)  ((__da)->len < (__da)->cap || dyarr_resize((__da), (__da)->cap ? (__da)->cap * 2 : 16) ? &(__da)->ptr[(__da)->len++] : NULL)
+/* NULL if empty */
+#define dyarr_pop(__da)  ((__da)->len ? &(__da)->ptr[--(__da)->len] : NULL)
+/* NULL (or rather 0) if OOM, else pointer to the new sub-array (at k, of size n) */
+#define dyarr_insert(__da, __k, __n)  (trace_hint(), (__da)->ptr + _dyarr_insert(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, &(__da)->len, (__k), (__n)))
+/* doesn't check bounds, pointer to where the sub-array was */
+#define dyarr_remove(__da, __k, __n)  ((__da)->ptr + _dyarr_remove(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->len, (__k), (__n)))
+
+static inline bool _dyarr_resize(void* ptr, size_t isz, size_t* cap, size_t rsz) {
+    void* niw = realloc(*(void**)ptr, rsz * isz);
+    return niw ? *(void**)ptr = niw, *cap = rsz, true : false;
+    (void)_dyarr_insert;
+    (void)_dyarr_remove;
 }
 
-// clears it empty and free used memory
-#define dyarr_clear(__da)  ((__da)->len = (__da)->cap = 0, free((__da)->ptr), (__da)->ptr = NULL)
+static inline size_t _dyarr_insert(void* ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n) {
+    return *len+n < *cap || _dyarr_resize(ptr, isz, cap, *len+n) ? memmove(*(char**)ptr+(k+n)*isz, *(char**)ptr+k*isz, (*len-k)*isz), *len+= n, k : -(size_t)*(char**)ptr;
+}
 
-// resize exactly to given, new size should not be 0
-// (FIXME: __res is evaluated twice, but I really want the realloc to be in the macro, not in the function)
-#define dyarr_resize(__da, __res)  _dyarr_resize((void*)&(__da)->ptr, &(__da)->cap, realloc((__da)->ptr, (__res)*sizeof*(__da)->ptr), (__res))
+static inline size_t _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n) {
+    return memmove(*(char**)ptr+k*isz, *(char**)ptr+(k+n)*isz, ((*len-= n)-k)*isz), k;
+}
 
-// double the capacity if more memory is needed
-#define dyarr_push(__da)  ((__da)->len < (__da)->cap || dyarr_resize((__da), (__da)->cap ? (__da)->cap * 2 : 16) ? &(__da)->ptr[(__da)->len++] : NULL)
-
-// NULL if empty
-#define dyarr_pop(__da)  ((__da)->len ? &(__da)->ptr[(__da)->len--] : NULL)
-
-// NULL if out of range
-#define dyarr_at(__da, __k)  (0 <= (__k) && (__k) < (__da)->len ? &(__da)->ptr[(__k)] : NULL)
-
-// NULL if OOM, else pointer to the new sub-array (at k, of size n)
-#define dyarr_insert(__da, __k, __n)  ((__n)+(__da)->len < (__da)->cap || dyarr_resize((__da), (__n)+(__da)->len) ? memmove((__k)+(__n)+(__da)->ptr, (__k)+(__da)->ptr, ((__da)->len-(__k))*sizeof*(__da)->ptr), (__da)->len+= (__n), (__k)+(__da)->ptr : NULL)
-
-// (doesn't check bounds)
-#define dyarr_remove(__da, __k, __n)  memmove((__k)+(__da)->ptr, (__k)+(__n)+(__da)->ptr, (((__da)->len-=(__n))-(__k))*sizeof*(__da)->ptr)
-
-#endif // __DYARR_H__
+#endif /* dyarr */
