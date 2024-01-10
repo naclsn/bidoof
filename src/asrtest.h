@@ -89,17 +89,17 @@ static inline bool _asr_parseargs(int argc, char** argv) {
     return true;
 }
 
-#define ASSERT_REACH(__tag, __cdt) do                                        \
-    if (0 == strcmp(#__tag, _asr_current)) {                                 \
-        _asr_reached = true;                                                 \
-        bool _asr_curr_res = __cdt;                                          \
-        if (_asr_color) asr_printf(_asr_current                              \
-                ? ASR_COLOR_SUCCESS                                          \
-                : ASR_COLOR_FAILURE);                                        \
-        asr_printf(#__tag "(" __FILE__ ":%d)\t%s\n", __LINE__, _asr_current  \
-                ? "pass"                                                     \
-                : (_asr_fails++, "condition not verified: " #__cdt));        \
-        if (_asr_color) asr_printf(ASR_COLOR_RESET);                         \
+#define ASSERT_REACH(__tag, __cdt) do                                         \
+    if (0 == strcmp(#__tag, _asr_current)) {                                  \
+        _asr_reached = true;                                                  \
+        bool _asr_curr_res = __cdt;                                           \
+        if (_asr_color) asr_printf(_asr_curr_res                              \
+                ? ASR_COLOR_SUCCESS                                           \
+                : ASR_COLOR_FAILURE);                                         \
+        asr_printf(#__tag "(" __FILE__ ":%d)\t%s\n", __LINE__, _asr_curr_res  \
+                ? "pass"                                                      \
+                : (_asr_fails++, "condition not verified: " #__cdt));         \
+        if (_asr_color) asr_printf(ASR_COLOR_RESET);                          \
     } while (0)
 
 #define ASR_TEST(__tag) do                                         \

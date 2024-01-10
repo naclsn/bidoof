@@ -259,7 +259,7 @@ static inline bool ar_lex_tokens_fn(void) {
             default: *h++ = p.t.ptr[k];
         }
         *h = '\0';
-        printf("else if (_lex(&p), strncmp(\"%s\", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !\"%s\");\n", s, s);
+        printf("    else if (_lex(&p), strncmp(\"%s\", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !\"%s\");\n", s, s);
     }
 
     else if (_lex(&p), strncmp("name", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"name");
@@ -357,6 +357,8 @@ sz _escape(char const* ptr, sz len, u32* res) {
                 u8 lo = 32 | ptr[2];
                 *res = ((lo & 0xf) + ('9'<lo)*9) | ( ((hi & 0xf) + ('9'<hi)*9) << 4 );
             }
+            ASSERT_REACH(ar_escape_x, 42 == *res);
+            #define ar_escape_x { u32 res; _escape("x2a", 3, &res); }
             return 3;
 
         case 'u': // 4 hex digits codepoint below 0x10000
@@ -366,6 +368,8 @@ sz _escape(char const* ptr, sz len, u32* res) {
                 u8 it = 32 | ptr[k];
                 *res = (*res << 4) | ((it & 0xf) + ('9'<it)*9);
             }
+            ASSERT_REACH(ar_escape_u, 12295 == *res);
+            #define ar_escape_u { u32 res; _escape("u3007", 5, &res); }
             return 5;
 
         case 'U': // 8 hex digits codepoint
@@ -375,6 +379,8 @@ sz _escape(char const* ptr, sz len, u32* res) {
                 u8 it = 32 | ptr[k];
                 *res = (*res << 4) | ((it & 0xf) + ('9'<it)*9);
             }
+            ASSERT_REACH(ar_escape_U, 128027 == *res);
+            #define ar_escape_U { u32 res; _escape("U0001f41b", 9, &res); }
             return 9;
 
         default: // 3 oct digits byte
@@ -388,8 +394,10 @@ sz _escape(char const* ptr, sz len, u32* res) {
                     u8 hi = ptr[0] & 0xf;
                     u8 mi = ptr[1] & 0xf;
                     u8 lo = ptr[2] & 0xf;
-                    *res = lo | (mi <<3) | (hi <<3);
+                    *res = lo | (mi <<3) | (hi <<6);
                 }
+                ASSERT_REACH(ar_escape_o, 0644 == *res);
+                #define ar_escape_o { u32 res; _escape("644", 9, &res); }
                 return 3;
             }
     }
@@ -463,7 +471,7 @@ short _precedence(Slice const op) {
         case '*': return 1 == op.len ? 12 : 13;
         case '/': return 12;
     }
-    printf("op: <<%.*s>>\n", (int)op.len, op.ptr);
+    //printf("op: <<%.*s>>\n", (int)op.len, op.ptr);
     return 99;
 }
 
@@ -925,6 +933,10 @@ Scope exts_scope = {0};
 void notify_default(char const* s) { }
 void (*notify)(char const* s) = notify_default;
 ASR_MAIN(
-    ASR_TEST(ar_lex_tokens)
+    ASR_TEST(ar_lex_tokens);
+    ASR_TEST(ar_escape_x);
+    ASR_TEST(ar_escape_u);
+    ASR_TEST(ar_escape_U);
+    ASR_TEST(ar_escape_o);
 )
 #endif // ASR_TEST_BUILD
