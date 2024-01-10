@@ -15,6 +15,10 @@
 # define ASR_MAIN(...)
 #else // (till end of file)
 
+#define ASR_COLOR_FAILURE "\x1b[31m"
+#define ASR_COLOR_SUCCESS "\x1b[32m"
+#define ASR_COLOR_RESET "\x1b[m"
+
 #include <stdbool.h>
 #include <string.h>
 
@@ -38,6 +42,7 @@ static int _asr_total = 0;
 static bool _asr_summary = true;
 static bool _asr_listing = false;
 static char const* _asr_filter = NULL;
+static bool _asr_color = true;
 
 static bool _asr_run(char const* tag) { return !_asr_listing && (!_asr_filter || 0 == asr_filter(_asr_filter, tag)); }
 static bool _asr_list(char const* tag) { return _asr_listing && (!_asr_filter || 0 == asr_filter(_asr_filter, tag)); }
@@ -53,6 +58,7 @@ static inline bool _asr_parseargs(int argc, char** argv) {
                        "     --nosum      do not display a summary once done\n"
                        "     --list       list tests instead of running them\n"
                        "     --filter     use a glob to filter tests to use\n"
+                       "     --nocolor    disable use of colors (VT escapes)\n"
                        "\n", prog);
             return false;
         }
@@ -70,6 +76,9 @@ static inline bool _asr_parseargs(int argc, char** argv) {
                 return false;
             }
         }
+        else if_arg ("--nocolor") {
+            _asr_color = false;
+        }
         else {
             asr_printf("Unknown argument: '%s'\n", *argv);
             return false;
@@ -80,12 +89,17 @@ static inline bool _asr_parseargs(int argc, char** argv) {
     return true;
 }
 
-#define ASSERT_REACH(__tag, __cdt) do                                 \
-    if (0 == strcmp(#__tag, _asr_current)) {                          \
-        _asr_reached = true;                                          \
-        asr_printf(#__tag "(" __FILE__ ":%d)\t%s\n", __LINE__, __cdt  \
-            ? "pass"                                                  \
-            : (_asr_fails++, "condition not verified: " #__cdt));     \
+#define ASSERT_REACH(__tag, __cdt) do                                        \
+    if (0 == strcmp(#__tag, _asr_current)) {                                 \
+        _asr_reached = true;                                                 \
+        bool _asr_curr_res = __cdt;                                          \
+        if (_asr_color) asr_printf(_asr_current                              \
+                ? ASR_COLOR_SUCCESS                                          \
+                : ASR_COLOR_FAILURE);                                        \
+        asr_printf(#__tag "(" __FILE__ ":%d)\t%s\n", __LINE__, _asr_current  \
+                ? "pass"                                                     \
+                : (_asr_fails++, "condition not verified: " #__cdt));        \
+        if (_asr_color) asr_printf(ASR_COLOR_RESET);                         \
     } while (0)
 
 #define ASR_TEST(__tag) do                                         \
@@ -96,7 +110,9 @@ static inline bool _asr_parseargs(int argc, char** argv) {
         { __tag; }                                                 \
         if (!_asr_reached) {                                       \
             _asr_misses++;                                         \
+            if (_asr_color) asr_printf(ASR_COLOR_FAILURE);         \
             asr_printf(#__tag "(" __FILE__ ":?)\tnot reached\n");  \
+            if (_asr_color) asr_printf(ASR_COLOR_RESET);           \
         }                                                          \
     } else if (_asr_list(#__tag)) {                                \
         asr_printf(#__tag "\n");                                   \
