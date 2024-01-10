@@ -1,7 +1,7 @@
 // TODO(whole file): cleanup on failure; whenever parsing fails
 //                   it throws away a bunch of allocated stuff
 
-//#include "asrtest.h"
+#include "asrtest.h"
 #include "exts.h"
 #include "lang.h"
 
@@ -79,14 +79,19 @@ typedef struct Pars {
 
 // TODO: maybe change it for void
 bool _lex(Pars* self) {
-#define AT              (self->s + self->i)
-#define IN(__lo, __hi)  (__lo <= c && c <= __hi)
+#   define AT              (self->s + self->i)
+#   define IN(__lo, __hi)  (__lo <= c && c <= __hi)
     char c;
     while (' ' == (c = *AT)
             || '\t' == c
             || '\n' == c
             || '\r' == c
             ) self->i++;
+
+    if ('#' == c) {
+        while ('\n' != *AT) self->i++;
+        return _lex(self);
+    }
 
     self->t.ptr = AT;
     self->t.len = 0;
@@ -129,11 +134,9 @@ bool _lex(Pars* self) {
         case '+':
         case '%':
         case '~':
-        case '#':
             self->t.len++;
             self->i++;
             return true;
-
 
         case '"': {
             char const* end = AT+1;
@@ -184,7 +187,7 @@ bool _lex(Pars* self) {
             }
             // fall through
         default:
-            if (IN('1', '9')) {
+            if (IN('1', '9') || (self->t.len && ('.' == c || '_' == c))) {
                 bool is_digit;
                 while ('_' == c
                     || (is_digit = (  2 == base && (IN('0', '1')) )
@@ -234,9 +237,65 @@ bool _lex(Pars* self) {
         else msg[25] = '\0';
         fail(msg);
     }
-#undef IN
-#undef AT
+#   undef IN
+#   undef AT
 }
+
+static inline bool ar_lex_tokens_fn(void) {
+    Pars p = {.s=
+        "name Function :symbol _ _ok " //12err"
+        "42 -1 +12 - 1 -0.5 0.742 0x2a -one* /"
+        "(= ( =) # comment\n"
+        "\"str line 1\nstr not-quite-line 2\"\n"
+        "},{,]["
+    };
+    char s[256] = {0};
+
+    if (0 /* generate */) while (_lex(&p) && p.t.len) {
+        char* h = s;
+        for (size_t k = 0; k < p.t.len; k++) switch (p.t.ptr[k]) {
+            case '\n': *h++ = '\\'; *h++ = 'n'; break;
+            case '"': *h++ = '\\';
+            default: *h++ = p.t.ptr[k];
+        }
+        *h = '\0';
+        printf("else if (_lex(&p), strncmp(\"%s\", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !\"%s\");\n", s, s);
+    }
+
+    else if (_lex(&p), strncmp("name", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"name");
+    else if (_lex(&p), strncmp("Function", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"Function");
+    else if (_lex(&p), strncmp(":symbol", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !":symbol");
+    else if (_lex(&p), strncmp("_", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"_");
+    else if (_lex(&p), strncmp("_ok", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"_ok");
+    else if (_lex(&p), strncmp("42", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"42");
+    else if (_lex(&p), strncmp("-1", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"-1");
+    else if (_lex(&p), strncmp("+", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"+");
+    else if (_lex(&p), strncmp("12", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"12");
+    else if (_lex(&p), strncmp("-", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"-");
+    else if (_lex(&p), strncmp("1", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"1");
+    else if (_lex(&p), strncmp("-0.5", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"-0.5");
+    else if (_lex(&p), strncmp("0.742", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"0.742");
+    else if (_lex(&p), strncmp("0x2a", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"0x2a");
+    else if (_lex(&p), strncmp("-", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"-");
+    else if (_lex(&p), strncmp("one", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"one");
+    else if (_lex(&p), strncmp("*", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"*");
+    else if (_lex(&p), strncmp("/", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"/");
+    else if (_lex(&p), strncmp("(=", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"(=");
+    else if (_lex(&p), strncmp("(", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"(");
+    else if (_lex(&p), strncmp("=", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"=");
+    else if (_lex(&p), strncmp(")", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !")");
+    else if (_lex(&p), strncmp("\"str line 1\nstr not-quite-line 2\"", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"\"str line 1\nstr not-quite-line 2\"");
+    else if (_lex(&p), strncmp("}", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"}");
+    else if (_lex(&p), strncmp(",", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !",");
+    else if (_lex(&p), strncmp("{", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"{");
+    else if (_lex(&p), strncmp(",", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !",");
+    else if (_lex(&p), strncmp("]", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"]");
+    else if (_lex(&p), strncmp("[", p.t.ptr, p.t.len)) ASSERT_REACH(ar_lex_tokens, !"[");
+
+    else ASSERT_REACH(ar_lex_tokens, (_lex(&p), !p.t.len));
+    return true;
+}
+#define ar_lex_tokens ar_lex_tokens_fn()
 
 void _print_location(Pars* self, char* reason) {
     sz lineNr = 1, colNr = 1;
@@ -272,7 +331,7 @@ void _print_location(Pars* self, char* reason) {
 }
 
 sz _escape(char const* ptr, sz len, u32* res) {
-#define AT_IN(__off, __lo, __hi)  (__lo <= ptr[__off] && ptr[__off] <= __hi)
+#   define AT_IN(__off, __lo, __hi)  (__lo <= ptr[__off] && ptr[__off] <= __hi)
     *res = 0;
 
     switch (*ptr) {
@@ -336,7 +395,7 @@ sz _escape(char const* ptr, sz len, u32* res) {
     }
 
     return 0;
-#undef AT_IN
+#   undef AT_IN
 }
 
 bool _update_free_str(Obj* self) {
@@ -866,6 +925,6 @@ Scope exts_scope = {0};
 void notify_default(char const* s) { }
 void (*notify)(char const* s) = notify_default;
 ASR_MAIN(
-    puts("u wish");
+    ASR_TEST(ar_lex_tokens)
 )
 #endif // ASR_TEST_BUILD

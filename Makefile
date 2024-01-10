@@ -23,13 +23,13 @@ $(OUT):
 	$(MD) '$(OUT)'
 
 $(OUT)/$(call as-exe,$(NAME)): src/*.[ch]
-	$(CC) $^ -o '$@' -DEXTS_NAMES='$(foreach ext,$(EXTS),"$(call as-lib,$(ext))",)' $(CFLAGS)
+	$(CC) $(filter %.c,$^) -o '$@' -DEXTS_NAMES='$(foreach ext,$(EXTS),"$(call as-lib,$(ext))",)' $(CFLAGS)
 
 $(OUT)/$(call as-lib,%): ext/%.c src/helper.h src/base.[ch]
-	$(CC) $^ -o '$@' -fPIC -shared $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
+	$(CC) $(filter %.c,$^) -o '$@' -fPIC -shared $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
 
 $(OUT)/$(call as-exe,test-%): src/%.c
-	$(CC) $^ -o '$@' -DASR_TEST_BUILD
+	$(CC) $(filter %.c,$^) -o '$@' -DASR_TEST_BUILD
 	'$@'
 
 wip/%: wip/%.c

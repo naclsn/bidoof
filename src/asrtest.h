@@ -10,7 +10,7 @@
 /// ```
 
 #ifndef ASR_TEST_BUILD
-# define ASSERT_REACH(__tag, __cdt)
+# define ASSERT_REACH(__tag, __cdt) (void)0
 # define ASR_TEST(__tag)
 # define ASR_MAIN(...)
 #else // (till end of file)
@@ -93,7 +93,7 @@ static inline bool _asr_parseargs(int argc, char** argv) {
         _asr_total++;                                              \
         _asr_current = #__tag;                                     \
         _asr_reached = false;                                      \
-        { (void)__tag; }                                           \
+        { __tag; }                                                 \
         if (!_asr_reached) {                                       \
             _asr_misses++;                                         \
             asr_printf(#__tag "(" __FILE__ ":?)\tnot reached\n");  \
@@ -105,7 +105,7 @@ static inline bool _asr_parseargs(int argc, char** argv) {
 #define ASR_MAIN(...)                                      \
     int main(int argc, char** argv) {                      \
         if (!_asr_parseargs(argc, argv)) return 1;         \
-        do { __VA_ARGS__ } while (0);                      \
+        { __VA_ARGS__; }                                   \
         if (_asr_summary) asr_printf("\n--------\n"        \
                 "%d fail%s\n%d miss%s\n%d total%s\n",      \
                 _asr_fails, 1 < _asr_fails ? "s" : "",     \
