@@ -70,6 +70,7 @@ typedef struct Pars {
     sz i;
     Slice t;
     Obj* unnamed;
+    bool unnamed_used;
 } Pars;
 
 #define fail(__msg) do {  \
@@ -538,7 +539,7 @@ Obj* _parse_math_expr(Pars* self, Scope* scope) {
     }
 
     return r;
-}
+} // _parse_math_expr
 
 Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
     Obj* rhs = _parse_math_expr(self, scope);
@@ -592,7 +593,7 @@ Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
     }
 
     return r;
-}
+} // _parse_math
 
 Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     Obj* r = NULL;
@@ -639,8 +640,10 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         Slice const open = self->t;
         _lex(self);
 
+        Obj* punnamed = self->unnamed;
         r = _parse_expr(self, scope, false);
         if (!r) fail("in parenthesised expression");
+        self->unnamed = punnamed;
 
         if (!tok_is(")", self->t)) {
             self->t = open;
@@ -847,6 +850,7 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
 
     else if (tok_is("_", self->t)) {
         r = self->unnamed;
+        self->unnamed_used = true;
         if (!r) fail("no unnamed variable at this point");
         _lex(self);
     }
@@ -862,7 +866,14 @@ Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     if (atomic) return r;
 
     if (tok_is(",", self->t)) {
+        // (when reaching the 2nd ",")
+        if (6 < self->i) ASSERT_REACH(ar_parse_expr_unnamed_unused, self->unnamed && !self->unnamed_used);
+                         #define ar_parse_expr_unnamed_unused Pars p = {.s= "Fn1 a, Fn2 b c, Fn1 _"}; _lex(&p); _parse_expr(&p, NULL, false);
+        if (self->unnamed && !self->unnamed_used) {
+            // XXX: free unnamed
+        }
         self->unnamed = r;
+        self->unnamed_used = false;
         _lex(self);
         return _parse_expr(self, scope, false);
     }
@@ -880,10 +891,18 @@ bool _parse_script(Pars* self, Scope* scope) {
         _lex(self);
 
         Obj* value = _parse_expr(self, scope, false);
+        ASSERT_REACH(ar_parse_script_unnamed_unused, self->unnamed && !self->unnamed_used);
+        #define ar_parse_script_unnamed_unused Pars p = {.s= "some = Fn1 a, Fn1 d"}; _lex(&p); _parse_script(&p, NULL);
+        if (self->unnamed && !self->unnamed_used) {
+            // XXX: free unnamed
+        }
         if (!value) fail("in script expression");
 
         Sym const key = slice2sym(name);
-        if (!scope_put(scope, key, value)) fail("OOM");
+        if (!scope_put(scope, key, value)) {
+            // XXX: free value
+            fail("OOM");
+        }
 
         if (!tok_is(";", self->t)) break;
         _lex(self);
@@ -925,18 +944,44 @@ void lang_show_tokens(char const* name, char const* script) {
 }
 
 #ifdef ASR_TEST_BUILD
-Obj* scope_get(Scope* self, Sym const key) { return NULL; }
-bool obj_call(Obj* self, Obj* res) { return NULL; }
-void obj_destroy(Obj* self) { }
-bool scope_put(Scope* self, Sym const key, Obj* value) { return false; }
 Scope exts_scope = {0};
-void notify_default(char const* s) { }
+bool _Fn_call(Obj* self, Obj* res) { return *res = (Obj){0}, true; }
+Obj* scope_get(Scope* self, Sym const key) {
+    if (&exts_scope == self) {
+        if (!strcmp("Fn1", key.txt)) {
+            static Obj f1 = {.ty= FUN, .as.fun.call= _Fn_call};
+            return &f1;
+        }
+        if (!strcmp("Fn2", key.txt)) {
+            static Obj f2 = {.ty= FUN, .as.fun.call= _Fn_call};
+            return &f2;
+        }
+    } else {
+        if ('\0' == key.txt[1]) switch (key.txt[0]) {
+            case 'a': static Obj a = {.ty= NUM, .as.num.val= 1}; return &a; break;
+            case 'b': static Obj b = {.ty= NUM, .as.num.val= 2}; return &b; break;
+            case 'c': static Obj c = {.ty= NUM, .as.num.val= 3}; return &c; break;
+            case 'd': static Obj d = {.ty= NUM, .as.num.val= 4}; return &d; break;
+        }
+    }
+    printf("scope_get <<%s>> => NULL\n", key.txt);
+    return NULL;
+}
+bool scope_put(Scope* self, Sym const key, Obj* value) { return true; }
+
+bool obj_call(Obj* self, Obj* res) { return true; }
+void obj_destroy(Obj* self) { }
+
+void notify_default(char const* s) { printf("!! %s\n", s); }
 void (*notify)(char const* s) = notify_default;
+#endif // ASR_TEST_BUILD
+
 ASR_MAIN(
     ASR_TEST(ar_lex_tokens);
     ASR_TEST(ar_escape_x);
     ASR_TEST(ar_escape_u);
     ASR_TEST(ar_escape_U);
     ASR_TEST(ar_escape_o);
+    ASR_TEST(ar_parse_expr_unnamed_unused);
+    ASR_TEST(ar_parse_script_unnamed_unused);
 )
-#endif // ASR_TEST_BUILD
