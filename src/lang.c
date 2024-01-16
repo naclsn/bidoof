@@ -476,12 +476,12 @@ short _precedence(Slice const op) {
     return 99;
 }
 
-static Obj* _parse_math_expr(Pars* self, Scope* scope) {
+static Obj* _parse_expr_math_1(Pars* self, Scope* scope) {
     if (tok_is_unop(self->t)) {
         if (!_lex(self)) fail("expected operand for unary operator");
 
         Obj* f = _math_unary(self->t);
-        Obj* arg = _parse_math_expr(self, scope);
+        Obj* arg = _parse_expr_math_1(self, scope);
         if (!arg) fail("in operand for unary operator");
 
         Obj* r = malloc(sizeof(Obj));
@@ -504,7 +504,7 @@ static Obj* _parse_math_expr(Pars* self, Scope* scope) {
     if (tok_is("[", self->t)) {
         _lex(self);
 
-        Obj* st = _parse_math_expr(self, scope);
+        Obj* st = _parse_expr_math_1(self, scope);
         Obj* ed = NULL;
         if (!st) fail("in indexing operator");
 
@@ -515,7 +515,7 @@ static Obj* _parse_math_expr(Pars* self, Scope* scope) {
             _lex(self);
             ff = scope_get(&exts_scope, mksym("Slice"));
             if (!tok_is("]", self->t)) {
-                ed = _parse_math_expr(self, scope);
+                ed = _parse_expr_math_1(self, scope);
                 if (!ed) fail("in indexing operator end");
             }
         } else ff = scope_get(&exts_scope, mksym("At"));
@@ -541,8 +541,8 @@ static Obj* _parse_math_expr(Pars* self, Scope* scope) {
     return r;
 } // _parse_math_expr
 
-static Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
-    Obj* rhs = _parse_math_expr(self, scope);
+static Obj* _parse_expr_math_2(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
+    Obj* rhs = _parse_expr_math_1(self, scope);
     Slice nop = self->t;
 
     bool tail = tok_is(")", nop);
@@ -566,7 +566,7 @@ static Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
     //     else:  (left [lastOp] right) [nextOp] ...
 
     if (!tail && nfirst) {
-        rhs = _parse_math(self, scope, rhs, nop);
+        rhs = _parse_expr_math_2(self, scope, rhs, nop);
         if (!rhs) fail("in rhs");
     }
 
@@ -588,7 +588,7 @@ static Obj* _parse_math(Pars* self, Scope* scope, Obj* lhs, Slice const op) {
     }
 
     if (!tail && !nfirst) {
-        r = _parse_math(self, scope, r, nop);
+        r = _parse_expr_math_2(self, scope, r, nop);
         if (!r) fail("in lhs");
     }
 
@@ -600,63 +600,86 @@ static Obj* _parse_expr_fun(Pars* self, Scope* scope, bool atomic) {
 
     Obj* f = scope_get(&exts_scope, slice2sym(self->t));
     if (!f) fail("unknown function");
-    _lex(self);
 
+    _lex(self);
     if (atomic) return f;
+
+    Obj* r = calloc(1, sizeof(Obj));
+    if (!r) fail("OOM");
 
     dyarr(Obj*) args = {0};
     while (!tok_is_end(self->t)) {
         Obj** arg = dyarr_push(&args);
-        if (!arg) fail("OOM");
+        if (!arg) {
+            notify("OOM");
+            goto failed;
+        }
 
         *arg = _parse_expr(self, scope, true);
-        if (!*arg) fail("in function argument");
+        if (!*arg) {
+            notify("in function argument");
+            goto failed;
+        }
     }
 
-    Obj* rr = malloc(sizeof(Obj));
-    if (!rr) fail("OOM");
+    r->args.ptr = args.ptr;
+    r->args.len = args.len;
+    r->args.cap = args.cap;
 
-    rr->args.ptr = args.ptr;
-    rr->args.len = args.len;
-    rr->args.cap = args.cap;
-
-    if (!obj_call(f, rr)) {
-        //obj_destroy(rr);
-        free(rr);
-        self->t = funct;
-        fail("could not call function");
+    if (!obj_call(f, r)) {
+        //obj_destroy(r); probly not, obj_call should make sure there is nothing to cleanup if it fails
+        self->t = funct; // on function being called, for error message
+        notify("could not call function");
+        goto failed;
     }
 
-    // TODO: shouldn't f (the function) be dropped?
-    //       -> no, the result effectively depends on it (TODO)
+    // TODO: the result effectively depends on f (the function)
     //       when you eventually come back to it, also do make argv a dyarr, thanks
-    return rr;
-}
+    return r;
+
+failed:
+    for (size_t k = 0; k < args.len; k++) {
+        // XXX: free args.ptr[k]
+    }
+    free(args.ptr);
+    free(r);
+    return NULL;
+} // _parse_expr_fun
 
 static Obj* _parse_expr_sub(Pars* self, Scope* scope) {
     Slice const open = self->t;
-    _lex(self);
+
+    // `x, (a _, b _), y _`  this is not valid, `_` in `a _` doesn't exist
+    // `x, a _, b _, y _`  this is the correct way to write it
 
     Obj* punnamed = self->unnamed;
+    bool punnamed_used = self->unnamed_used;
+    self->unnamed = NULL;
+    self->unnamed_used = false;
+
+    _lex(self);
     Obj* r = _parse_expr(self, scope, false);
-    if (!r) fail("in parenthesised expression");
+
     self->unnamed = punnamed;
+    self->unnamed_used = punnamed_used;
+    if (!r) fail("in parenthesised expression");
 
     if (!tok_is(")", self->t)) {
-        self->t = open;
+        self->t = open; // on matching openning, for error message
         fail("missing closing parenthesis");
     }
-    _lex(self);
 
+    _lex(self);
     return r;
 }
 
+// TODO: test and finish fixing (this and the functions it depends on)
 static Obj* _parse_expr_math(Pars* self, Scope* scope) {
     Obj* r = NULL;
     Slice const open = self->t;
-    _lex(self);
 
-    Obj* first = _parse_math_expr(self, scope);
+    _lex(self);
+    Obj* first = _parse_expr_math_1(self, scope);
     if (!first) fail("in math expression lhs");
 
     bool isbinop = tok_is_binop(self->t);
@@ -670,16 +693,20 @@ static Obj* _parse_expr_math(Pars* self, Scope* scope) {
             self->t.len--;
         } else _lex(self);
 
-        r = _parse_math(self, scope, first, op);
-        if (!r) fail("in math expression rhs");
+        r = _parse_expr_math_2(self, scope, first, op);
+        if (!r) {
+            // XXX: free first
+            fail("in math expression rhs");
+        }
     } else r = first;
 
     if (!tok_is(")", self->t)) {
-        self->t = open;
+        self->t = open; // on matching openning, for error message
+        // XXX: free r
         fail("missing closing parenthesis");
     }
-    _lex(self);
 
+    _lex(self);
     return r;
 }
 
@@ -713,7 +740,10 @@ static Obj* _parse_expr_str(Pars* self) {
             u32 val = 0;
             k++;
             sz sk = _escape(self->t.ptr+k, self->t.len-1-k, &val);
-            if (0 == sk) fail("invalid escape sequence");
+            if (0 == sk) {
+                free(bufptr);
+                fail("invalid escape sequence");
+            }
             k+= sk-1;
 
             if (1 == sk || 3 == sk)
@@ -742,8 +772,14 @@ static Obj* _parse_expr_str(Pars* self) {
         } // if '\\'
     } // for chars in literal
 
+    ASSERT_REACH(ar_parse_expr_str, !strncmp("hi :3 \\", bufptr, buflen));
+    #define ar_parse_expr_str Pars p = {.s= "\"hi :\x33 \\\\\""}; _lex(&p); _parse_expr_str(&p);
+
     Obj* r = calloc(1, sizeof(Obj));
-    if (!r) fail("OOM");
+    if (!r) {
+        free(bufptr);
+        fail("OOM");
+    }
     r->ty = BUF;
     r->as.buf.ptr = bufptr;
     r->as.buf.len = buflen;
@@ -751,7 +787,7 @@ static Obj* _parse_expr_str(Pars* self) {
 
     _lex(self);
     return r;
-}
+} // _parse_expr_str
 
 static Obj* _parse_expr_num(Pars* self) {
     i64 ival;
@@ -767,22 +803,24 @@ static Obj* _parse_expr_num(Pars* self) {
     } else {
         sz k = negative;
         ival = 0;
-        if ('0' == self->t.ptr[0] && 1 < self->t.len) switch (self->t.ptr[1]) {
+        if ('0' == self->t.ptr[k] && 1 < self->t.len) switch (self->t.ptr[k+1]) {
             case 'b':
-                for (k = 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
+                for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
                     ival = (ival << 1) | (self->t.ptr[k] & 0xf);
                 break;
 
             case 'o':
-                for (k = 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
+                for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k])
                     ival = (ival <<3 ) | (self->t.ptr[k] & 0xf);
                 break;
 
             case 'x':
-                for (k = 2; k < self->t.len; k++) if ('_' != self->t.ptr[k]) {
+                for (k+= 2; k < self->t.len; k++) if ('_' != self->t.ptr[k]) {
                     u8 it = 32 | self->t.ptr[k];
                     ival = (ival << 4) | ((it & 0xf) + ('9'<it)*9);
                 }
+                ASSERT_REACH(ar_parse_expr_num_1, 42 == ival);
+                #define ar_parse_expr_num_1 Pars p = {.s= "-0x2a"}; _lex(&p); _parse_expr_num(&p);
                 break;
 
             default: goto decimal;
@@ -799,6 +837,9 @@ static Obj* _parse_expr_num(Pars* self) {
                     fval = fval/10 + (self->t.ptr[f] & 0xf);
                 fval = ival + fval/10;
             }
+
+            ASSERT_REACH(ar_parse_expr_num_2, 123.456 == fval);
+            #define ar_parse_expr_num_2 Pars p = {.s= "1_2_3.4_5_6"}; _lex(&p); _parse_expr_num(&p);
         } // if (not) 0[box..]
     } // if (not) '\''
 
@@ -814,20 +855,28 @@ static Obj* _parse_expr_num(Pars* self) {
 
     _lex(self);
     return r;
-}
+} // _parse_expr_num
 
 static Obj* _parse_expr_lst(Pars* self, Scope* scope) {
     Slice const open = self->t;
 
+    Obj* r = calloc(1, sizeof(Obj));
+    if (!r) fail("OOM");
+
     dyarr(Obj*) items = {0};
     do {
-        _lex(self);
-
         Obj** item = dyarr_push(&items);
-        if (!item) fail("OOM");
+        if (!item) {
+            notify("OOM");
+            goto failed;
+        }
 
+        _lex(self);
         *item = _parse_expr(self, scope, true);
-        if (!*item) fail("in list expression");
+        if (!*item) {
+            notify("in list expression");
+            goto failed;
+        }
 
         // TODO: change to the list being a proper depnt
         // which means that when an item gets updated,
@@ -836,12 +885,11 @@ static Obj* _parse_expr_lst(Pars* self, Scope* scope) {
     } while (tok_is(",", self->t));
 
     if (!tok_is("}", self->t)) {
-        self->t = open;
-        fail("missing closing brace");
+        self->t = open; // on matching openning, for error message
+        notify("missing closing brace");
+        goto failed;
     }
 
-    Obj* r = calloc(1, sizeof(Obj));
-    if (!r) fail("OOM");
     r->ty = LST;
     r->as.lst.ptr = items.ptr;
     r->as.lst.len = items.len;
@@ -849,7 +897,15 @@ static Obj* _parse_expr_lst(Pars* self, Scope* scope) {
 
     _lex(self);
     return r;
-}
+
+failed:
+    for (size_t k = 0; k < items.len; k++) {
+        // XXX: free items.ptr[k]
+    }
+    free(items.ptr);
+    free(r);
+    return NULL;
+} // _parse_expr_lst
 
 static Obj* _parse_expr_sym(Pars* self) {
     Obj* r = calloc(1, sizeof(Obj));
@@ -873,6 +929,7 @@ static Obj* _parse_expr_unnamed(Pars* self) {
 static Obj* _parse_expr_var(Pars* self, Scope* scope) {
     Obj* r = scope_get(scope, slice2sym(self->t));
     if (!r) fail("unknown variable");
+
     _lex(self);
     return r;
 }
@@ -891,22 +948,36 @@ static Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
     else if (tok_is_sym(self->t))   r = _parse_expr_sym(self);
     else if (tok_is("_", self->t))  r = _parse_expr_unnamed(self);
     else if (tok_is_var(self->t))   r = _parse_expr_var(self, scope);
-
     else fail("expected expression");
 
     if (atomic) return r;
 
-    if (tok_is(",", self->t)) {
-        // (when reaching the 2nd ",")
-        if (6 < self->i) ASSERT_REACH(ar_parse_expr_unnamed_unused, self->unnamed && !self->unnamed_used);
-                         #define ar_parse_expr_unnamed_unused Pars p = {.s= "Fn1 a, Fn2 b c, Fn1 _"}; _lex(&p); _parse_expr(&p, NULL, false);
-        if (self->unnamed && !self->unnamed_used) {
-            // XXX: free unnamed
-        }
+    // NOTE: this could, and probly should, be re-written as to not be recursive
+    if (r && tok_is(",", self->t)) {
+        Obj* punnamed = self->unnamed;
+        bool punnamed_used = self->unnamed_used;
         self->unnamed = r;
         self->unnamed_used = false;
+#ifdef ASR_TEST_BUILD
+        Obj const* const pr = r;
+#endif
+
         _lex(self);
-        return _parse_expr(self, scope, false);
+        r = _parse_expr(self, scope, false);
+
+        ASSERT_REACH(ar_parse_expr_unnamed_unused, !self->unnamed_used);
+        #define ar_parse_expr_unnamed_unused Pars p = {.s= "Fn1 a, Fn2 b c"}; _lex(&p); _parse_expr(&p, NULL, false);
+        ASSERT_REACH(ar_parse_expr_unnamed_used, self->unnamed_used);
+        #define ar_parse_expr_unnamed_used Pars p = {.s= "Fn1 a, Fn2 _ c"}; _lex(&p); _parse_expr(&p, NULL, false);
+        // this causes a double test :/
+        ASSERT_REACH(ar_parse_expr_unnamed_restored, pr == self->unnamed);
+        #define ar_parse_expr_unnamed_restored Pars p = {.s= "Fn1 a, Fn2 _ c, Fn1 _"}; _lex(&p); _parse_expr(&p, NULL, false);
+        if (!self->unnamed_used) {
+            // XXX: free self->unnamed
+        }
+
+        self->unnamed = punnamed;
+        self->unnamed_used = punnamed_used;
     }
 
     return r;
@@ -922,11 +993,6 @@ static bool _parse_script(Pars* self, Scope* scope) {
         _lex(self);
 
         Obj* value = _parse_expr(self, scope, false);
-        ASSERT_REACH(ar_parse_script_unnamed_unused, self->unnamed && !self->unnamed_used);
-        #define ar_parse_script_unnamed_unused Pars p = {.s= "some = Fn1 a, Fn1 d"}; _lex(&p); _parse_script(&p, NULL);
-        if (self->unnamed && !self->unnamed_used) {
-            // XXX: free unnamed
-        }
         if (!value) fail("in script expression");
 
         Sym const key = slice2sym(name);
@@ -1013,6 +1079,10 @@ ASR_MAIN(
     ASR_TEST(ar_escape_u);
     ASR_TEST(ar_escape_U);
     ASR_TEST(ar_escape_o);
+    ASR_TEST(ar_parse_expr_str);
+    ASR_TEST(ar_parse_expr_num_1);
+    ASR_TEST(ar_parse_expr_num_2);
     ASR_TEST(ar_parse_expr_unnamed_unused);
-    ASR_TEST(ar_parse_script_unnamed_unused);
+    ASR_TEST(ar_parse_expr_unnamed_used);
+    ASR_TEST(ar_parse_expr_unnamed_restored);
 )
