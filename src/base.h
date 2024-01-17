@@ -107,10 +107,7 @@ typedef struct Obj {
     enum  Ty ty;
     union As as;
 
-    struct Depnt {
-        struct Obj* obj;
-        struct Depnt* next;
-    }* depnts;
+    dyarr(struct Obj*) depnts;
     u16 cycle;
     u16 keepalive;
 
@@ -155,16 +152,14 @@ static inline Sym mksym(char const* s) {
 void obj_show(Obj const* self, int indent);
 void obj_show_depnts(Obj const* self, int curdepth);
 
-// self is a function, the argument, and later result, are all in res
+// self is a function, the argument, and later result, are all in res.
+// if it failed, caller is still responsible for the arguments
 bool obj_call(Obj* self, Obj* res);
-// remove self from dep's depnts and decrement its keepalive
-// false if it was not in
-bool obj_remdep(Obj* self, Obj* dep);
-// do not destroy an Obj which has other Obj depending on it
-// (ie. `self->keepalive` non-zero)
-// destroying is recursive and assumes the arguments are allocated
-// (these are freed if identified as not used)
+// destroying is recursive and assumes the arguments are allocated.
+// prefer using obj_may_destroy_free
 void obj_destroy(Obj* self);
-bool obj_update(Obj* self);
+// checks keepalive, if 0 calls obj_destroy and free
+void obj_may_destroy_free(Obj* self);
+//bool obj_update(Obj* self);
 
 #endif // __BIDOOF_BASE_H__

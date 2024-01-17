@@ -3,7 +3,7 @@
 
 static inline bool   _dyarr_resize(void* ptr, size_t isz, size_t* cap, size_t rsz);
 static inline size_t _dyarr_insert(void* ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n);
-static inline size_t _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n);
+static inline void   _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n);
 
 #ifndef dyarr
 #include <string.h>
@@ -23,7 +23,7 @@ static inline size_t _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k,
 /* NULL (or rather 0) if OOM, else pointer to the new sub-array (at k, of size n) */
 #define dyarr_insert(__da, __k, __n)  (trace_hint(), (__da)->ptr + _dyarr_insert(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, &(__da)->len, (__k), (__n)))
 /* doesn't check bounds, pointer to where the sub-array was */
-#define dyarr_remove(__da, __k, __n)  ((__da)->ptr + _dyarr_remove(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->len, (__k), (__n)))
+#define dyarr_remove(__da, __k, __n)  _dyarr_remove(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->len, (__k), (__n))
 
 static inline bool _dyarr_resize(void* ptr, size_t isz, size_t* cap, size_t rsz) {
     void* niw = realloc(*(void**)ptr, rsz * isz);
@@ -36,8 +36,8 @@ static inline size_t _dyarr_insert(void* ptr, size_t isz, size_t* cap, size_t* l
     return *len+n < *cap || _dyarr_resize(ptr, isz, cap, *len+n) ? memmove(*(char**)ptr+(k+n)*isz, *(char**)ptr+k*isz, (*len-k)*isz), *len+= n, k : -(size_t)*(char**)ptr;
 }
 
-static inline size_t _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n) {
-    return memmove(*(char**)ptr+k*isz, *(char**)ptr+(k+n)*isz, ((*len-= n)-k)*isz), k;
+static inline void _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n) {
+    memmove(*(char**)ptr+k*isz, *(char**)ptr+(k+n)*isz, ((*len-= n)-k)*isz);
 }
 
 #endif /* dyarr */

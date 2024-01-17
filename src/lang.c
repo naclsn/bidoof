@@ -424,10 +424,8 @@ static bool _update_free_lst(Obj* self) {
     if (!self->update) {
         for (sz k = 0; k < self->as.lst.len; k++) {
             Obj* it = self->as.lst.ptr[k];
-            if (!--it->keepalive) {
-                obj_destroy(it);
-                free(it);
-            }
+            it->keepalive--;
+            obj_may_destroy_free(it);
         }
         free(self->as.lst.ptr);
     }
@@ -495,7 +493,6 @@ static Obj* _parse_expr_math_1(Pars* self, Scope* scope) {
         Obj* r = calloc(1, sizeof(Obj));
         if (!r) fail("OOM");
 
-        dyarr_zero(&r->args);
         *dyarr_push(&r->args) = arg;
 
         if (!obj_call(f, r)) {
@@ -529,10 +526,9 @@ static Obj* _parse_expr_math_1(Pars* self, Scope* scope) {
         } else ff = scope_get(&exts_scope, mksym("At"));
         if (!tok_is("]", self->t)) fail("missing closing bracket");
 
-        rr = malloc(sizeof(Obj));
+        rr = calloc(1, sizeof(Obj));
         if (!rr) fail("OOM");
 
-        dyarr_zero(&rr->args);
         *dyarr_push(&rr->args) = r;
         *dyarr_push(&rr->args) = st;
         if (ed) *dyarr_push(&rr->args) = ed;
@@ -583,10 +579,9 @@ static Obj* _parse_expr_math_2(Pars* self, Scope* scope, Obj* lhs, Slice const o
     }
 
     Obj* f = _math_binary(op);
-    Obj* r = malloc(sizeof(Obj));
+    Obj* r = calloc(1, sizeof(Obj));
     if (!r) fail("OOM");
 
-    dyarr_zero(&r->args);
     *dyarr_push(&r->args) = lhs;
     *dyarr_push(&r->args) = rhs;
 
@@ -635,20 +630,15 @@ static Obj* _parse_expr_fun(Pars* self, Scope* scope, bool atomic) {
     r->args.cap = args.cap;
 
     if (!obj_call(f, r)) {
-        //obj_destroy(r); probly not, obj_call should make sure there is nothing to cleanup if it fails
         self->t = funct; // on function being called, for error message
         notify("could not call function");
         goto failed;
     }
 
-    // TODO: the result effectively depends on f (the function)
-    //       when you eventually come back to it, also do make argv a dyarr, thanks
     return r;
 
 failed:
-    for (size_t k = 0; k < args.len; k++) {
-        // XXX: free args.ptr[k]
-    }
+    for (size_t k = 0; k < args.len; k++) obj_may_destroy_free(args.ptr[k]);
     free(args.ptr);
     free(r);
     return NULL;
@@ -673,6 +663,7 @@ static Obj* _parse_expr_sub(Pars* self, Scope* scope) {
     if (!r) fail("in parenthesised expression");
 
     if (!tok_is(")", self->t)) {
+        obj_may_destroy_free(r);
         self->t = open; // on matching openning, for error message
         fail("missing closing parenthesis");
     }
@@ -889,7 +880,7 @@ static Obj* _parse_expr_lst(Pars* self, Scope* scope) {
         // TODO: change to the list being a proper depnt
         // which means that when an item gets updated,
         // the whole list does too
-        (*item)->keepalive++;
+        //(*item)->keepalive++;
     } while (tok_is(",", self->t));
 
     if (!tok_is("}", self->t)) {
@@ -907,9 +898,7 @@ static Obj* _parse_expr_lst(Pars* self, Scope* scope) {
     return r;
 
 failed:
-    for (size_t k = 0; k < items.len; k++) {
-        // XXX: free items.ptr[k]
-    }
+    for (size_t k = 0; k < items.len; k++) obj_may_destroy_free(items.ptr[k]);
     free(items.ptr);
     free(r);
     return NULL;
@@ -980,9 +969,7 @@ static Obj* _parse_expr(Pars* self, Scope* scope, bool atomic) {
         // this causes a double test :/
         ASSERT_REACH(ar_parse_expr_unnamed_restored, pr == self->unnamed);
         #define ar_parse_expr_unnamed_restored Pars p = {.s= "Fn1 a, Fn2 _ c, Fn1 _"}; _lex(&p); _parse_expr(&p, NULL, false);
-        if (!self->unnamed_used) {
-            // XXX: free self->unnamed
-        }
+        if (!self->unnamed_used) obj_may_destroy_free(self->unnamed);
 
         self->unnamed = punnamed;
         self->unnamed_used = punnamed_used;
@@ -1005,7 +992,7 @@ static bool _parse_script(Pars* self, Scope* scope) {
 
         Sym const key = slice2sym(name);
         if (!scope_put(scope, key, value)) {
-            // XXX: free value
+            obj_may_destroy_free(value);
             fail("OOM");
         }
 

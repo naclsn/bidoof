@@ -59,15 +59,12 @@ void obj_show(Obj const* self, int indent) {
 
 void obj_show_depnts(Obj const* self, int curdepth) {
     printf("(%p) keepalive %d", (void*)self, self->keepalive);
-    struct Depnt* cur = self->depnts;
 
-    if (!cur)
-        printf(", no depnts");
-    else do {
+    if (!self->depnts.len) printf(", no depnts");
+    else for (sz k = 0; k < self->depnts.len; k++) {
         printf("\n%*.s-> ", (curdepth < 0 ? 1 : curdepth+1)*3, "");
-        if (0 <= curdepth) obj_show_depnts(cur->obj, curdepth+1);
-        cur = cur->next;
-    } while (cur);
+        if (0 <= curdepth) obj_show_depnts(self->depnts.ptr[k], curdepth+1);
+    }
 
     if (curdepth < 1) printf("\n");
 }
@@ -75,50 +72,25 @@ void obj_show_depnts(Obj const* self, int curdepth) {
 bool obj_call(Obj* self, Obj* res) {
     if (!self->as.fun.call(self, res)) return false;
 
-    for (sz k = 0; k < res->args.len; k++) {
+    sz k = 0;
+    for (; k < res->args.len; k++) {
         Obj* on = res->args.ptr[k];
 
-        struct Depnt* tail = malloc(sizeof *tail);
-        if (!tail) {
-            for (; 0 < k; k--) obj_remdep(res, res->args.ptr[k-1]);
-            return false;
-        }
-
-        tail->obj = res;
-        tail->next = NULL;
-
-        if (!on->depnts)
-            on->depnts = tail;
-        else {
-            struct Depnt* cur = on->depnts;
-            while (cur->next) cur = cur->next;
-            cur->next = tail;
-        }
+        Obj** p = dyarr_push(&on->depnts);
+        if (!p) goto failed;
+        *p = res;
 
         on->keepalive++;
     }
+    // TODO: the result effectively depends on f (the function)
 
-    if (res->update && !res->update(res)) {
-        obj_destroy(res);
-        return false;
-    }
+    if (!res->update || res->update(res)) return true;
 
-    return true;
-}
-
-bool obj_remdep(Obj* self, Obj* dep) {
-    struct Depnt* prev = dep->depnts;
-    for (struct Depnt* cur = prev; cur; prev = cur, cur = cur->next) {
-        if (self == cur->obj) {
-            if (prev == cur)
-                dep->depnts = cur->next;
-            else
-                prev->next = cur->next;
-            free(cur);
-
-            dep->keepalive--;
-            return true;
-        }
+failed:
+    for (; 0 < k; k--) {
+        Obj* on = res->args.ptr[k-1];
+        on->depnts.len--;
+        on->keepalive--;
     }
     return false;
 }
@@ -134,15 +106,25 @@ void obj_destroy(Obj* self) {
     // then delete dep if it has no depnts anymore
     for (sz k = 0; k < self->args.len; k++) {
         Obj* dep = self->args.ptr[k];
-        if (obj_remdep(self, dep) && 0 == dep->keepalive) {
-            obj_destroy(dep);
-            free(dep);
+
+        for (sz k = 0; k < dep->depnts.len; k++) if (self == dep->depnts.ptr[k]) {
+            dyarr_remove(&dep->depnts, k, 1);
+            dep->keepalive--;
+            obj_may_destroy_free(dep);
+            break;
         }
     }
 
-    memset(&self->as, 0, sizeof self->as);
+    self->as = (union As){0};
 }
 
+void obj_may_destroy_free(Obj* self) {
+    if (!self || self->keepalive) return;
+    obj_destroy(self);
+    free(self);
+}
+
+/*
 static u16 _static_curr_cycle = 0;
 bool _update_depnts(Obj* self) {
     u32 needs_up = 0;
@@ -175,6 +157,7 @@ bool obj_update(Obj* self) {
     self->cycle = _static_curr_cycle;
     return _update_depnts(self);
 }
+*/
 
 #ifdef TRACE_ALLOCS
 #undef malloc
