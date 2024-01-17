@@ -78,10 +78,10 @@ typedef struct Pars {
     return 0;             \
 } while (1)
 
-// TODO: maybe change it for void
-static bool _lex(Pars* self) {
+static void _lex(Pars* self) {
 #   define AT              (self->s + self->i)
 #   define IN(__lo, __hi)  (__lo <= c && c <= __hi)
+#   define lex_fail(__msg) do { notify(__msg); goto failed; } while (1)
     char c;
     while (' ' == (c = *AT)
             || '\t' == c
@@ -91,7 +91,8 @@ static bool _lex(Pars* self) {
 
     if ('#' == c) {
         while ('\n' != *AT) self->i++;
-        return _lex(self);
+        _lex(self);
+        return;
     }
 
     self->t.ptr = AT;
@@ -114,7 +115,7 @@ static bool _lex(Pars* self) {
         case ',': case ';':
             self->t.len++;
             self->i++;
-            return true;
+            return;
 
         case '<': case '>':
         case '!':
@@ -137,40 +138,40 @@ static bool _lex(Pars* self) {
         case '~':
             self->t.len++;
             self->i++;
-            return true;
+            return;
 
         case '"': {
             char const* end = AT+1;
             while (*end && '"' != *end) if ('\\' == *(end++)) end++;
-            if (!*end) fail("missing closing double quote");
+            if (!*end) lex_fail("missing closing double quote");
             self->t.len = end+1 - AT;
             self->i+= self->t.len;
-        } return true;
+        } return;
 
         case '\'': {
             char const* end = AT;
             do end = strchr(end+1, '\'');
             while (end && '\\' == end[-1]);
-            if (!end) fail("missing closing simple quote");
+            if (!end) lex_fail("missing closing simple quote");
             self->t.len = end+1 - AT;
             self->i+= self->t.len;
-        } return true;
+        } return;
 
         case ':':
             do c = self->s[++self->t.len, ++self->i];
             while ('_' == c || IN('0', '9') || IN('A', 'Z') || IN('a', 'z'));
-            if (1 == self->t.len) fail("expected symbol name");
-            return true;
+            if (1 == self->t.len) lex_fail("expected symbol name");
+            return;
 
         case '\0':
-            return true;
+            return;
 
         case '-':
             self->t.len++;
             self->i++;
             c = *AT;
-            if ('.' == c) fail("expected digits");
-            if (!IN('0', '9')) return true;
+            if ('.' == c) lex_fail("expected digits");
+            if (!IN('0', '9')) return;
             // fall through
         case '0':
             if ('0' == c) {
@@ -182,8 +183,8 @@ static bool _lex(Pars* self) {
                     case 'x': base = 16; c = self->s[++self->t.len, ++self->i]; break;
                     default:
                         if ('.' == c || '_' == c || IN('0', '9')) { digits++; break; }
-                        if (IN('A', 'Z') || IN('a', 'z')) fail("expected digits or spacing");
-                        return true;
+                        if (IN('A', 'Z') || IN('a', 'z')) lex_fail("expected digits or spacing");
+                        return;
                 }
             }
             // fall through
@@ -201,29 +202,29 @@ static bool _lex(Pars* self) {
                 }
                 if (10 == base && '.' == c) {
                     unsigned ddigits = 0;
-                    if ('.' == AT[0] && '.' == AT[1]) return true; // eg. `[0..]`
+                    if ('.' == AT[0] && '.' == AT[1]) return; // eg. `[0..]`
                     do {
                         c = self->s[++self->t.len, ++self->i];
                         is_digit = IN('0', '9');
                         ddigits+= is_digit;
                     } while ('_' == c || is_digit);
-                    if (!ddigits) fail("expected decimal digits");
+                    if (!ddigits) lex_fail("expected decimal digits");
                 }
-                if (!digits) fail("expected digits");
+                if (!digits) lex_fail("expected digits");
                 // better report as syntax error, ~~even tho~~
                 // **because** it could be valid
-                if (IN('2', '9') || IN('A', 'Z') || IN('a', 'z')) fail("unexpected characters");
-                return true;
+                if (IN('2', '9') || IN('A', 'Z') || IN('a', 'z')) lex_fail("unexpected characters");
+                return;
             }
             if (IN('A', 'Z')) {
                 do c = self->s[++self->t.len, ++self->i];
                 while (IN('0', '9') || IN('A', 'Z') || IN('a', 'z'));
-                return true;
+                return;
             }
             if ('_' == c || IN('a', 'z')) {
                 do c = self->s[++self->t.len, ++self->i];
                 while ('_' == c || IN('0', '9') || IN('a', 'z'));
-                return true;
+                return;
             }
     } // switch c
 
@@ -236,8 +237,15 @@ static bool _lex(Pars* self) {
         msg[24] = (9 < lo ? 'A'-10 : '0') + lo;
         if (' ' < c && c <= '~') msg[27] = c;
         else msg[25] = '\0';
-        fail(msg);
+        lex_fail(msg);
     }
+
+failed:
+    self->t.ptr = AT;
+    self->t.len = 0;
+    return;
+
+#   undef lex_fail
 #   undef IN
 #   undef AT
 }
@@ -252,7 +260,7 @@ static inline bool ar_lex_tokens_fn(void) {
     };
     char s[256] = {0};
 
-    if (0 /* generate */) while (_lex(&p) && p.t.len) {
+    if (0 /* generate */) while (_lex(&p), p.t.len) {
         char* h = s;
         for (size_t k = 0; k < p.t.len; k++) switch (p.t.ptr[k]) {
             case '\n': *h++ = '\\'; *h++ = 'n'; break;
@@ -478,13 +486,13 @@ short _precedence(Slice const op) {
 
 static Obj* _parse_expr_math_1(Pars* self, Scope* scope) {
     if (tok_is_unop(self->t)) {
-        if (!_lex(self)) fail("expected operand for unary operator");
-
         Obj* f = _math_unary(self->t);
+
+        _lex(self);
         Obj* arg = _parse_expr_math_1(self, scope);
         if (!arg) fail("in operand for unary operator");
 
-        Obj* r = malloc(sizeof(Obj));
+        Obj* r = calloc(1, sizeof(Obj));
         if (!r) fail("OOM");
 
         dyarr_zero(&r->args);
@@ -1013,7 +1021,7 @@ static bool _parse_script(Pars* self, Scope* scope) {
 bool lang_process(char const* name, char const* script, Scope* scope) {
     Pars p = {.n= name, .s= script, .i= 0};
 
-    if (_lex(&p) && _parse_script(&p, scope)) return true;
+    if (_lex(&p), _parse_script(&p, scope)) return true;
 
     _print_location(&p, "ERROR");
     return false;
@@ -1021,7 +1029,7 @@ bool lang_process(char const* name, char const* script, Scope* scope) {
 
 void lang_show_tokens(char const* name, char const* script) {
     Pars p = {.n= name, .s= script, .i= 0};
-    while (_lex(&p) && !tok_is("", p.t)) {
+    while (_lex(&p), !tok_is("", p.t)) {
         char m[21+p.t.len];
         sprintf(m, "token <<%.*s>> (a %s)",
                 (int)p.t.len, p.t.ptr,
