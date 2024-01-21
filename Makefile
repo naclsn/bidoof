@@ -1,38 +1,10 @@
-CFLAGS += -std=c99 -Wall -Wextra -Wpedantic -Werror #-Wfatal-errors
-OUT ?= build
-NAME ?= bidoof
-EXTS ?= archives builtin encodings views
+CFLAGS += -std=c99 -Wall -Wextra -Wpedantic -Werror -Wno-unused-function -Wno-unused-variable #-Wfatal-errors
 
-ifeq ($(OS), Windows_NT)
-  as-exe = $(1).exe
-  as-lib = $(1).dll
-  MD ?= mkdir -p #md
-  views-LDFLAGS = -pthread -lopengl32 -lgdi32
-else
-  as-exe = $(1)
-  as-lib = lib$(1).so
-  MD ?= mkdir -p
-  views-LDFLAGS = -pthread -lGL -lX11
-endif
-as-test = $(call as-exe,$(OUT)/test-$(1))
+builddir = build
+toolnames = archives encodings images
 
-all: $(OUT) $(foreach ext,$(EXTS),$(OUT)/$(call as-lib,$(ext))) $(OUT)/$(call as-exe,$(NAME))
-test: $(call as-test,lang)
+toolobjs = $(foreach t,$(toolnames),$(builddir)/t-$(t).o)
+all: $(toolobjs)
 
-$(OUT):
-	$(MD) '$(OUT)'
-
-$(OUT)/$(call as-exe,$(NAME)): src/*.[ch]
-	$(CC) $(filter %.c,$^) -o '$@' -DEXTS_NAMES='$(foreach ext,$(EXTS),"$(call as-lib,$(ext))",)' $(CFLAGS)
-
-$(OUT)/$(call as-lib,%): ext/%.c src/helper.h src/base.[ch]
-	$(CC) $(filter %.c,$^) -o '$@' -fPIC -shared $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
-
-$(OUT)/$(call as-exe,test-%): src/%.c
-	$(CC) $(filter %.c,$^) -o '$@' -DASR_TEST_BUILD
-	'$@'
-
-wip/%: wip/%.c
-	$(MD) '$(OUT)/wip'
-	$(CC) $^ -o '$(OUT)/$@' $(CFLAGS) $(LDFLAGS)
-	'$(OUT)/$@' $(ARGS)
+$(builddir)/t-%.o: bidoof/tools/%.h bidoof/*.h; $(CC) -x c -c $< -o $@ $(CFLAGS) -DBDF_IMPLEMENTATION
+$(builddir)/%: %.c all; $(CC) $< $(toolobjs) -o $@ $(CFLAGS)
