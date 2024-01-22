@@ -1,4 +1,4 @@
-CFLAGS += -std=c99 -Wall -Wextra -Wpedantic -Werror -Wno-unused-function -Wno-unused-variable #-Wfatal-errors
+CFLAGS += -ggdb -std=c99 -Wall -Wextra -Wpedantic -Werror -Wno-unused-function -Wno-unused-variable #-Wfatal-errors
 
 builddir = build
 toolnames = archives encodings images

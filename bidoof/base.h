@@ -33,8 +33,7 @@ typedef dyarr(u8) buf;
 
 #define ref * const
 #define cref const ref
-#define track(__vname, __free) __vname = {0}; trackadd(&__vname, (void(*)(void cref))__free); __vname
-#define atrack(__tname, __vname) __tname track(__vname, __tname##_free)
+#define let(__tname, __vname) __tname* __vname = calloc(1, sizeof *__vname); trackadd(__vname, (void(*)(void cref))__tname##_free); *__vname
 
 struct trackent {
     void const* self;
@@ -45,20 +44,23 @@ static inline void trackadd(void cref self, void (*free)(void cref)) {
     *dyarr_push(&tracked) = (struct trackent){self, free};
 }
 static void cleanup(void) {
-    for (sz k = 0; k < tracked.len; k++)
+    for (sz k = 0; k < tracked.len; k++) {
         tracked.ptr[k].free(tracked.ptr[k].self);
+        free((void*)tracked.ptr[k].self);
+    }
     dyarr_clear(&tracked);
 }
 
 #define _HERE_STR(__ln) #__ln
 #define _HERE_XSTR(__ln) _HERE_STR(__ln)
 #define HERE __FILE__ ":" _HERE_XSTR(__LINE__)
-#define exitf(...) (printf(HERE ": " __VA_ARGS__), putchar(10), exit(1))
+#define exitf(...) (printf(HERE ": " __VA_ARGS__), putchar('\n'), exit(1))
 
 #define adapt_bipa_type(__tname)                            \
     typedef struct __tname __tname;                         \
     static inline void __tname##_dump(__tname cref self) {  \
         bipa_dump_##__tname(self, stdout, 0);               \
+        putchar('\n');                                      \
     }                                                       \
     static inline buf __tname##_build(__tname cref self) {  \
         buf r = {0};                                        \
@@ -77,10 +79,22 @@ static void cleanup(void) {
         bipa_free_##__tname(self);                          \
     }
 
-static void xxd(buf const b) {
-    for (sz k = 0; k < b.len; k++) {
-        if (k && !(k & 0xf)) printf("\n");
-        printf("%02X ", b.ptr[k]);
+static void xxd(buf cref b) {
+    if (0 == b->len) return;
+    for (sz j = 0; j < (b->len-1)/16+1; j++) {
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (b->len < k) printf("   ");
+            else printf("%02X ", b->ptr[k]);
+        }
+        printf("       ");
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (b->len < k) break;
+            char const it = b->ptr[i+16*j];
+            printf("%c", ' ' <= it && it <= '~' ? it : '.');
+        }
+        printf("\n");
     }
 }
 
@@ -90,7 +104,14 @@ static void buf_free(buf cref self) {
     free(self->ptr);
 }
 
-static void bcat(buf ref to, buf cref other) {
+static buf bufcpy(u8 cref ptr, sz const len) {
+    buf r = {.ptr= malloc(len), .len= len, .cap= len};
+    if (!r.ptr) exitf("OOM");
+    memcpy(r.ptr, ptr, len);
+    return r;
+}
+
+static void bufcat(buf ref to, buf cref other) {
     u8* dest = dyarr_insert(to, to->len, other->len);
     if (!dest) exitf("OOM");
     memcpy(dest, other->ptr, other->len);
@@ -110,19 +131,26 @@ static void bcat(buf ref to, buf cref other) {
 
 static buf file_read(buf cref path) {
     buf r = {0};
-    FILE* f = fopen((char*)path->ptr, "rb");
+    char local[path->len+1];
+    memcpy(local, path->ptr, path->len);
+    local[path->len] = '\0';
+    FILE* f = fopen(local, "rb");
     if (!f) exitf("could not open file %.*s", bfmt(path));
     if (0 != fseek(f, 0, SEEK_END)) exitf("could not read file %.*s", bfmt(path));
     r.len = ftell(f);
     r.ptr = malloc(r.len);
     if (!r.ptr) exitf("OOM");
+    fseek(f, 0, SEEK_SET);
     fread(r.ptr, 1, r.len, f);
     fclose(f);
     return r;
 }
 
 static void file_write(buf cref b, buf cref path) {
-    FILE* f = fopen((char*)path->ptr, "wb");
+    char local[path->len+1];
+    memcpy(local, path->ptr, path->len);
+    local[path->len] = '\0';
+    FILE* f = fopen(local, "wb");
     if (!f) exitf("could not open file %.*s", bfmt(path));
     fwrite(b->ptr, 1, b->len, f);
     fclose(f);

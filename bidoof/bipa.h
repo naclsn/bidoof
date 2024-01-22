@@ -91,6 +91,29 @@
 #define _hidump_id(__c) __c
 #endif
 
+// :-(
+static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declonly({
+    if (0 == len) return;
+    sz const top = (len-1)/16+1;
+    for (sz j = 0; j < top; j++) {
+        fprintf(strm, "\n%*.s", (depth+2)*2-1, "");
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (len <= k) {
+                if (len < 16) break;
+                fprintf(strm, "   ");
+            } else fprintf(strm, " " _hidump_st("%02X"), ptr[k]);
+        }
+        fprintf(strm, "    ");
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (len <= k) break;
+            char const it = ptr[i+16*j];
+            fprintf(strm, _hidump_st("%c"), ' ' <= it && it <= '~' ? it : '.');
+        }
+    }
+})
+
 #define _JOIN(__l, __r) __l##__r
 #define _XJOIN(__l, __r) _JOIN(__l, __r)
 
@@ -262,10 +285,7 @@
         for (sz k = 0; s != (*it)[k]; k++) len++;                        \
         fprintf(strm, _hidump_kw("cstr")                                 \
                 "(" _hidump_nb("%zu") _hidump_ex("+1") ")", len);        \
-        for (sz k = 0; k < len; k++) {                                   \
-            if (!(k & 0xf)) fprintf(strm, "\n%*.s", (depth+2)*2-1, "");  \
-            fprintf(strm, " " _hidump_st("%02X"), (*it)[k]);             \
-        }                                                                \
+        bipa_xxd(strm, *it, len, depth);                                 \
         if (!(len & 0xf)) fprintf(strm, "\n%*.s", (depth+2)*2-1, "");    \
         fprintf(strm, _hidump_ex(" %02X"), s);                           \
     }
@@ -295,10 +315,7 @@
 #define _dump_lstr(__length) {                                             \
         sz len = (__length);                                               \
         fprintf(strm, _hidump_kw("lstr") "(" _hidump_nb("%zu") ")", len);  \
-        for (sz k = 0; k < len; k++) {                                     \
-            if (!(k & 0xf)) fprintf(strm, "\n%*.s", (depth+2)*2-1, "");    \
-            fprintf(strm, " " _hidump_st("%02X"), (*it)[k]);               \
-        }                                                                  \
+        bipa_xxd(strm, *it, len, depth);                                   \
     }
 #define _build_lstr(__length) {                              \
         sz len = (__length);                                 \
