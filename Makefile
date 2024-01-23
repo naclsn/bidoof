@@ -1,7 +1,7 @@
 CFLAGS += -ggdb -std=c99 -Wall -Wextra -Wpedantic -Werror -Wno-unused-function -Wno-unused-variable #-Wfatal-errors
 
 builddir = build
-toolnames = archives encodings images
+toolnames = archives crcs encodings images
 
 toolobjs = $(foreach t,$(toolnames),$(builddir)/t-$(t).o)
 all: $(toolobjs)

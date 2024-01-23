@@ -114,10 +114,10 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
     }
 })
 
+#define _STR(__ln) #__ln
+#define _XSTR(__ln) _HERE_STR(__ln)
 #define _JOIN(__l, __r) __l##__r
 #define _XJOIN(__l, __r) _JOIN(__l, __r)
-
-//#define _UNPACK(...) __VA_ARGS__
 #define _CALL(__macro, ...) __macro(__VA_ARGS__)
 
 #define  _FOR_TYNM_1(__n, __macro, __inv, __ty, __nm)       __macro((__n- 1), __n, __inv, __ty, __nm)
@@ -399,21 +399,21 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _union_kinds_typename_one(__k, __n, __inv, __ty, __nm) _typename __ty _union_getvar_name __nm;
 #define _union_kinds_tagname_one(__k, __n, __tname, __ty, __nm) _XJOIN(__tname##_tag_, _union_getvar_name __nm) = __k,
 
-#define _union_kinds_dump_one(__k, __n, __tname, __ty, __nm)  \
-    case _XJOIN(__tname##_tag_, _union_getvar_name __nm): {   \
-        fprintf(strm, "|");                                   \
-        {                                                     \
-            _XJOIN(_typename_, _union_getvar_tagtype __nm)()  \
-                const _it = _union_getvar_tagvalue __nm,      \
-                * const it = &_it;                            \
-            _XJOIN(_dump_, _union_getvar_tagtype __nm)()      \
-        }                                                     \
-        fprintf(strm, "| ");                                  \
-        {                                                     \
-            _typename __ty const* const it =                  \
-                &self->val._union_getvar_name __nm;           \
-            _dump __ty                                        \
-        }                                                     \
+#define _union_kinds_dump_one(__k, __n, __tname, __ty, __nm)     \
+    case _XJOIN(__tname##_tag_, _union_getvar_name __nm): {      \
+        fprintf(strm, "|");                                      \
+        {                                                        \
+            _XJOIN(_typename_, _union_getvar_tagtype __nm)()     \
+                const _it = _union_getvar_tagvalue __nm,         \
+                * const it = &_it;                               \
+            _XJOIN(_dump_, _union_getvar_tagtype __nm)()         \
+        }                                                        \
+        fprintf(strm, "." _XSTR(_union_getvar_name __nm) "| ");  \
+        {                                                        \
+            _typename __ty const* const it =                     \
+                &self->val._union_getvar_name __nm;              \
+            _dump __ty                                           \
+        }                                                        \
     } break;
 
 #define _union_kinds_build_one(__k, __n, __tname, __ty, __nm)  \

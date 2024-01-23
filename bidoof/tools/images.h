@@ -13,14 +13,27 @@ bipa_union(png_chunk_type, 3
         , (struct, png_chunk_type_other), (void, 0, other)
         )
 
+bipa_union(color_type, 5
+        , (void,), (u8, 0, grayscale)
+        , (void,), (u8, 2, truecolor)
+        , (void,), (u8, 3, indexed_color)
+        , (void,), (u8, 4, grauscale_with_alpha)
+        , (void,), (u8, 6, truecolor_with_alpha)
+        )
+bipa_union(compression_method, 1, (void,), (u8, 0, deflate))
+bipa_union(filter_method, 1, (void,), (u8, 0, method_0))
+bipa_union(interlace_method, 2
+        , (void,), (u8, 0, no_interlacing)
+        , (void,), (u8, 1, adam_7)
+        )
 bipa_struct(png_chunk_header, 7
         , (u32be,), width
         , (u32be,), height
         , (u8,), bit_depth
-        , (u8,), color_type
-        , (u8,), compression_method
-        , (u8,), filter_method
-        , (u8,), interlace_method
+        , (union, color_type), color_type
+        , (union, compression_method), compression_method
+        , (union, filter_method), filter_method
+        , (union, interlace_method), interlace_method
         )
 
 bipa_struct(png_chunk, 4

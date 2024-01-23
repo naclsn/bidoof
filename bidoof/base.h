@@ -33,7 +33,7 @@ typedef dyarr(u8) buf;
 
 #define ref * const
 #define cref const ref
-#define let(__tname, __vname) __tname* __vname = calloc(1, sizeof *__vname); trackadd(__vname, (void(*)(void cref))__tname##_free); *__vname
+#define let(__tname, __vname) __tname __vname = {0}; trackadd(&__vname, (void(*)(void cref))__tname##_free); __vname
 
 struct trackent {
     void const* self;
@@ -44,10 +44,8 @@ static inline void trackadd(void cref self, void (*free)(void cref)) {
     *dyarr_push(&tracked) = (struct trackent){self, free};
 }
 static void cleanup(void) {
-    for (sz k = 0; k < tracked.len; k++) {
+    for (sz k = 0; k < tracked.len; k++)
         tracked.ptr[k].free(tracked.ptr[k].self);
-        free((void*)tracked.ptr[k].self);
-    }
     dyarr_clear(&tracked);
 }
 
@@ -55,6 +53,15 @@ static void cleanup(void) {
 #define _HERE_XSTR(__ln) _HERE_STR(__ln)
 #define HERE __FILE__ ":" _HERE_XSTR(__LINE__)
 #define exitf(...) (printf(HERE ": " __VA_ARGS__), putchar('\n'), exit(1))
+
+#define swapn(__x, __y, __sz) do {  \
+    sz _sz = __sz;                  \
+    u8 tmp[__sz];                   \
+    memcpy(tmp, &(__y), _sz);       \
+    memcpy(&(__y), &(__x),  _sz);   \
+    memcpy(&(__x), tmp, _sz);       \
+} while (0)
+#define swap(__x, __y) swapn((__x), (__y), sizeof(__x))
 
 #define adapt_bipa_type(__tname)                            \
     typedef struct __tname __tname;                         \
@@ -115,6 +122,90 @@ static void bufcat(buf ref to, buf cref other) {
     u8* dest = dyarr_insert(to, to->len, other->len);
     if (!dest) exitf("OOM");
     memcpy(dest, other->ptr, other->len);
+}
+
+static u16 peek16le(buf cref b, sz const k) {
+    return (u16)b->ptr[k]
+         | (u16)b->ptr[k+1]<<8;
+}
+static u32 peek32le(buf cref b, sz const k) {
+    return (u32)b->ptr[k]
+         | (u32)b->ptr[k+1]<<8
+         | (u32)b->ptr[k+2]<<16
+         | (u32)b->ptr[k+3]<<24;
+}
+static u64 peek64le(buf cref b, sz const k) {
+    return (u64)b->ptr[k]
+         | (u64)b->ptr[k+1]<<8
+         | (u64)b->ptr[k+2]<<16
+         | (u64)b->ptr[k+3]<<24
+         | (u64)b->ptr[k+4]<<32
+         | (u64)b->ptr[k+5]<<40
+         | (u64)b->ptr[k+6]<<48
+         | (u64)b->ptr[k+7]<<56;
+}
+
+static void poke16le(buf ref b, sz const k, u16 const v) {
+    b->ptr[k] = v&0xff;
+    b->ptr[k+1] = (v>>8)&0xff;
+}
+static void poke32le(buf ref b, sz const k, u32 const v) {
+    b->ptr[k] = v&0xff;
+    b->ptr[k+1] = (v>>8)&0xff;
+    b->ptr[k+2] = (v>>16)&0xff;
+    b->ptr[k+3] = (v>>24)&0xff;
+}
+static void poke64le(buf ref b, sz const k, u64 const v) {
+    b->ptr[k] = v&0xff;
+    b->ptr[k+1] = (v>>8)&0xff;
+    b->ptr[k+2] = (v>>16)&0xff;
+    b->ptr[k+3] = (v>>24)&0xff;
+    b->ptr[k+4] = (v>>32)&0xff;
+    b->ptr[k+5] = (v>>40)&0xff;
+    b->ptr[k+6] = (v>>48)&0xff;
+    b->ptr[k+7] = (v>>56)&0xff;
+}
+
+static u16 peek16be(buf cref b, sz const k) {
+    return (u16)b->ptr[k]<<8
+         | (u16)b->ptr[k+1];
+}
+static u32 peek32be(buf cref b, sz const k) {
+    return (u32)b->ptr[k]<<24
+         | (u32)b->ptr[k+1]<<16
+         | (u32)b->ptr[k+2]<<8
+         | (u32)b->ptr[k+3];
+}
+static u64 peek64be(buf cref b, sz const k) {
+    return (u64)b->ptr[k]<<56
+         | (u64)b->ptr[k+1]<<48
+         | (u64)b->ptr[k+2]<<40
+         | (u64)b->ptr[k+3]<<32
+         | (u64)b->ptr[k+4]<<24
+         | (u64)b->ptr[k+5]<<16
+         | (u64)b->ptr[k+6]<<8
+         | (u64)b->ptr[k+7];
+}
+
+static void poke16be(buf ref b, sz const k, u16 const v) {
+    b->ptr[k] = (v>>8)&0xff;
+    b->ptr[k+1] = v&0xff;
+}
+static void poke32be(buf ref b, sz const k, u32 const v) {
+    b->ptr[k] = (v>>24)&0xff;
+    b->ptr[k+1] = (v>>16)&0xff;
+    b->ptr[k+2] = (v>>8)&0xff;
+    b->ptr[k+3] = v&0xff;
+}
+static void poke64be(buf ref b, sz const k, u64 const v) {
+    b->ptr[k] = (v>>56)&0xff;
+    b->ptr[k+1] = (v>>48)&0xff;
+    b->ptr[k+2] = (v>>40)&0xff;
+    b->ptr[k+3] = (v>>32)&0xff;
+    b->ptr[k+4] = (v>>24)&0xff;
+    b->ptr[k+5] = (v>>16)&0xff;
+    b->ptr[k+6] = (v>>8)&0xff;
+    b->ptr[k+7] = v&0xff;
 }
 
 #define with_buf_as_stream(__buf, __name, ...) do {         \
