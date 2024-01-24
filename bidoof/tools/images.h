@@ -52,17 +52,13 @@ bipa_struct(png_data, 2
 
 // https://www.w3.org/TR/2003/REC-PNG-20031110/
 adapt_bipa_type(png_data)
-buf png_data_get(png_data cref png, int const tag);
-adapt_bipa_type(png_chunk_header)
 
-#ifdef BDF_IMPLEMENTATION
-
-buf png_data_get(png_data cref png, int const tag) {
+buf png_data_get(png_data cref png, int const tag) _bdf_impl({
     for (sz k = 0; k < png->chunks.len; k++)
         if (tag == (int)png->chunks.ptr[k].type.tag)
             return bufcpy(png->chunks.ptr[k].data, png->chunks.ptr[k].length);
     exitf("no chunk in png_data for given tag %d", tag);
     return (buf){0};
-}
+})
 
-#endif // BDF_IMPLEMENTATION
+adapt_bipa_type(png_chunk_header)

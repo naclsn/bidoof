@@ -106,16 +106,11 @@ bipa_struct(zip_data, 3
         , (struct, end_of_central_directory_record), end_of_central_directory_record
         )
 
-/// https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+// https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 adapt_bipa_type(zip_data)
-buf zip_data_find_by_path(zip_data cref zip, buf cref path);
 
-#ifdef BDF_IMPLEMENTATION
-
-buf zip_data_find_by_path(zip_data cref zip, buf cref path) {
+buf zip_data_find_by_path(zip_data cref zip, buf cref path) _bdf_impl({
     (void)zip;
     (void)path;
     return (buf){0};
-}
-
-#endif // BDF_IMPLEMENTATION
+})

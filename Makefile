@@ -1,10 +1,11 @@
 CFLAGS += -ggdb -std=c99 -Wall -Wextra -Wpedantic -Werror -Wno-unused-function -Wno-unused-variable #-Wfatal-errors
 
 builddir = build
-toolnames = archives crcs encodings images
+toolnames = archives crcs encodings encryptions images
 
 toolobjs = $(foreach t,$(toolnames),$(builddir)/t-$(t).o)
-all: $(toolobjs)
+all: $(builddir)/bdf-base.o $(toolobjs)
 
-$(builddir)/t-%.o: bidoof/tools/%.h bidoof/*.h; $(CC) -x c -c $< -o $@ $(CFLAGS) -DBDF_IMPLEMENTATION
-$(builddir)/%: %.c all; $(CC) $< $(toolobjs) -o $@ $(CFLAGS)
+$(builddir)/bdf-base.o: bidoof/base.h bidoof/*.h; $(CC) -x c -c $< -o $@ -DBDF_BASE_IMPLEMENTATION $(CFLAGS)
+$(builddir)/t-%.o: bidoof/tools/%.h bidoof/*.h; $(CC) -x c -c $< -o $@ -DBDF_IMPLEMENTATION $(CFLAGS)
+$(builddir)/%: %.c all; $(CC) $< $(builddir)/bdf-base.o $(toolobjs) -o $@ $(CFLAGS)

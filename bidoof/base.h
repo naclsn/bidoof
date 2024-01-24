@@ -1,11 +1,11 @@
 #ifndef __BIDOOF_H__
 #define __BIDOOF_H__
 
-///#if 1//def BIDOOF_IMPLEMENTATION
-///#define _bidoof_impl(...) __VA_ARGS__
-///#else
-///#define _bidoof_impl(...) ;
-///#endif
+#ifdef BDF_BASE_IMPLEMENTATION
+#define _bdf_impl(...) __VA_ARGS__
+#else
+#define _bdf_impl(...) ;
+#endif
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -39,15 +39,19 @@ struct trackent {
     void const* self;
     void (*free)(void cref);
 };
-static dyarr(struct trackent) tracked = {0};
-static inline void trackadd(void cref self, void (*free)(void cref)) {
+#ifdef BDF_BASE_IMPLEMENTATION
+dyarr(struct trackent) tracked = {0};
+#else
+extern dyarr(struct trackent) tracked;
+#endif
+void trackadd(void cref self, void (*free)(void cref)) _bdf_impl({
     *dyarr_push(&tracked) = (struct trackent){self, free};
-}
-static void cleanup(void) {
+})
+void cleanup(void) _bdf_impl({
     for (sz k = 0; k < tracked.len; k++)
         tracked.ptr[k].free(tracked.ptr[k].self);
     dyarr_clear(&tracked);
-}
+})
 
 #define _HERE_STR(__ln) #__ln
 #define _HERE_XSTR(__ln) _HERE_STR(__ln)
@@ -63,30 +67,39 @@ static void cleanup(void) {
 } while (0)
 #define swap(__x, __y) swapn((__x), (__y), sizeof(__x))
 
-#define adapt_bipa_type(__tname)                            \
-    typedef struct __tname __tname;                         \
-    static inline void __tname##_dump(__tname cref self) {  \
-        bipa_dump_##__tname(self, stdout, 0);               \
-        putchar('\n');                                      \
-    }                                                       \
-    static inline buf __tname##_build(__tname cref self) {  \
-        buf r = {0};                                        \
-        if (!bipa_build_##__tname(self, &r))                \
-            exitf("could not build a " #__tname);           \
-        return r;                                           \
-    }                                                       \
-    static inline __tname __tname##_parse(buf cref buf) {   \
-        struct __tname r;                                   \
-        sz at = 0;                                          \
-        if (!bipa_parse_##__tname(&r, buf, &at))            \
-            exitf("could not parse a " #__tname);           \
-        return r;                                           \
-    }                                                       \
-    static inline void __tname##_free(__tname cref self) {  \
-        bipa_free_##__tname(self);                          \
+#ifdef BDF_IMPLEMENTATION
+#define adapt_bipa_type(__tname)                   \
+    typedef struct __tname __tname;                \
+    void __tname##_dump(__tname cref self) {       \
+        bipa_dump_##__tname(self, stdout, 0);      \
+        putchar('\n');                             \
+    }                                              \
+    buf __tname##_build(__tname cref self) {       \
+        buf r = {0};                               \
+        if (!bipa_build_##__tname(self, &r))       \
+            exitf("could not build a " #__tname);  \
+        return r;                                  \
+    }                                              \
+    __tname __tname##_parse(buf cref buf) {        \
+        struct __tname r;                          \
+        sz at = 0;                                 \
+        if (!bipa_parse_##__tname(&r, buf, &at))   \
+            exitf("could not parse a " #__tname);  \
+        return r;                                  \
+    }                                              \
+    void __tname##_free(__tname cref self) {       \
+        bipa_free_##__tname(self);                 \
     }
+#else
+#define adapt_bipa_type(__tname)                   \
+    typedef struct __tname __tname;                \
+    void __tname##_dump(__tname cref self);        \
+    buf __tname##_build(__tname cref self);        \
+    __tname __tname##_parse(buf cref buf);         \
+    void __tname##_free(__tname cref self);
+#endif
 
-static void xxd(buf cref b) {
+void xxd(buf cref b) _bdf_impl({
     if (0 == b->len) return;
     for (sz j = 0; j < (b->len-1)/16+1; j++) {
         for (sz i = 0; i < 16; i++) {
@@ -103,38 +116,38 @@ static void xxd(buf cref b) {
         }
         printf("\n");
     }
-}
+})
 
 #define bfmt(__buf) (int)(__buf)->len, (__buf)->ptr
 
-static void buf_free(buf cref self) {
+void buf_free(buf cref self) _bdf_impl({
     free(self->ptr);
-}
+})
 
-static buf bufcpy(u8 cref ptr, sz const len) {
+buf bufcpy(u8 cref ptr, sz const len) _bdf_impl({
     buf r = {.ptr= malloc(len), .len= len, .cap= len};
     if (!r.ptr) exitf("OOM");
     memcpy(r.ptr, ptr, len);
     return r;
-}
+})
 
-static void bufcat(buf ref to, buf cref other) {
+void bufcat(buf ref to, buf cref other) _bdf_impl({
     u8* dest = dyarr_insert(to, to->len, other->len);
     if (!dest) exitf("OOM");
     memcpy(dest, other->ptr, other->len);
-}
+})
 
-static u16 peek16le(buf cref b, sz const k) {
+u16 peek16le(buf cref b, sz const k) _bdf_impl({
     return (u16)b->ptr[k]
          | (u16)b->ptr[k+1]<<8;
-}
-static u32 peek32le(buf cref b, sz const k) {
+})
+u32 peek32le(buf cref b, sz const k) _bdf_impl({
     return (u32)b->ptr[k]
          | (u32)b->ptr[k+1]<<8
          | (u32)b->ptr[k+2]<<16
          | (u32)b->ptr[k+3]<<24;
-}
-static u64 peek64le(buf cref b, sz const k) {
+})
+u64 peek64le(buf cref b, sz const k) _bdf_impl({
     return (u64)b->ptr[k]
          | (u64)b->ptr[k+1]<<8
          | (u64)b->ptr[k+2]<<16
@@ -143,19 +156,19 @@ static u64 peek64le(buf cref b, sz const k) {
          | (u64)b->ptr[k+5]<<40
          | (u64)b->ptr[k+6]<<48
          | (u64)b->ptr[k+7]<<56;
-}
+})
 
-static void poke16le(buf ref b, sz const k, u16 const v) {
+void poke16le(buf ref b, sz const k, u16 const v) _bdf_impl({
     b->ptr[k] = v&0xff;
     b->ptr[k+1] = (v>>8)&0xff;
-}
-static void poke32le(buf ref b, sz const k, u32 const v) {
+})
+void poke32le(buf ref b, sz const k, u32 const v) _bdf_impl({
     b->ptr[k] = v&0xff;
     b->ptr[k+1] = (v>>8)&0xff;
     b->ptr[k+2] = (v>>16)&0xff;
     b->ptr[k+3] = (v>>24)&0xff;
-}
-static void poke64le(buf ref b, sz const k, u64 const v) {
+})
+void poke64le(buf ref b, sz const k, u64 const v) _bdf_impl({
     b->ptr[k] = v&0xff;
     b->ptr[k+1] = (v>>8)&0xff;
     b->ptr[k+2] = (v>>16)&0xff;
@@ -164,19 +177,19 @@ static void poke64le(buf ref b, sz const k, u64 const v) {
     b->ptr[k+5] = (v>>40)&0xff;
     b->ptr[k+6] = (v>>48)&0xff;
     b->ptr[k+7] = (v>>56)&0xff;
-}
+})
 
-static u16 peek16be(buf cref b, sz const k) {
+u16 peek16be(buf cref b, sz const k) _bdf_impl({
     return (u16)b->ptr[k]<<8
          | (u16)b->ptr[k+1];
-}
-static u32 peek32be(buf cref b, sz const k) {
+})
+u32 peek32be(buf cref b, sz const k) _bdf_impl({
     return (u32)b->ptr[k]<<24
          | (u32)b->ptr[k+1]<<16
          | (u32)b->ptr[k+2]<<8
          | (u32)b->ptr[k+3];
-}
-static u64 peek64be(buf cref b, sz const k) {
+})
+u64 peek64be(buf cref b, sz const k) _bdf_impl({
     return (u64)b->ptr[k]<<56
          | (u64)b->ptr[k+1]<<48
          | (u64)b->ptr[k+2]<<40
@@ -185,19 +198,19 @@ static u64 peek64be(buf cref b, sz const k) {
          | (u64)b->ptr[k+5]<<16
          | (u64)b->ptr[k+6]<<8
          | (u64)b->ptr[k+7];
-}
+})
 
-static void poke16be(buf ref b, sz const k, u16 const v) {
+void poke16be(buf ref b, sz const k, u16 const v) _bdf_impl({
     b->ptr[k] = (v>>8)&0xff;
     b->ptr[k+1] = v&0xff;
-}
-static void poke32be(buf ref b, sz const k, u32 const v) {
+})
+void poke32be(buf ref b, sz const k, u32 const v) _bdf_impl({
     b->ptr[k] = (v>>24)&0xff;
     b->ptr[k+1] = (v>>16)&0xff;
     b->ptr[k+2] = (v>>8)&0xff;
     b->ptr[k+3] = v&0xff;
-}
-static void poke64be(buf ref b, sz const k, u64 const v) {
+})
+void poke64be(buf ref b, sz const k, u64 const v) _bdf_impl({
     b->ptr[k] = (v>>56)&0xff;
     b->ptr[k+1] = (v>>48)&0xff;
     b->ptr[k+2] = (v>>40)&0xff;
@@ -206,7 +219,7 @@ static void poke64be(buf ref b, sz const k, u64 const v) {
     b->ptr[k+5] = (v>>16)&0xff;
     b->ptr[k+6] = (v>>8)&0xff;
     b->ptr[k+7] = v&0xff;
-}
+})
 
 #define with_buf_as_stream(__buf, __name, ...) do {         \
     FILE* __name = tmpfile();                               \
@@ -220,7 +233,7 @@ static void poke64be(buf ref b, sz const k, u64 const v) {
     fclose(__name);                                         \
 } while (0)
 
-static buf file_read(buf cref path) {
+buf file_read(buf cref path) _bdf_impl({
     buf r = {0};
     char local[path->len+1];
     memcpy(local, path->ptr, path->len);
@@ -235,9 +248,9 @@ static buf file_read(buf cref path) {
     fread(r.ptr, 1, r.len, f);
     fclose(f);
     return r;
-}
+})
 
-static void file_write(buf cref b, buf cref path) {
+void file_write(buf cref b, buf cref path) _bdf_impl({
     char local[path->len+1];
     memcpy(local, path->ptr, path->len);
     local[path->len] = '\0';
@@ -245,6 +258,13 @@ static void file_write(buf cref b, buf cref path) {
     if (!f) exitf("could not open file %.*s", bfmt(path));
     fwrite(b->ptr, 1, b->len, f);
     fclose(f);
-}
+})
+
+#undef _bdf_impl
+#ifdef BDF_IMPLEMENTATION
+#define _bdf_impl(...) __VA_ARGS__
+#else
+#define _bdf_impl(...) ;
+#endif
 
 #endif // __BIDOOF_H__

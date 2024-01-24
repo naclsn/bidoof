@@ -6,9 +6,7 @@ typedef dyarr(u32) codepoints;
 codepoints utf8_decode(buf cref source);
 buf utf8_encode(codepoints cref source);
 
-#ifdef BDF_IMPLEMENTATION
-
-buf b64_decode(buf cref source) {
+buf b64_decode(buf cref source) _bdf_impl({
     static u8 const from64[] = {
         66,66,66,66,66,66,66,66,66,66,64,66,66,66,66,66,66,66,66,66,66,66,66,66,66,
         66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,62,66,66,66,63,52,53,
@@ -74,9 +72,9 @@ buf b64_decode(buf cref source) {
     }
 
     return r;
-}
+})
 
-buf b64_encode(buf cref source) {
+buf b64_encode(buf cref source) _bdf_impl({
     static u8 const to64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     buf r = {0};
@@ -122,9 +120,9 @@ buf b64_encode(buf cref source) {
     }
 
     return r;
-}
+})
 
-codepoints utf8_decode(buf cref source) {
+codepoints utf8_decode(buf cref source) _bdf_impl({
     codepoints r = {0};
     if (!dyarr_resize(&r, source->len/2)) exitf("OOM");
 
@@ -151,21 +149,20 @@ codepoints utf8_decode(buf cref source) {
     }
 
     return r;
-}
+})
 
-
-buf utf8_encode(codepoints cref source) {
-    buf r = {0};
-    if (!dyarr_resize(&r, source->len)) exitf("OOM");
-
-    for (sz k = 0; k < source->len; k++) {
-        u32 val = source->ptr[k];
 
 #define _push(__val) do {             \
             u8* at = dyarr_push(&r);  \
             if (!at) exitf("OOM");    \
             *at = __val;              \
         } while (false)
+buf utf8_encode(codepoints cref source) _bdf_impl({
+    buf r = {0};
+    if (!dyarr_resize(&r, source->len)) exitf("OOM");
+
+    for (sz k = 0; k < source->len; k++) {
+        u32 val = source->ptr[k];
 
         if (val < 128) _push(val);
         else {
@@ -185,11 +182,8 @@ buf utf8_encode(codepoints cref source) {
             }
             _push(128 | x);
         }
-
-#undef _push
-    }
+    } // for in source
 
     return r;
-}
-
-#endif // BDF_IMPLEMENTATION
+})
+#undef _push
