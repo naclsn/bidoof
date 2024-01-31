@@ -33,6 +33,7 @@ typedef dyarr(u8) buf;
 
 #define ref * const
 #define cref const ref
+#define opref * const
 #define let(__tname, __vname) __tname __vname = {0}; trackadd(&__vname, (void(*)(void cref))__tname##_free); __vname
 
 struct trackent {
@@ -99,18 +100,18 @@ void cleanup(void) _bdf_impl({
     void __tname##_free(__tname cref self);
 #endif
 
-void xxd(buf cref b) _bdf_impl({
+void xxd(buf cref b, sz const l) _bdf_impl({
     if (0 == b->len) return;
-    for (sz j = 0; j < (b->len-1)/16+1; j++) {
+    for (sz j = 0; j < l && j < (b->len-1)/16+1; j++) {
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (b->len < k) printf("   ");
+            if (b->len <= k) printf("   ");
             else printf("%02X ", b->ptr[k]);
         }
         printf("       ");
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (b->len < k) break;
+            if (b->len <= k) break;
             char const it = b->ptr[i+16*j];
             printf("%c", ' ' <= it && it <= '~' ? it : '.');
         }
@@ -118,10 +119,53 @@ void xxd(buf cref b) _bdf_impl({
     }
 })
 
+void xxdiff(buf cref a, buf cref b, sz const l) _bdf_impl({
+    sz const len = a->len < b->len ? b->len : a->len;
+    if (0 == len) return;
+    sz first = -1;
+    for (sz j = 0; j < l && j < (len-1)/16+1; j++) {
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (a->len <= k) printf("   ");
+            else {
+                bool const diff = b->len <= k || a->ptr[k] != b->ptr[k];
+                if (diff) printf("\x1b[31m");
+                printf("%02X ", a->ptr[k]);
+                if (diff) printf("\x1b[m");
+                if (diff && (sz)-1 == first) first = k;
+            }
+        }
+        printf("       ");
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (b->len <= k) printf("   ");
+            else {
+                bool const diff = a->len <= k || a->ptr[k] != b->ptr[k];
+                if (diff) printf("\x1b[32m");
+                printf("%02X ", b->ptr[k]);
+                if (diff) printf("\x1b[m");
+                if (diff && (sz)-1 == first) first = k;
+            }
+        }
+        printf("\n");
+    }
+    if ((sz)-1 != first) printf("first diff at offset %zu\n", first);
+})
+
+char const* binstr(u64 n, unsigned const w) _bdf_impl({
+    static char r[64+3] = {'0', 'b'};
+    for (unsigned k = 0; k < w; k++) {
+        r[w+1-k] = '0' + (n & 1);
+        n>>= 1;
+    }
+    r[w+2] = '\0';
+    return r;
+})
+
 #define bfmt(__buf) (int)(__buf)->len, (__buf)->ptr
 
 void buf_free(buf cref self) _bdf_impl({
-    free(self->ptr);
+    if (self->cap) free(self->ptr);
 })
 
 buf bufcpy(u8 cref ptr, sz const len) _bdf_impl({
@@ -132,9 +176,12 @@ buf bufcpy(u8 cref ptr, sz const len) _bdf_impl({
 })
 
 void bufcat(buf ref to, buf cref other) _bdf_impl({
-    u8* dest = dyarr_insert(to, to->len, other->len);
-    if (!dest) exitf("OOM");
-    memcpy(dest, other->ptr, other->len);
+    //u8* dest = dyarr_insert(to, to->len, other->len); // FIXME: this no work, see why
+    //if (!dest) exitf("OOM");
+    //memcpy(dest, other->ptr, other->len);
+    if (!dyarr_resize(to, to->len+other->len)) exitf("OOM");
+    memcpy(to->ptr+to->len, other->ptr, other->len);
+    to->len+= other->len;
 })
 
 u16 peek16le(buf cref b, sz const k) _bdf_impl({
@@ -250,7 +297,7 @@ buf file_read(buf cref path) _bdf_impl({
     return r;
 })
 
-void file_write(buf cref b, buf cref path) _bdf_impl({
+void file_write(buf cref path, buf cref b) _bdf_impl({
     char local[path->len+1];
     memcpy(local, path->ptr, path->len);
     local[path->len] = '\0';

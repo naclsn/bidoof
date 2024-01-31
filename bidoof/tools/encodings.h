@@ -33,17 +33,16 @@ buf b64_decode(buf cref source) _bdf_impl({
     if (2 < source->len && '=' == source->ptr[source->len-3])
         exitf("invalid padding");
 
-    u8 pad
+    u8 const pad
         = '=' == source->ptr[source->len-2] ? 2
         : '=' == source->ptr[source->len-1] ? 1
         : 0;
-    sz len = source->len/4*3 - pad;
-    if (!(r.ptr = malloc(len))) exitf("OOM");
-    r.len = len;
+    r.len = source->len/4*3 - pad;
+    if (!dyarr_resize(&r, r.len)) exitf("OOM");
 
     sz i = 0, j = 0;
     if (1 < r.len) for (; i < r.len-2; i+= 3, j+= 4) {
-        u32 n
+        u32 const n
             = (from64[source->ptr[j+0]] << (6*3))
             | (from64[source->ptr[j+1]] << (6*2))
             | (from64[source->ptr[j+2]] << (6*1))
@@ -56,7 +55,7 @@ buf b64_decode(buf cref source) _bdf_impl({
     }
 
     if (0 != pad) {
-        u32 n = 1 == pad
+        u32 const n = 1 == pad
             ? (from64[source->ptr[j+0]] << (6*3))
             | (from64[source->ptr[j+1]] << (6*2))
             | (from64[source->ptr[j+2]] << (6*1))
@@ -79,16 +78,15 @@ buf b64_encode(buf cref source) _bdf_impl({
 
     buf r = {0};
 
-    u8 mod = source->len%3;
-    u8 pad = 0 != mod ? 3-mod : 0;
+    u8 const mod = source->len%3;
+    u8 const pad = 0 != mod ? 3-mod : 0;
 
-    sz len = (source->len + pad) * 4/3;
-    if (!(r.ptr = malloc(len))) exitf("OOM");
-    r.len = len;
+    r.len = (source->len + pad) * 4/3;
+    if (!dyarr_resize(&r, r.len)) exitf("OOM");
 
     sz i = 0, j = 0;
     if (1 < source->len) for (; i < source->len-2; i+= 3, j+= 4) {
-        int n
+        unsigned const n
             = (source->ptr[i+0] << (8*2))
             | (source->ptr[i+1] << (8*1))
             | (source->ptr[i+2] << (8*0))
@@ -101,7 +99,7 @@ buf b64_encode(buf cref source) _bdf_impl({
     }
 
     if (0 != pad) {
-        int n = 1 == pad
+        unsigned const n = 1 == pad
             ? (source->ptr[i+0] << (8*2))
             | (source->ptr[i+1] << (8*1))
             | 0
@@ -127,8 +125,11 @@ codepoints utf8_decode(buf cref source) _bdf_impl({
     if (!dyarr_resize(&r, source->len/2)) exitf("OOM");
 
     for (sz k = 0; k < source->len; k++) {
-        u32* u = dyarr_push(&r);
-        if (!u) exitf("OOM");
+        u32* const u = dyarr_push(&r);
+        if (!u) {
+            free(r.ptr);
+            exitf("OOM");
+        }
         *u = source->ptr[k];
 
         if (0 == (128 & *u))
@@ -145,18 +146,24 @@ codepoints utf8_decode(buf cref source) _bdf_impl({
             u8 x = source->ptr[++k], y = source->ptr[++k], z = source->ptr[++k];
             *u = ((*u & 7) << 18) | ((x & 63) << 12) | ((y & 63) << 6) | (z & 63);
         }
-        else exitf("unexpected byte 0x%02X or end of stream at index %zu (/%zu)", *u, k, source->len);
+        else {
+            free(r.ptr);
+            exitf("unexpected byte 0x%02X or end of stream at index %zu (/%zu)", *u, k, source->len);
+        }
     }
 
     return r;
 })
 
 
-#define _push(__val) do {             \
-            u8* at = dyarr_push(&r);  \
-            if (!at) exitf("OOM");    \
-            *at = __val;              \
-        } while (false)
+#define _push(__val) do {         \
+        u8* at = dyarr_push(&r);  \
+        if (!at) {                \
+            free(r.ptr);          \
+            exitf("OOM");         \
+        }                         \
+        *at = __val;              \
+    } while (false)
 buf utf8_encode(codepoints cref source) _bdf_impl({
     buf r = {0};
     if (!dyarr_resize(&r, source->len)) exitf("OOM");
