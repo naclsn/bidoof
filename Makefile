@@ -12,7 +12,7 @@ toolobjs = $(foreach t,$(toolnames),$(builddir)/t-$(t).o)
 # x-toolobjs
 -include unreleased/Makefile
 ifdef x-toolnames
-CFLAGS += -Iunreleased
+CFLAGS += -Iunreleased -Ibidoof/tools
 endif
 
 base: $(builddir)/bdf-base.o $(toolobjs) $(x-toolobjs)

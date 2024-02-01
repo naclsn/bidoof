@@ -9,7 +9,7 @@ struct inflate_extra_info {
 };
 
 #define _accbits(__n) do {                            \
-        unsigned wants = (__n);                       \
+        unsigned const wants = (__n);                 \
         while (has < wants) {                         \
             if (source->len <= at) {                  \
                 free(r.ptr);                          \
@@ -19,10 +19,10 @@ struct inflate_extra_info {
             has+= 8;                                  \
         }                                             \
     } while (0)
-#define _dropbits(__n) do {      \
-        unsigned drops = (__n);  \
-        has-= drops;             \
-        acc>>= drops;            \
+#define _dropbits(__n) do {            \
+        unsigned const drops = (__n);  \
+        has-= drops;                   \
+        acc>>= drops;                  \
     } while (0)
 // https://www.ietf.org/rfc/rfc1950.txt
 // https://www.ietf.org/rfc/rfc1951.txt
