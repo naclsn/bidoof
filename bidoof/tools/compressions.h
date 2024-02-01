@@ -1,3 +1,6 @@
+#ifndef __BIDOOF_T_COMPRESSIONS__
+#define __BIDOOF_T_COMPRESSIONS__
+
 #include "../base.h"
 
 struct inflate_extra_info {
@@ -8,25 +11,13 @@ struct inflate_extra_info {
     sz last_at;
 };
 
-#define _accbits(__n) do {                            \
-        unsigned const wants = (__n);                 \
-        while (has < wants) {                         \
-            if (source->len <= at) {                  \
-                free(r.ptr);                          \
-                exitf("not enough bits to inflate");  \
-            }                                         \
-            acc|= source->ptr[at++] << has;           \
-            has+= 8;                                  \
-        }                                             \
-    } while (0)
-#define _dropbits(__n) do {            \
-        unsigned const drops = (__n);  \
-        has-= drops;                   \
-        acc>>= drops;                  \
-    } while (0)
 // https://www.ietf.org/rfc/rfc1950.txt
 // https://www.ietf.org/rfc/rfc1951.txt
-buf inflate(buf cref source, struct inflate_extra_info opref xnfo) _bdf_impl({
+buf inflate(buf cref source, struct inflate_extra_info opref xnfo);
+
+#ifdef BIDOOF_IMPLEMENTATION
+
+buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
     buf r = {0};
     sz at = 0;
 
@@ -59,6 +50,23 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) _bdf_impl({
 
     unsigned has = 0;
     u64 acc = 0;
+#   define _accbits(__n) do {                             \
+            unsigned const wants = (__n);                 \
+            while (has < wants) {                         \
+                if (source->len <= at) {                  \
+                    free(r.ptr);                          \
+                    exitf("not enough bits to inflate");  \
+                }                                         \
+                acc|= source->ptr[at++] << has;           \
+                has+= 8;                                  \
+            }                                             \
+        } while (0)
+#   define _dropbits(__n) do {             \
+            unsigned const drops = (__n);  \
+            has-= drops;                   \
+            acc>>= drops;                  \
+        } while (0)
+
     unsigned bfinal, btype;
     do {
         _accbits(3);
@@ -281,7 +289,12 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) _bdf_impl({
         xnfo->last_at = at;
     }
 
+#   undef _dropbits
+#   undef _accbits
+
     return r;
-})
-#undef _dropbits
-#undef _accbits
+}
+
+#endif // BIDOOF_IMPLEMENTATION
+
+#endif // __BIDOOF_T_COMPRESSIONS__

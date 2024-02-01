@@ -1,4 +1,8 @@
-#ifndef BDF_IMPLEMENTATION
+#ifndef __BIDOOF_T_IMAGES__
+#define __BIDOOF_T_IMAGES__
+
+#include "../base.h"
+#ifndef BIDOOF_IMPLEMENTATION
 #define BIPA_DECLONLY
 #endif
 #define BIPA_HIDUMP
@@ -53,16 +57,29 @@ bipa_struct(png_data, 2
 
 // https://www.w3.org/TR/2003/REC-PNG-20031110/
 adapt_bipa_type(png_data)
+adapt_bipa_type(png_chunk_header)
 
-buf png_data_get(png_data cref png, int const tag) _bdf_impl({
+buf png_data_get(png_data cref png, int const tag);
+buf png_data_get_all_data(png_data cref png);
+buf png_unfilter(png_chunk_header cref png_h, buf cref source);
+buf png_get_pixels(png_data cref png, png_chunk_header opref header);
+
+#ifdef BIDOOF_IMPLEMENTATION
+
+#undef BIDOOF_IMPLEMENTATION
+#undef BIDOOF_T_IMPLEMENTATION
+#include "compressions.h"
+#define BIDOOF_IMPLEMENTATION
+
+buf png_data_get(png_data cref png, int const tag) {
     for (sz k = 0; k < png->chunks.len; k++)
         if (tag == (int)png->chunks.ptr[k].type.tag)
             return bufcpy(png->chunks.ptr[k].data, png->chunks.ptr[k].length);
     exitf("no chunk in png_data for given tag %d", tag);
     return (buf){0};
-})
+}
 
-buf png_data_get_all_data(png_data cref png) _bdf_impl({
+buf png_data_get_all_data(png_data cref png) {
     buf r = {0};
     for (sz k = 0; k < png->chunks.len; k++)
         if (png_chunk_type_tag_IDAT == png->chunks.ptr[k].type.tag)
@@ -71,25 +88,24 @@ buf png_data_get_all_data(png_data cref png) _bdf_impl({
                 .len= png->chunks.ptr[k].length
             });
     return r;
-})
+}
 
 // TODO: interlacing
 
-adapt_bipa_type(png_chunk_header)
-
-#define _x (r.ptr[r.len+j*chan+k])
-#define _a (r.ptr[r.len+(j-1)*chan+k])
-#define _b (r.ptr[r.len+(j-w)*chan+k])
-#define _c (r.ptr[r.len+(j-w-1)*chan+k])
-#define _f (source->ptr[at+j*chan+k])
-#define for_chan(...) do for (sz k = 0; k < chan; k++) { __VA_ARGS__; } while (0)
-buf png_unfilter(png_chunk_header cref png_h, buf cref source) _bdf_impl({
+buf png_unfilter(png_chunk_header cref png_h, buf cref source) {
     buf r = {0};
 
     sz const chan = 4;
     if (color_type_tag_truecolor_with_alpha != png_h->color_type.tag || 8 != png_h->bit_depth)
         exitf("NIY: only 8 bits truecolor with alpha is supported");
     if (!dyarr_resize(&r, png_h->width * png_h->height * chan)) exitf("OOM");
+
+#   define _x (r.ptr[r.len+j*chan+k])
+#   define _a (r.ptr[r.len+(j-1)*chan+k])
+#   define _b (r.ptr[r.len+(j-w)*chan+k])
+#   define _c (r.ptr[r.len+(j-w-1)*chan+k])
+#   define _f (source->ptr[at+j*chan+k])
+#   define for_chan(...) do for (sz k = 0; k < chan; k++) { __VA_ARGS__; } while (0)
 
     sz const w = png_h->width, h = png_h->height;
     sz at = 0;
@@ -133,11 +149,30 @@ buf png_unfilter(png_chunk_header cref png_h, buf cref source) _bdf_impl({
             exitf("unknown filter type: %d\n", source->ptr[at-1]);
     }
 
+#   undef for_chan
+#   undef _f
+#   undef _c
+#   undef _b
+#   undef _a
+#   undef _x
+
     return r;
-})
-#undef for_chan
-#undef _f
-#undef _c
-#undef _b
-#undef _a
-#undef _x
+}
+
+buf png_get_pixels(png_data cref png, png_chunk_header opref header) {
+    buf idat = png_data_get_all_data(png);
+    buf infl = inflate(&idat, NULL);
+
+    buf r;
+    if (!header) {
+        buf ihdr = png_data_get(png, png_chunk_type_tag_IHDR);
+        png_chunk_header info = png_chunk_header_parse(&ihdr);
+        r = png_unfilter(&info, &infl);
+    } else r = png_unfilter(header, &infl);
+
+    return r;
+}
+
+#endif // BIDOOF_IMPLEMENTATION
+
+#endif // __BIDOOF_T_IMAGES__

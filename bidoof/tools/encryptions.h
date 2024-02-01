@@ -1,3 +1,6 @@
+#ifndef __BIDOOF_T_ENCRYPTIONS__
+#define __BIDOOF_T_ENCRYPTIONS__
+
 #include "../base.h"
 
 enum rot_cipher_target {
@@ -7,7 +10,13 @@ enum rot_cipher_target {
     //ROT_ONLY_ALNUM,
     ROT_ONLY_ASCIIPR,
 };
-buf rot_cipher(buf cref source, int const shift, enum rot_cipher_target const target) _bdf_impl({
+
+buf rot_cipher(buf cref source, int const shift, enum rot_cipher_target const target);
+buf vigenere_cipher(buf cref source, buf cref key);
+
+#ifdef BIDOOF_IMPLEMENTATION
+
+buf rot_cipher(buf cref source, int const shift, enum rot_cipher_target const target) {
     buf r = {0};
     if (!dyarr_resize(&r, r.len = source->len)) exitf("OOM");
 
@@ -50,9 +59,9 @@ buf rot_cipher(buf cref source, int const shift, enum rot_cipher_target const ta
     }
 
     return r;
-})
+}
 
-buf vigenere_cipher(buf cref source, buf cref key) _bdf_impl({
+buf vigenere_cipher(buf cref source, buf cref key) {
     if (!key->len) exitf("empty key");
 
     buf r = {0};
@@ -70,4 +79,8 @@ buf vigenere_cipher(buf cref source, buf cref key) _bdf_impl({
     }
 
     return r;
-})
+}
+
+#endif // BIDOOF_IMPLEMENTATION
+
+#endif // __BIDOOF_T_ENCRYPTIONS__

@@ -1,4 +1,8 @@
-#ifndef BDF_IMPLEMENTATION
+#ifndef __BIDOOF_T_ARCHIVES__
+#define __BIDOOF_T_ARCHIVES__
+
+#include "../base.h"
+#ifndef BIDOOF_IMPLEMENTATION
 #define BIPA_DECLONLY
 #endif
 #define BIPA_HIDUMP
@@ -109,8 +113,16 @@ bipa_struct(zip_data, 3
 // https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 adapt_bipa_type(zip_data)
 
-buf zip_data_find_by_path(zip_data cref zip, buf cref path) _bdf_impl({
+buf zip_data_find_by_path(zip_data cref zip, buf cref path);
+
+#ifdef BIDOOF_IMPLEMENTATION
+
+buf zip_data_find_by_path(zip_data cref zip, buf cref path) {
     (void)zip;
     (void)path;
     return (buf){0};
-})
+}
+
+#endif // BIDOOF_IMPLEMENTATION
+
+#endif // __BIDOOF_T_ARCHIVES__

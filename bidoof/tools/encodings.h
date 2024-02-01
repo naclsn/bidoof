@@ -1,3 +1,6 @@
+#ifndef __BIDOOF_T_ENCODINGS__
+#define __BIDOOF_T_ENCODINGS__
+
 #include "../base.h"
 
 buf b64_decode(buf cref source);
@@ -6,7 +9,9 @@ typedef dyarr(u32) codepoints;
 codepoints utf8_decode(buf cref source);
 buf utf8_encode(codepoints cref source);
 
-buf b64_decode(buf cref source) _bdf_impl({
+#ifdef BIDOOF_IMPLEMENTATION
+
+buf b64_decode(buf cref source) {
     static u8 const from64[] = {
         66,66,66,66,66,66,66,66,66,66,64,66,66,66,66,66,66,66,66,66,66,66,66,66,66,
         66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,62,66,66,66,63,52,53,
@@ -71,9 +76,9 @@ buf b64_decode(buf cref source) _bdf_impl({
     }
 
     return r;
-})
+}
 
-buf b64_encode(buf cref source) _bdf_impl({
+buf b64_encode(buf cref source) {
     static u8 const to64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     buf r = {0};
@@ -118,9 +123,9 @@ buf b64_encode(buf cref source) _bdf_impl({
     }
 
     return r;
-})
+}
 
-codepoints utf8_decode(buf cref source) _bdf_impl({
+codepoints utf8_decode(buf cref source) {
     codepoints r = {0};
     if (!dyarr_resize(&r, source->len/2)) exitf("OOM");
 
@@ -153,20 +158,21 @@ codepoints utf8_decode(buf cref source) _bdf_impl({
     }
 
     return r;
-})
+}
 
 
-#define _push(__val) do {         \
-        u8* at = dyarr_push(&r);  \
-        if (!at) {                \
-            free(r.ptr);          \
-            exitf("OOM");         \
-        }                         \
-        *at = __val;              \
-    } while (false)
-buf utf8_encode(codepoints cref source) _bdf_impl({
+buf utf8_encode(codepoints cref source) {
     buf r = {0};
     if (!dyarr_resize(&r, source->len)) exitf("OOM");
+
+#   define _push(__val) do {          \
+            u8* at = dyarr_push(&r);  \
+            if (!at) {                \
+                free(r.ptr);          \
+                exitf("OOM");         \
+            }                         \
+            *at = __val;              \
+        } while (false)
 
     for (sz k = 0; k < source->len; k++) {
         u32 val = source->ptr[k];
@@ -191,6 +197,11 @@ buf utf8_encode(codepoints cref source) _bdf_impl({
         }
     } // for in source
 
+#   undef _push
+
     return r;
-})
-#undef _push
+}
+
+#endif // BIDOOF_IMPLEMENTATION
+
+#endif // __BIDOOF_T_ENCODINGS__

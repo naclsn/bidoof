@@ -1,6 +1,14 @@
+#ifndef __BIDOOF_T_CHECKS__
+#define __BIDOOF_T_CHECKS__
+
 #include "../base.h"
 
-u32 crc32(buf cref s) _bdf_impl({
+u32 crc32(buf cref s);
+u32 adler32(buf cref s);
+
+#ifdef BIDOOF_IMPLEMENTATION
+
+u32 crc32(buf cref s) {
     u32 crc = 0xffffffff;
     for (sz i = 0; i < s->len; i++) {
         crc^= s->ptr[i];
@@ -8,9 +16,9 @@ u32 crc32(buf cref s) _bdf_impl({
             crc = (crc >> 1) ^ (0xedb88320 & -(crc & 1));
     }
     return ~crc;
-})
+}
 
-u32 adler32(buf cref s) _bdf_impl({
+u32 adler32(buf cref s) {
     u32 adler = 1;
     u32 s1 = adler & 0xffff;
     u32 s2 = (adler >> 16) & 0xffff;
@@ -19,4 +27,8 @@ u32 adler32(buf cref s) _bdf_impl({
         s2 = (s2 + s1)        % 65521;
     }
     return (s2 << 16) + s1;
-})
+}
+
+#endif // BIDOOF_IMPLEMENTATION
+
+#endif // __BIDOOF_T_CHECKS__
