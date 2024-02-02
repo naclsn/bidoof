@@ -6,7 +6,7 @@
 #define BIPA_DECLONLY
 #endif
 #define BIPA_HIDUMP
-#include "../bipa.h"
+#include "../utils/bipa.h"
 
 bipa_union(local_file_header_signature, 1, (void,), (u32le, 0x04034b50, _))
 bipa_struct(local_file_header, 13

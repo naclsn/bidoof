@@ -6,7 +6,7 @@
 #define BIPA_DECLONLY
 #endif
 #define BIPA_HIDUMP
-#include "../bipa.h"
+#include "../utils/bipa.h"
 
 #define _png_chunk_id(a,b,c,d) ((a<<24)|(b<<16)|(c<<8)|d)
 

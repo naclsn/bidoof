@@ -67,7 +67,7 @@
 ///  - reading a byte: `*it = src->ptr[(*at)++]`
 
 // uNN typedefs, buf typedef and dyarr_ macros, ref/cref macros
-#include "base.h"
+#include "../base.h"
 
 #ifdef BIPA_DECLONLY
 #define _declonly(...) ;

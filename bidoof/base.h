@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dyarr.h"
+#include "utils/dyarr.h"
 
 #define mkbuf(__c) (buf){.ptr= (u8*)__c, .len= strlen(__c)}
 #define mkbufsl(__b, __st, __ed) (buf){.ptr= (__b)->ptr+(__st), .len= (__ed)-(__st)}
