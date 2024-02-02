@@ -3,6 +3,12 @@
 
 #include "../base.h"
 
+#ifdef BIDOOF_LIST_DEPS
+static struct _list_deps_item const _list_deps_me_encodings = {_list_deps_first, "encodings"};
+#undef _list_deps_first
+#define _list_deps_first &_list_deps_me_encodings
+#endif
+
 buf b64_decode(buf cref source);
 buf b64_encode(buf cref source);
 typedef dyarr(u32) codepoints;

@@ -8,6 +8,12 @@
 #define BIPA_HIDUMP
 #include "../utils/bipa.h"
 
+#ifdef BIDOOF_LIST_DEPS
+static struct _list_deps_item const _list_deps_me_archives = {_list_deps_first, "archives"};
+#undef _list_deps_first
+#define _list_deps_first &_list_deps_me_archives
+#endif
+
 bipa_union(local_file_header_signature, 1, (void,), (u32le, 0x04034b50, _))
 bipa_struct(local_file_header, 13
         , (union, local_file_header_signature), _

@@ -3,6 +3,12 @@
 
 #include "../base.h"
 
+#ifdef BIDOOF_LIST_DEPS
+static struct _list_deps_item const _list_deps_me_encryptions = {_list_deps_first, "encryptions"};
+#undef _list_deps_first
+#define _list_deps_first &_list_deps_me_encryptions
+#endif
+
 enum rot_cipher_target {
     ROT_ALL,
     ROT_ONLY_ALPHA,

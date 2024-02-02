@@ -3,6 +3,12 @@
 
 #include "../base.h"
 
+#ifdef BIDOOF_LIST_DEPS
+static struct _list_deps_item const _list_deps_me_checks = {_list_deps_first, "checks"};
+#undef _list_deps_first
+#define _list_deps_first &_list_deps_me_checks
+#endif
+
 u32 crc32(buf cref s);
 u32 adler32(buf cref s);
 

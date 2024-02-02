@@ -1,12 +1,30 @@
 #ifndef __BIDOOF_T_IMAGES__
 #define __BIDOOF_T_IMAGES__
 
+#ifdef BIDOOF_T_IMPLEMENTATION
+#define _redef_after_image
+#undef BIDOOF_IMPLEMENTATION
+#undef BIDOOF_T_IMPLEMENTATION
+#endif
+#include "compressions.h"
+#ifdef _redef_after_image
+#undef _redef_after_image
+#define BIDOOF_IMPLEMENTATION
+#define BIDOOF_T_IMPLEMENTATION
+#endif
+
 #include "../base.h"
 #ifndef BIDOOF_IMPLEMENTATION
 #define BIPA_DECLONLY
 #endif
 #define BIPA_HIDUMP
 #include "../utils/bipa.h"
+
+#ifdef BIDOOF_LIST_DEPS
+static struct _list_deps_item const _list_deps_me_images = {_list_deps_first, "images"};
+#undef _list_deps_first
+#define _list_deps_first &_list_deps_me_images
+#endif
 
 #define _png_chunk_id(a,b,c,d) ((a<<24)|(b<<16)|(c<<8)|d)
 
@@ -62,14 +80,9 @@ adapt_bipa_type(png_chunk_header)
 buf png_data_get(png_data cref png, int const tag);
 buf png_data_get_all_data(png_data cref png);
 buf png_unfilter(png_chunk_header cref png_h, buf cref source);
-buf png_get_pixels(png_data cref png, png_chunk_header opref header);
+buf png_get_pixels(png_data cref png, png_chunk_header opcref header);
 
 #ifdef BIDOOF_IMPLEMENTATION
-
-#undef BIDOOF_IMPLEMENTATION
-#undef BIDOOF_T_IMPLEMENTATION
-#include "compressions.h"
-#define BIDOOF_IMPLEMENTATION
 
 buf png_data_get(png_data cref png, int const tag) {
     for (sz k = 0; k < png->chunks.len; k++)
@@ -159,7 +172,7 @@ buf png_unfilter(png_chunk_header cref png_h, buf cref source) {
     return r;
 }
 
-buf png_get_pixels(png_data cref png, png_chunk_header opref header) {
+buf png_get_pixels(png_data cref png, png_chunk_header opcref header) {
     buf idat = png_data_get_all_data(png);
     buf infl = inflate(&idat, NULL);
 

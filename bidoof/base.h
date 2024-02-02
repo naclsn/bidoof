@@ -20,6 +20,7 @@
 #define ref * const
 #define cref const ref
 #define opref * const
+#define opcref const opref
 typedef uint8_t   u8;
 typedef uint16_t  u16;
 typedef uint32_t  u32;
@@ -281,9 +282,71 @@ void file_write(buf cref path, buf cref b) {
 
 #endif // BIDOOF_IMPLEMENTATION
 
+#ifdef BIDOOF_LIST_DEPS
+
+struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
+#define _list_deps_first NULL
+#define make_main(...)                                             \
+    int main(void) {                                               \
+        for ( struct _list_deps_item const* it = _list_deps_first  \
+            ; it                                                   \
+            ; it = it->next                                        \
+            ) puts(it->name);                                      \
+        return 0;                                                  \
+    }
+
+#else // BIDOOF_LIST_DEPS
+
 #ifdef BIDOOF_T_IMPLEMENTATION
 #define BIDOOF_IMPLEMENTATION
 #endif
+
+#define make_arg_buf(__name, __information)                                                  \
+    buf cref __name = (_is_h ? puts("\t" #__name ":\t" __information), NULL                  \
+                    : !argc ? exitf("expected value for argument '" #__name "'"), NULL       \
+                    : (argc--, argv++, &(buf){.ptr= (u8*)argv[-1], .len= strlen(argv[-1])})  \
+                    )
+#define make_arg_int(__name, __information)                                           \
+    int const __name = (_is_h ? puts("\t" #__name ":\t" __information), 0             \
+                    : !argc ? exitf("expected number for argument '" #__name "'"), 0  \
+                    : (argc--, atoi(*argv++))                                         \
+                    )
+
+#define make_cmd(__invocation, __description, ...) do                             \
+    if (_is_h) puts("\t" #__invocation ":\t" __description);                      \
+    else {                                                                        \
+        static char const invocation[] = #__invocation;                           \
+        if (!strncmp(invocation, *argv, strchr(invocation, '(') - invocation)) {  \
+            argc--, argv++;                                                       \
+            if (argc && !strcmp("-h", *argv)) {                                   \
+                puts(#__invocation ":\t" __description);                          \
+                static bool const _is_h = true;                                   \
+                __VA_ARGS__                                                       \
+                return 0;                                                         \
+            }                                                                     \
+            static bool const _is_h = false;                                      \
+            __VA_ARGS__                                                           \
+            __invocation;                                                         \
+            return 0;                                                             \
+        }                                                                         \
+    } while (0)
+
+#define make_main(__summary, ...)                  \
+    int main(int argc, char** argv) {              \
+        char cref proc = (argc--, *argv++);        \
+        if (!argc || !strcmp("-h", *argv)) {       \
+            printf("%s: " __summary "\n", proc);   \
+            static bool const _is_h = true;        \
+            __VA_ARGS__                            \
+            return 0;                              \
+        }                                          \
+        static bool const _is_h = false;           \
+        __VA_ARGS__                                \
+        printf("unknown command: '%s'\n", *argv);  \
+        return 1;                                  \
+    }
+
+#endif // BIDOOF_LIST_DEPS
 
 #endif // __BIDOOF_H__
 

@@ -3,6 +3,12 @@
 
 #include "../base.h"
 
+#ifdef BIDOOF_LIST_DEPS
+static struct _list_deps_item const _list_deps_me_compressions = {_list_deps_first, "compressions"};
+#undef _list_deps_first
+#define _list_deps_first &_list_deps_me_compressions
+#endif
+
 struct inflate_extra_info {
     u32 winsize;
     char const* level;
