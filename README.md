@@ -8,7 +8,11 @@ $ make build/some
 $ build/some
 ```
 
-- base: buffer manipulation, to-free tracking, common things (like fs files)
+- base: buffer manipulation, common things (like fs files)
 - archives: zip
-- encodings: base 64, utf-8
+- checks: crc32, adler32
+- compressions: inflate
+- encodings: base64, utf8
+- encryptions: rot, vigenere
 - images: png
+- views: nothing
