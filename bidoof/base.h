@@ -87,9 +87,10 @@ void file_write(buf cref path, buf cref b);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
-void xxd(buf cref b, sz const l) {
+void xxd(buf cref b, sz const ln) {
     if (0 == b->len) return;
-    for (sz j = 0; j < l && j < (b->len-1)/16+1; j++) {
+    for (sz j = 0; j < ln && j < (b->len-1)/16+1; j++) {
+        printf("%07zx0:   ", j);
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
             if (b->len <= k) printf("   ");
@@ -106,18 +107,19 @@ void xxd(buf cref b, sz const l) {
     }
 }
 
-void xxdiff(buf cref a, buf cref b, sz const l) {
-    sz const len = a->len < b->len ? b->len : a->len;
+void xxdiff(buf cref l, buf cref r, sz const ln) {
+    sz const len = l->len < r->len ? r->len : l->len;
     if (0 == len) return;
     sz first = -1;
-    for (sz j = 0; j < l && j < (len-1)/16+1; j++) {
+    for (sz j = 0; j < ln && j < (len-1)/16+1; j++) {
+        printf("%07zx0:   ", j);
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (a->len <= k) printf("   ");
+            if (l->len <= k) printf("   ");
             else {
-                bool const diff = b->len <= k || a->ptr[k] != b->ptr[k];
+                bool const diff = r->len <= k || l->ptr[k] != r->ptr[k];
                 if (diff) printf("\x1b[31m");
-                printf("%02X ", a->ptr[k]);
+                printf("%02X ", l->ptr[k]);
                 if (diff) printf("\x1b[m");
                 if (diff && (sz)-1 == first) first = k;
             }
@@ -125,11 +127,11 @@ void xxdiff(buf cref a, buf cref b, sz const l) {
         printf("       ");
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (b->len <= k) printf("   ");
+            if (r->len <= k) printf("   ");
             else {
-                bool const diff = a->len <= k || a->ptr[k] != b->ptr[k];
+                bool const diff = l->len <= k || l->ptr[k] != r->ptr[k];
                 if (diff) printf("\x1b[32m");
-                printf("%02X ", b->ptr[k]);
+                printf("%02X ", r->ptr[k]);
                 if (diff) printf("\x1b[m");
                 if (diff && (sz)-1 == first) first = k;
             }

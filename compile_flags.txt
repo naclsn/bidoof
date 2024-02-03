@@ -1,0 +1,4 @@
+-DBIDOOF_IMPLEMENTATION
+-Iunreleased
+-Ibidoof/tools
+-std=c99

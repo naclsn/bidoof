@@ -26,15 +26,8 @@ static struct _list_deps_item const _list_deps_me_images = {_list_deps_first, "i
 #define _list_deps_first &_list_deps_me_images
 #endif
 
-#define _png_chunk_id(a,b,c,d) ((a<<24)|(b<<16)|(c<<8)|d)
-
-bipa_struct(png_chunk_type_other, 1, (lstr, 4), name)
-bipa_union(png_chunk_type, 4
-        , (void,), (u32be, _png_chunk_id('I','H','D','R'), IHDR)
-        , (void,), (u32be, _png_chunk_id('I','D','A','T'), IDAT)
-        , (void,), (u32be, _png_chunk_id('I','E','N','D'), IEND)
-        , (struct, png_chunk_type_other), (void, 0, other)
-        )
+#define png_chunk_type(a, b, c, d) (u32)((u32)(a<<24) | (u32)(b<<16) | (u32)(c<< 8) | (u32)(d<< 0))
+#define png_chunk_type_str(s) png_chunk_type(s[0], s[1], s[2], s[3])
 
 bipa_union(color_type, 5
         , (void,), (u8, 0, grayscale)
@@ -61,7 +54,7 @@ bipa_struct(png_chunk_header, 7
 
 bipa_struct(png_chunk, 4
         , (u32be,), length
-        , (union, png_chunk_type), type
+        , (u32be,), type
         , (lstr, self->length), data
         , (u32be,), crc
         )
@@ -70,32 +63,47 @@ bipa_array(png_chunks, (struct, png_chunk))
 bipa_union(png_magic_number, 1, (void,), (u64be, 0x89504e470d0a1a0aLL, _))
 bipa_struct(png_data, 2
         , (union, png_magic_number), _
-        , (array, png_chunks, !k || png_chunk_type_tag_IEND != it->ptr[k-1].type.tag), chunks
+        , (array, png_chunks, !k || png_chunk_type_str("IEND") != it->ptr[k-1].type), chunks
         )
 
 // https://www.w3.org/TR/2003/REC-PNG-20031110/
 adapt_bipa_type(png_data)
 adapt_bipa_type(png_chunk_header)
 
-buf png_data_get(png_data cref png, int const tag);
+buf png_data_chunknames(png_data cref png);
+buf png_data_find(png_data cref png, u32 const type);
 buf png_data_get_all_data(png_data cref png);
 buf png_unfilter(png_chunk_header cref png_h, buf cref source);
 buf png_get_pixels(png_data cref png, png_chunk_header opcref header);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
-buf png_data_get(png_data cref png, int const tag) {
+buf png_data_chunknames(png_data cref png) {
+    buf r = {0};
+    if (!dyarr_resize(&r, png->chunks.len*5)) exitf("OOM");
+    for (sz k = 0; k < png->chunks.len; k++) {
+        u32 const type = png->chunks.ptr[k].type;
+        r.ptr[r.len++] = type>>24 & 0xff;
+        r.ptr[r.len++] = type>>16 & 0xff;
+        r.ptr[r.len++] = type>> 8 & 0xff;
+        r.ptr[r.len++] = type>> 0 & 0xff;
+        r.ptr[r.len++] = '\0';
+    }
+    return r;
+}
+
+buf png_data_find(png_data cref png, u32 const type) {
     for (sz k = 0; k < png->chunks.len; k++)
-        if (tag == (int)png->chunks.ptr[k].type.tag)
+        if (type == png->chunks.ptr[k].type)
             return bufcpy(png->chunks.ptr[k].data, png->chunks.ptr[k].length);
-    exitf("no chunk in png_data for given tag %d", tag);
+    exitf("no chunk in png_data for given type %c%c%c%c", type<<24 & 0xff, type<<16 & 0xff, type<< 8 & 0xff, type<< 0 & 0xff);
     return (buf){0};
 }
 
 buf png_data_get_all_data(png_data cref png) {
     buf r = {0};
     for (sz k = 0; k < png->chunks.len; k++)
-        if (png_chunk_type_tag_IDAT == png->chunks.ptr[k].type.tag)
+        if (png_chunk_type_str("IDAT") == png->chunks.ptr[k].type)
             bufcat(&r, &(buf const){
                 .ptr= png->chunks.ptr[k].data,
                 .len= png->chunks.ptr[k].length
@@ -178,7 +186,7 @@ buf png_get_pixels(png_data cref png, png_chunk_header opcref header) {
 
     buf r;
     if (!header) {
-        buf ihdr = png_data_get(png, png_chunk_type_tag_IHDR);
+        buf ihdr = png_data_find(png, png_chunk_type_str("IHDR"));
         png_chunk_header info = png_chunk_header_parse(&ihdr);
         r = png_unfilter(&info, &infl);
     } else r = png_unfilter(header, &infl);
