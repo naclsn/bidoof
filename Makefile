@@ -29,4 +29,4 @@ $(builddir)/bdf-base.o: bidoof/base.h; $(CC) -x c -c $< -o $@ -DBIDOOF_IMPLEMENT
 $(builddir)/t-%.o: bidoof/tools/%.h; $(CC) -x c -c $< -o $@ -DBIDOOF_T_IMPLEMENTATION $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
 $(builddir)/d-%.exe: %.c; $(CC) $< -o $@ -DBIDOOF_LIST_DEPS -std=c99 -Iunreleased -Ibidoof/tools
 $(builddir)/%: %.c $(builddir)/d-%.exe $(objs); $(CC) $< $(builddir)/bdf-base.o -o $@ $(CFLAGS) $(foreach t,$(shell $(builddir)/d-$*.exe),$(builddir)/t-$(t).o $($(t)-CFLAGS) $($(t)-LDFLAGS))
-.PRECIOUS: $(builddir)/d-%.exe
+.PRECIOUS: $(builddir)/d-%.exe $(objs)

@@ -32,6 +32,7 @@ unsigned frame_key2char(unsigned key);
     int width;                                                       \
     int height;                                                      \
     char const* title;                                               \
+    void* userdata;                                                  \
                                                                      \
     struct {                                                         \
         void (*render)(Frame* self);                                 \
@@ -292,7 +293,7 @@ void frame_loop(Frame* self) {
                     self->width = ww;
                     self->height = hh;
                     _event(render, self);
-                    //glXSwapBuffers(self->dpy, self->win); // XXX: idk
+                    glXSwapBuffers(self->dpy, self->win);
                 }
              } break;
 
@@ -400,7 +401,7 @@ void frame_destroy(Frame* self) {
 #if 0 // example
 
 #define FRAME_IMPLEMENTATION
-#include "(this file)"
+#include "frame.h"
 #include <pthread.h> // if using main_threaded
 #include <unistd.h> // sleep
 
@@ -415,7 +416,6 @@ void triangle(Frame* frame) {
         glColor3f(0.0f, 0.0f, 1.0f);
         glVertex2i(1, -1);
     glEnd();
-    glFlush();
 }
 Frame frame = {
     .width= 256,
