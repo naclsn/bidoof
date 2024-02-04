@@ -114,7 +114,7 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
                 _accbits(5+5+4);
                 unsigned const hlit = (acc & 31) + 257;
                 unsigned const hdist = (acc>>5 & 31) + 1;
-                unsigned const hclen = (acc>>(5+4) & 15) + 4;
+                unsigned const hclen = (acc>>(5+5) & 15) + 4;
                 _dropbits(5+5+4);
 
                 // read the lens for the encoding of the instructions for the encoding of the codes
@@ -163,7 +163,8 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
                     unsigned const count = dlens == lit_lens ? hlit : hdist;
                     for (unsigned l = 0; l < count; ) {
                         _accbits(7);
-                        for (unsigned k = 0; k < 19; k++) if (lens[k] && (acc & ((1<<lens[k]) -1)) == dico[k]) {
+                        unsigned k;
+                        for (k = 0; k < 19; k++) if (lens[k] && (acc & ((1<<lens[k]) -1)) == dico[k]) {
                             _dropbits(lens[k]);
                             // instruction set of 3.2.7
                             if (k < 16) {
@@ -184,6 +185,10 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
                             }
                             break;
                         } // for seach
+                        if (k == 19) {
+                            free(r.ptr);
+                            exitf("could not find next len code in acc=%s", binstr(acc, has));
+                        }
                     } // for count
 
                     unsigned counts[16] = {0};
@@ -268,7 +273,7 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
                                 } // for seach dist
                                 if (b == 10) {
                                     free(r.ptr);
-                                    exitf("could not find next code in acc=%s", binstr(acc, has));
+                                    exitf("could not find next dist code in acc=%s", binstr(acc, has));
                                 }
                             } // if > 256
                             break;
@@ -276,7 +281,7 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
                     } // for search len
                     if (b == 16) {
                         free(r.ptr);
-                        exitf("could not find next code in acc=%s", binstr(acc, has));
+                        exitf("could not find next lit code in acc=%s", binstr(acc, has));
                     }
                 } // until code 256
             end_of_block:;
