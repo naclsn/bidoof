@@ -66,7 +66,7 @@
 ///  - writing a byte: `res->ptr[res->len++] = *it`
 ///  - reading a byte: `*it = src->ptr[(*at)++]`
 
-// uNN typedefs, buf typedef and dyarr_ macros, ref/cref macros
+// uNN/sz typedefs, buf typedef and dyarr_ macros, ref/cref macros
 #include "../base.h"
 
 #ifdef BIPA_DECLONLY
@@ -91,7 +91,6 @@
 #define _hidump_id(__c) __c
 #endif
 
-// :-(
 static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declonly({
     if (0 == len) return;
     sz const top = (len-1)/16+1;

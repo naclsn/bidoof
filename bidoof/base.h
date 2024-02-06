@@ -14,7 +14,10 @@
 
 #include "utils/dyarr.h"
 
+#define countof(__a) (sizeof(__a)/sizeof*(__a))
+
 #define mkbuf(__c) (buf){.ptr= (u8*)__c, .len= strlen(__c)}
+#define mkbufa(...) (buf){.ptr= (u8[])__VA_ARGS__, .len= countof(((u8[])__VA_ARGS__))}
 #define mkbufsl(__b, __st, __ed) (buf){.ptr= (__b)->ptr+(__st), .len= (__ed)-(__st)}
 
 #define ref * const
