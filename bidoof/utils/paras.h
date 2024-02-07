@@ -11,10 +11,14 @@
 #endif
 
 #define __rem_par(...) __VA_ARGS__
-#define __first_arg(h, ...) h
+#define __first_arg_(h, ...) h
+#define __first_arg(...) __first_arg_(__VA_ARGS__, _)
 
 union paras_generic { char const* s; int i; unsigned u; };
 static bool _paras_scan(buf cref src, sz ref at, char cref f, sz const argc, union paras_generic argv[argc]) _declonly({
+    (void)src;
+    (void)at;
+    (void)argv;
     printf("NYI: scan <<%s>>, %zu args\n", f, argc);
     return false;
 })
@@ -39,10 +43,10 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, sz const argc, uni
         continue;                                                         \
     }
 
-#define _paras_make_asmbl(__name, __code, __masks, __format, __encode)                    \
+#define _paras_make_asmbl(__name, __codes, __masks, __format, __encode)                   \
     if (!strcmp(#__name, word)) {                                                         \
         union paras_generic* args = NULL;                                                 \
-        union paras_generic _args[countof((u8[]){__rem_par __encode})];                   \
+        union paras_generic _args[countof((u8[]){__rem_par __codes})];                    \
         if (_paras_scan(src, &at, __first_arg __format, countof(_args), args = _args)) {  \
             u8 const _bytes[countof(codes)] = {__rem_par __encode};                       \
             (void)_bytes;                                                                 \
@@ -57,6 +61,7 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, sz const argc, uni
 
 #define paras_make_instrset(__name, ...)                                 \
     sz paras_disasm_##__name(buf cref src, buf ref res) _declonly({      \
+        (void)res;  \
         static bool const _disasm = true;                                \
         static char const* const word;                                   \
         sz at = 0;                                                       \
@@ -68,7 +73,8 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, sz const argc, uni
         return at;                                                       \
     })                                                                   \
                                                                          \
-    sz paras_asmbl_##__name(buf cref src, buf ref r) _declonly({         \
+    sz paras_asmbl_##__name(buf cref src, buf ref res) _declonly({       \
+        (void)res;  \
         static bool const _disasm = false;                               \
         static u8 const* const bytes;                                    \
         sz at = 0;                                                       \
