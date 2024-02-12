@@ -15,86 +15,99 @@
 #define __first_arg(...) __first_arg_(__VA_ARGS__, _)
 
 union paras_generic { char const* s; int i; unsigned u; };
-static bool _paras_scan(buf cref src, sz ref at, char cref f, sz const argc, union paras_generic argv[argc]) {
-    sz eol = *at;
-    while ('\n' != src->ptr[eol] && eol < src->len) eol++;
-
+static bool _paras_scan(buf cref src, sz ref at, char cref f, union paras_generic* args) _declonly({
     sz i = *at, j = 0, k = 0;
-    while (f[j] && i < eol && ';' != src->ptr[i] && k < argc) switch (f[j++]) {
+    while (f[j] && i < src->len && '\n' != src->ptr[i] && ';' != src->ptr[i]) switch (f[j++]) {
         case ' ':
-            while (strchr(" \t", src->ptr[i]) && i < eol) i++;
+            while (i < src->len && strchr(" \t", src->ptr[i])) i++;
             break;
 
         case '%': switch (f[j++]) {
-                case 's':
-                    argv[k++].s = (char*)src->ptr+i;
-                    while (!strchr(" \t;,][", src->ptr[i]) && i < eol) i++;
-                    break;
+            case 's':
+                args[k++].s = (char*)src->ptr+i;
+                for (char const* const endchs = '[' == src->ptr[i]
+                        ? " \t\n;,+-"
+                        : " \t\n;,]+-";
+                        i < src->len && !strchr(endchs, src->ptr[i]); i++);
+                break;
 
-                case 'u':
-                    if ('-' == src->ptr[i]) return false;
-                    // fallthrough
-                case 'i': {
-                    bool const minus = '-' == src->ptr[i];
-                    if (minus || '+' == src->ptr[i]) i++;
-                    unsigned shft = 0;
-                    char const* dgts = "0123456789";
-                    if ('0' == src->ptr[i]) switch (src->ptr[i++]) {
-                        case 'b': i++; shft = 1; dgts = "01";               break;
-                        case 'o': i++; shft = 3; dgts = "01234567";         break;
-                        case 'x': i++; shft = 4; dgts = "0123456789abcdef"; break;
-                    }
-                    argv[k].i = 0;
-                    u8 const* c = src->ptr+i;
-                    for (char const* v; c < src->ptr+eol && (v = strchr(dgts, *c|32)); c++)
-                        argv[k].i = (!shft ? argv[k].i*10 : argv[k].i<<shft) + (v-dgts);
-                    if (src->ptr+i == c) return false;
-                    if (minus) argv[k].i*= -1;
-                    k++;
-                    i = c-src->ptr;
-                } break;
-
-                case '%': if ('%' != src->ptr[i++]) return false;
+            case 'u':
+                if ('-' == src->ptr[i]) return false;
+                // fallthrough
+            case 'i': {
+                bool const minus = '-' == src->ptr[i];
+                if (minus || '+' == src->ptr[i]) i++;
+                unsigned shft = 0;
+                char const* dgts = "0123456789";
+                if ('0' == src->ptr[i]) switch (src->ptr[i++]) {
+                    case 'b': i++; shft = 1; dgts = "01";               break;
+                    case 'o': i++; shft = 3; dgts = "01234567";         break;
+                    case 'x': i++; shft = 4; dgts = "0123456789abcdef"; break;
+                }
+                args[k].i = 0;
+                char const* v = strchr(dgts, src->ptr[i++]|32);
+                if (!v) return false;
+                do args[k].i = (!shft ? args[k].i*10 : args[k].i<<shft) + (v-dgts);
+                while (i < src->len && (v = strchr(dgts, src->ptr[i++]|32)));
+                if (minus) args[k].i*= -1;
+                k++;
             } break;
+
+            case '%': if ('%' != src->ptr[i++]) return false;
+        } break;
 
         default: if (f[j-1] != src->ptr[i++]) return false;
     }
 
-    *at = eol+1;
-    return true;
-}
-
-#define _paras_make_statics(__name, __codes, __masks, __format, __encode)  \
-    static u8 const codes[] = {__rem_par __codes};                         \
-    static u8 const masks[countof(codes)] = {__rem_par __masks};
-
-#define _paras_make_disasm(__name, __codes, __masks, __format, __encode)  \
-    unsigned _k;                                                          \
-    for (_k = 0; _k < countof(codes); _k++)                               \
-        if ((bytes[_k] & masks[_k]) != codes[_k]) break;                  \
-    if (countof(codes) == _k) {                                           \
-        printf("%07zx0:   ", at);                                         \
-        for (unsigned k = 0; k < 5; k++)                                  \
-            if (k < _k) printf("%02X ", bytes[k]);                        \
-            else printf("   ");                                           \
-        printf("  " #__name " \t");                                       \
-        printf __format;                                                  \
-        printf("\n");                                                     \
-        at+= _k;                                                          \
-        continue;                                                         \
+    if (f[j]) return false;
+    while (i < src->len && '\n' != src->ptr[i]) {
+        if (';' != src->ptr[i]) {
+            while (i < src->len && '\n' != src->ptr[i]) i++;
+            break;
+        }
+        if (!strchr(" \t", src->ptr[i++])) return false;
     }
 
-#define _paras_make_asmbl(__name, __codes, __masks, __format, __encode)                   \
-    if (!memcmp(#__name, word, strlen(#__name))) {                                        \
-        union paras_generic* args = NULL;                                                 \
-        union paras_generic _args[countof((u8[]){__rem_par __codes})];                    \
-        if (_paras_scan(src, &at, __first_arg __format, countof(_args), args = _args)) {  \
-            u8 const _bytes[countof(codes)] = {__rem_par __encode};                       \
-            for (unsigned k = 0; k < countof(codes); k++)  \
-                printf(" %02X", _bytes[k]);  \
-            puts(" - " #__name);  \
-            continue;                                                                     \
-        }                                                                                 \
+    *at = i + (src->len != i);
+    return true;
+})
+
+static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
+#define paras_mark_invalid() _paras_mark_invalid(&valid)
+#define _paras_sprintf_h(...) sprintf(_h, " " __VA_ARGS__)
+
+#define _paras_make_statics(__name, __codes, __masks, __format, __encode)  \
+    static u8 const masks[] = {__rem_par __masks};                         \
+    static u8 const codes[countof(masks)] = {__rem_par __codes};
+
+#define _paras_make_disasm(__name, __codes, __masks, __format, __encode)        \
+    unsigned _k;                                                                \
+    for (_k = 0; _k < countof(codes); _k++)                                     \
+        if ((bytes[_k] & masks[_k]) != codes[_k]) break;                        \
+    if (countof(codes) == _k) {                                                 \
+        char _buf[256], *_h = _buf;                                             \
+        _h+= sprintf(_h, #__name);                                              \
+        _h+= _paras_sprintf_h __format;                                         \
+        _h+= sprintf(_h, "%*.s; %08zx:  ", (unsigned)(24-(_h-_buf)), "", at);   \
+        for (unsigned k = 0; k < _k; k++) _h+= sprintf(_h, " %02X", bytes[k]);  \
+        _h+= sprintf(_h, "\n");                                                 \
+        bufcat(res, &(buf){.ptr= (u8*)_buf, .len= _h-_buf});                    \
+        at+= _k;                                                                \
+        continue;                                                               \
+    }
+
+#define _paras_make_asmbl(__name, __codes, __masks, __format, __encode)        \
+    if (!memcmp(#__name, word, strlen(#__name))) {                             \
+        union paras_generic args[4];                                           \
+        sz _pat = at;                                                          \
+        if (_paras_scan(src, &at, __first_arg __format, args)) {               \
+            bool valid = true;                                                 \
+            u8 const _bytes[countof(codes)] = {__rem_par __encode};            \
+            if (valid) {                                                       \
+                bufcat(res, &(buf){.ptr= (u8*)_bytes, .len= countof(codes)});  \
+                continue;                                                      \
+            } else at = _pat;                                                  \
+        }                                                                      \
     }
 
 #define paras_make_instr(...) {                           \
@@ -105,7 +118,6 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, sz const argc, uni
 
 #define paras_make_instrset(__name, ...)                                   \
     sz paras_disasm_##__name(buf cref src, buf ref res) _declonly({        \
-        (void)res;  \
         static bool const _disasm = true;                                  \
         static char const* const word;                                     \
         sz at = 0;                                                         \
@@ -118,21 +130,26 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, sz const argc, uni
     })                                                                     \
                                                                            \
     sz paras_asmbl_##__name(buf cref src, buf ref res) _declonly({         \
-        (void)res;  \
         static bool const _disasm = false;                                 \
         static u8 const* const bytes;                                      \
+        unsigned _ln = 0;                                                  \
         sz at = 0;                                                         \
         while (at < src->len) {                                            \
-            while (strchr(" \t\n", src->ptr[at]) && at < src->len) at++;   \
+            _ln++;                                                         \
+            while (at < src->len && strchr(" \t\n", src->ptr[at])) {       \
+                if ('\n' == src->ptr[at]) _ln++;                           \
+                at++;                                                      \
+            }                                                              \
             char const* const word = (char*)src->ptr+at;                   \
-            while (!strchr(" \t\n", src->ptr[at]) && at < src->len) at++;  \
-            while (strchr(" \t", src->ptr[at]) && at < src->len) at++;     \
+            while (at < src->len && !strchr(" \t\n", src->ptr[at])) at++;  \
+            while (at < src->len && strchr(" \t", src->ptr[at])) at++;     \
             if (at < src->len && ';' != *word) {                           \
                 __VA_ARGS__                                                \
-                exitf("unknown instruction mnemonic: '%.*s'",              \
-                    (int)(src->ptr+at-(u8*)word), word);                   \
+                while (at < src->len && '\n' != src->ptr[at]) at++;        \
+                exitf("unknown mnemonic with given args line %u: '%.*s'",  \
+                    _ln, (int)(src->ptr+at - (u8*)word), word);            \
             }                                                              \
-            while ('\n' != src->ptr[at] && at < src->len) at++;            \
+            while (at < src->len && '\n' != src->ptr[at]) at++;            \
         }                                                                  \
         return at;                                                         \
     })
