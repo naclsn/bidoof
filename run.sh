@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
-name=${1%.c}
-shift
+#!/bin/sh
+test -d build/ || mkdir build/
+name=${1%.c}; shift
 make build/$name && exec build/$name "$@"
