@@ -299,6 +299,7 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
             ) puts(it->name);                                      \
         return 0;                                                  \
     }
+#define make_simple_main() make_main() void _unused_simple_main(void)
 
 #else // BIDOOF_LIST_DEPS
 
@@ -311,11 +312,11 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
                     : !argc ? exitf("expected value for argument '" #__name "'"), NULL       \
                     : (argc--, argv++, &(buf){.ptr= (u8*)argv[-1], .len= strlen(argv[-1])})  \
                     )
-#define make_arg_int(__name, __information)                                           \
-    int const __name = (_is_h ? puts("\t" #__name ":\t" __information), 0             \
-                    : !argc ? exitf("expected number for argument '" #__name "'"), 0  \
-                    : (argc--, atoi(*argv++))                                         \
-                    )
+#define make_arg_int(__name, __information)                                            \
+    int const __name = (_is_h ? puts("\t" #__name ":\t" __information), 0              \
+                     : !argc ? exitf("expected number for argument '" #__name "'"), 0  \
+                     : (argc--, atoi(*argv++))                                         \
+                     )
 
 #define make_cmd(__invocation, __description, ...) do                             \
     if (_is_h) puts("\t" #__invocation ":\t" __description);                      \
@@ -350,6 +351,8 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
         printf("unknown command: '%s'\n", *argv);  \
         return 1;                                  \
     }
+
+#define make_simple_main() int main(void)
 
 #endif // BIDOOF_LIST_DEPS
 

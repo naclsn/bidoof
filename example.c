@@ -1,10 +1,6 @@
 #include "bidoof/base.h"
 #include "bidoof/tools/images.h"
 
-// need to surround with this for now
-// TODO: clean this up
-#ifndef BIDOOF_LIST_DEPS
-
 // buf: has .ptr and .len
 // cref: const* const
 
@@ -42,8 +38,6 @@ void chunk(buf cref filepath, buf cref chunk, buf cref outfile) {
         file_write(outfile, &res);
     }
 }
-
-#endif // BIDOOF_LIST_DEPS
 
 // TODO: make it accept with a space after the function name
 make_main("png tool to get channels or chunks",

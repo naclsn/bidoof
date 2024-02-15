@@ -17,7 +17,8 @@ endif
 
 objs = $(builddir)/bdf-base.o $(toolobjs) $(x-toolobjs)
 list:; @echo $(toolnames) $(x-toolnames)
-clean: $(builddir)/d-*.exe; $(RM) $(objs) $^
+clean:; $(RM) $(objs) $(builddir)/d-*.exe
+.PHONY: all list clean
 
 ifeq ($(OS), Windows_NT)
 views-LDFLAGS = -pthread -lopengl32 -lgdi32
@@ -25,8 +26,8 @@ else
 views-LDFLAGS = -pthread -lGL -lX11
 endif
 
-$(builddir)/bdf-base.o: bidoof/base.h; $(CC) -x c -c $< -o $@ -DBIDOOF_IMPLEMENTATION $(CFLAGS)
-$(builddir)/t-%.o: bidoof/tools/%.h; $(CC) -x c -c $< -o $@ -DBIDOOF_T_IMPLEMENTATION $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
-$(builddir)/d-%.exe: %.c; $(CC) $< -o $@ -DBIDOOF_LIST_DEPS -std=c99 -Iunreleased -Ibidoof/tools
+$(builddir)/bdf-base.o: bidoof/base.h bidoof/utils/*.h; $(CC) -x c -c $< -o $@ -DBIDOOF_IMPLEMENTATION $(CFLAGS)
+$(builddir)/t-%.o: bidoof/tools/%.h $(builddir)/bdf-base.o; $(CC) -x c -c $< -o $@ -DBIDOOF_T_IMPLEMENTATION $(CFLAGS) $($*-CFLAGS) $($*-LDFLAGS)
+$(builddir)/d-%.exe: %.c; $(CC) $< -o $@ -DBIDOOF_LIST_DEPS $(CFLAGS) -Wl,--unresolved-symbols=ignore-all
 $(builddir)/%: %.c $(builddir)/d-%.exe $(objs); $(CC) $< $(builddir)/bdf-base.o -o $@ $(CFLAGS) $(foreach t,$(shell $(builddir)/d-$*.exe),$(builddir)/t-$(t).o $($(t)-CFLAGS) $($(t)-LDFLAGS))
 .PRECIOUS: $(builddir)/d-%.exe $(objs)

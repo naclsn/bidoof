@@ -22,7 +22,7 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, union paras_generi
             while (i < src->len && strchr(" \t", src->ptr[i])) i++;
             break;
 
-        case '%': switch (f[j++]) {
+        case '%': switch ('#' == f[j] ? j++, f[j++] : f[j++]) {
             case 's':
                 args[k++].s = (char*)src->ptr+i;
                 for (char const* const endchs = '[' == src->ptr[i]
@@ -32,6 +32,7 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, union paras_generi
                 break;
 
             case 'u':
+            case 'x':
                 if ('-' == src->ptr[i]) return false;
                 // fallthrough
             case 'i': {
@@ -80,20 +81,20 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
     static u8 const masks[] = {__rem_par __masks};                         \
     static u8 const codes[countof(masks)] = {__rem_par __codes};
 
-#define _paras_make_disasm(__name, __codes, __masks, __format, __encode)        \
-    unsigned _k;                                                                \
-    for (_k = 0; _k < countof(codes); _k++)                                     \
-        if ((bytes[_k] & masks[_k]) != codes[_k]) break;                        \
-    if (countof(codes) == _k) {                                                 \
-        char _buf[256], *_h = _buf;                                             \
-        _h+= sprintf(_h, #__name);                                              \
-        _h+= _paras_sprintf_h __format;                                         \
-        _h+= sprintf(_h, "%*.s; %08zx:  ", (unsigned)(24-(_h-_buf)), "", at);   \
-        for (unsigned k = 0; k < _k; k++) _h+= sprintf(_h, " %02X", bytes[k]);  \
-        _h+= sprintf(_h, "\n");                                                 \
-        bufcat(res, &(buf){.ptr= (u8*)_buf, .len= _h-_buf});                    \
-        at+= _k;                                                                \
-        continue;                                                               \
+#define _paras_make_disasm(__name, __codes, __masks, __format, __encode)           \
+    unsigned _k;                                                                   \
+    for (_k = 0; _k < countof(codes); _k++)                                        \
+        if ((bytes[_k] & masks[_k]) != codes[_k]) break;                           \
+    if (countof(codes) == _k) {                                                    \
+        char _buf[256], *_h = _buf;                                                \
+        _h+= sprintf(_h, #__name);                                                 \
+        _h+= _paras_sprintf_h __format;                                            \
+        _h+= sprintf(_h, "%*.s; %08zx:  ", (unsigned)(24-(_h-_buf)), "", loc+at);  \
+        for (unsigned k = 0; k < _k; k++) _h+= sprintf(_h, " %02X", bytes[k]);     \
+        _h+= sprintf(_h, "\n");                                                    \
+        bufcat(res, &(buf){.ptr= (u8*)_buf, .len= _h-_buf});                       \
+        at+= _k;                                                                   \
+        continue;                                                                  \
     }
 
 #define _paras_make_asmbl(__name, __codes, __masks, __format, __encode)        \
@@ -116,42 +117,42 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
         else { _paras_make_asmbl(__VA_ARGS__) }           \
     }
 
-#define paras_make_instrset(__name, ...)                                   \
-    sz paras_disasm_##__name(buf cref src, buf ref res) _declonly({        \
-        static bool const _disasm = true;                                  \
-        static char const* const word;                                     \
-        sz at = 0;                                                         \
-        while (at < src->len) {                                            \
-            u8 const* const bytes = src->ptr+at;                           \
-            __VA_ARGS__                                                    \
-            break;                                                         \
-        }                                                                  \
-        return at;                                                         \
-    })                                                                     \
-                                                                           \
-    sz paras_asmbl_##__name(buf cref src, buf ref res) _declonly({         \
-        static bool const _disasm = false;                                 \
-        static u8 const* const bytes;                                      \
-        unsigned _ln = 0;                                                  \
-        sz at = 0;                                                         \
-        while (at < src->len) {                                            \
-            _ln++;                                                         \
-            while (at < src->len && strchr(" \t\n", src->ptr[at])) {       \
-                if ('\n' == src->ptr[at]) _ln++;                           \
-                at++;                                                      \
-            }                                                              \
-            char const* const word = (char*)src->ptr+at;                   \
-            while (at < src->len && !strchr(" \t\n", src->ptr[at])) at++;  \
-            while (at < src->len && strchr(" \t", src->ptr[at])) at++;     \
-            if (at < src->len && ';' != *word) {                           \
-                __VA_ARGS__                                                \
-                while (at < src->len && '\n' != src->ptr[at]) at++;        \
-                exitf("unknown mnemonic with given args line %u: '%.*s'",  \
-                    _ln, (int)(src->ptr+at - (u8*)word), word);            \
-            }                                                              \
-            while (at < src->len && '\n' != src->ptr[at]) at++;            \
-        }                                                                  \
-        return at;                                                         \
+#define paras_make_instrset(__name, ...)                                           \
+    sz paras_disasm_##__name(buf cref src, buf ref res, sz const loc) _declonly({  \
+        static bool const _disasm = true;                                          \
+        static char const* const word;                                             \
+        sz at = 0;                                                                 \
+        while (at < src->len) {                                                    \
+            u8 const* const bytes = src->ptr+at;                                   \
+            __VA_ARGS__                                                            \
+            break;                                                                 \
+        }                                                                          \
+        return at;                                                                 \
+    })                                                                             \
+                                                                                   \
+    sz paras_asmbl_##__name(buf cref src, buf ref res) _declonly({                 \
+        static bool const _disasm = false;                                         \
+        static u8 const* const bytes;                                              \
+        unsigned _ln = 0;                                                          \
+        sz at = 0, loc;                                                            \
+        while (at < src->len) {                                                    \
+            _ln++;                                                                 \
+            while (at < src->len && strchr(" \t\n", src->ptr[at])) {               \
+                if ('\n' == src->ptr[at]) _ln++;                                   \
+                at++;                                                              \
+            }                                                                      \
+            char const* const word = (char*)src->ptr+at;                           \
+            while (at < src->len && !strchr(" \t\n", src->ptr[at])) at++;          \
+            while (at < src->len && strchr(" \t", src->ptr[at])) at++;             \
+            if (at < src->len && ';' != *word) {                                   \
+                __VA_ARGS__                                                        \
+                while (at < src->len && '\n' != src->ptr[at]) at++;                \
+                exitf("unknown mnemonic with given args line %u: '%.*s'",          \
+                    _ln, (int)(src->ptr+at - (u8*)word), word);                    \
+            }                                                                      \
+            while (at < src->len && '\n' != src->ptr[at]) at++;                    \
+        }                                                                          \
+        return at;                                                                 \
     })
 
 #endif // __PARAS_H__

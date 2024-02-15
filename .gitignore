@@ -1,2 +1,8 @@
+# t-, d-, user exe
 build/
+# not integrated (private, wip, ..) tools and files
 unreleased/
+# user sources (usually at repo root, so "/*.c", but ther are only headers here)
+*.c
+# (except this one)
+!example.c
