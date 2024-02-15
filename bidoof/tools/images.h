@@ -2,13 +2,13 @@
 #define __BIDOOF_T_IMAGES__
 
 #ifdef BIDOOF_T_IMPLEMENTATION
-#define _redef_after_image
+#define _redef_after_images
 #undef BIDOOF_IMPLEMENTATION
 #undef BIDOOF_T_IMPLEMENTATION
 #endif
 #include "compressions.h"
-#ifdef _redef_after_image
-#undef _redef_after_image
+#ifdef _redef_after_images
+#undef _redef_after_images
 #define BIDOOF_IMPLEMENTATION
 #define BIDOOF_T_IMPLEMENTATION
 #endif
@@ -95,7 +95,7 @@ buf png_data_chunknames(png_data cref png) {
 buf png_data_find(png_data cref png, u32 const type) {
     for (sz k = 0; k < png->chunks.len; k++)
         if (type == png->chunks.ptr[k].type)
-            return bufcpy(png->chunks.ptr[k].data, png->chunks.ptr[k].length);
+            return bufcpy(&mkbufsl(png->chunks.ptr[k].data, 0, png->chunks.ptr[k].length));
     exitf("no chunk in png_data for given type %c%c%c%c", type<<24 & 0xff, type<<16 & 0xff, type<< 8 & 0xff, type<< 0 & 0xff);
     return (buf){0};
 }

@@ -1,6 +1,18 @@
 #ifndef __BIDOOF_T_ARCHIVES__
 #define __BIDOOF_T_ARCHIVES__
 
+#ifdef BIDOOF_T_IMPLEMENTATION
+#define _redef_after_archives
+#undef BIDOOF_IMPLEMENTATION
+#undef BIDOOF_T_IMPLEMENTATION
+#endif
+#include "checks.h"
+#ifdef _redef_after_archives
+#undef _redef_after_archives
+#define BIDOOF_IMPLEMENTATION
+#define BIDOOF_T_IMPLEMENTATION
+#endif
+
 #include "../base.h"
 #ifndef BIDOOF_IMPLEMENTATION
 #define BIPA_DECLONLY
@@ -119,7 +131,22 @@ bipa_struct(zip_data, 3
 // https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 adapt_bipa_type(zip_data)
 
+typedef struct zip_entry {
+    struct zip_data* zip;
+    struct local_file* file;
+    struct central_directory_header* header;
+} zip_entry;
+
 buf zip_data_find_by_path(zip_data cref zip, buf cref path);
+
+zip_entry zip_add_entry(zip_data ref zip);
+void zip_entry_file_name(zip_entry ref en, buf cref file_name);
+void zip_entry_extra_field(zip_entry ref en, buf cref extra_field);
+void zip_entry_file_data(zip_entry ref en, buf cref file_data);
+void zip_fix_entry(zip_entry ref en);
+
+void zip_fix_central_dir(zip_data ref zip);
+void zip_swap_central_dir_comment(zip_data ref zip, buf ref com);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
@@ -127,6 +154,80 @@ buf zip_data_find_by_path(zip_data cref zip, buf cref path) {
     (void)zip;
     (void)path;
     return (buf){0};
+}
+
+zip_entry zip_add_entry(zip_data ref zip) {
+    struct local_file* file = dyarr_push(&zip->local_files);
+    struct central_directory_header* header = dyarr_push(&zip->central_directory_headers);
+    if (!file || !header) exitf("OOM");
+
+    file->local_file_header.version_needed_to_extract = 10;
+    header->version_needed_to_extract = 10;
+
+    return (zip_entry){.zip= zip, .file= file, .header= header};
+}
+
+void zip_entry_file_name(zip_entry ref en, buf cref file_name) {
+    en->file->local_file_header.file_name_length = file_name->len;
+    en->file->local_file_header.file_name = bufcpy(file_name).ptr;
+    en->header->file_name_length = file_name->len;
+    en->header->file_name = bufcpy(file_name).ptr;
+}
+
+void zip_entry_extra_field(zip_entry ref en, buf cref extra_field) {
+    en->file->local_file_header.extra_field_length = extra_field->len;
+    en->file->local_file_header.extra_field = bufcpy(extra_field).ptr;
+    en->header->extra_field_length = extra_field->len;
+    en->header->extra_field = bufcpy(extra_field).ptr;
+}
+
+void zip_entry_file_data(zip_entry ref en, buf cref file_data) {
+    en->file->local_file_header.compressed_size = file_data->len;
+    en->file->file_data = bufcpy(file_data).ptr;
+}
+
+void zip_fix_entry(zip_entry ref en) {
+    u32 crc = crc32(&mkbufsl(en->file->file_data, 0, en->file->local_file_header.compressed_size));
+    en->file->local_file_header.crc_32 = crc;
+    en->header->crc_32 = crc;
+
+    // for now
+    en->file->local_file_header.uncompressed_size =
+    en->header->compressed_size =
+    en->header->uncompressed_size =
+        en->file->local_file_header.compressed_size;
+
+    u32 off = 0;
+    for (struct local_file const* it = en->zip->local_files.ptr; it != en->file; it++)
+        off+= bipa_bytesz_local_file(it);
+    en->header->relative_offset_of_local_header = off;
+
+    // please
+    en->file->local_file_header.last_mod_file_time = en->header->last_mod_file_time = 44642;
+    en->file->local_file_header.last_mod_file_date = en->header->last_mod_file_date = 22350;
+    en->header->internal_file_attributes= 0;
+    en->header->external_file_attributes= 2175008768;
+}
+
+void zip_fix_central_dir(zip_data ref zip) {
+    zip->end_of_central_directory_record.number_of_this_disk = 0;
+    zip->end_of_central_directory_record.number_of_the_disk_with_the_start_of_the_central_directory = 0;
+
+    zip->end_of_central_directory_record.size_of_the_central_directory =
+        bipa_bytesz_central_directory_headers(&zip->central_directory_headers);
+
+    zip->end_of_central_directory_record.offset_of_start_of_central_directory_with_respect_to_the_starting_disk_number =
+        bipa_bytesz_local_files(&zip->local_files);
+}
+
+void zip_swap_central_dir_comment(zip_data ref zip, buf ref com) {
+    buf const tmp = *com;
+
+    com->len = zip->end_of_central_directory_record.zip_file_comment_length;
+    com->ptr = zip->end_of_central_directory_record.zip_file_comment;
+
+    zip->end_of_central_directory_record.zip_file_comment_length = tmp.len;
+    zip->end_of_central_directory_record.zip_file_comment = tmp.ptr;
 }
 
 #endif // BIDOOF_IMPLEMENTATION

@@ -1,6 +1,10 @@
 #ifndef __PARAS_H__
 #define __PARAS_H__
 
+// TODO: doc
+
+/// (here)
+
 // uNN/sz typedefs, buf typedef and dyarr_ macros, ref/cref macros
 #include "../base.h"
 

@@ -18,7 +18,7 @@
 
 #define mkbuf(__c) (buf){.ptr= (u8*)__c, .len= strlen(__c)}
 #define mkbufa(...) (buf){.ptr= (u8[])__VA_ARGS__, .len= countof(((u8[])__VA_ARGS__))}
-#define mkbufsl(__b, __st, __ed) (buf){.ptr= (__b)->ptr+(__st), .len= (__ed)-(__st)}
+#define mkbufsl(__p, __st, __ed) (buf){.ptr= (__p)+(__st), .len= (__ed)-(__st)}
 
 #define ref * const
 #define cref const ref
@@ -55,7 +55,7 @@ void buf_free(buf cref self);
     fclose(__name);                                         \
 } while (0)
 
-buf bufcpy(u8 cref ptr, sz const len);
+buf bufcpy(buf cref other);
 void bufcat(buf ref to, buf cref other);
 
 u16 peek16le(buf cref b, sz const k);
@@ -158,10 +158,10 @@ void buf_free(buf cref self) {
     if (self->cap) free(self->ptr);
 }
 
-buf bufcpy(u8 cref ptr, sz const len) {
-    buf r = {.ptr= malloc(len), .len= len, .cap= len};
+buf bufcpy(buf cref other) {
+    buf r = {.ptr= malloc(other->len), .len= other->len, .cap= other->len};
     if (!r.ptr) exitf("OOM");
-    memcpy(r.ptr, ptr, len);
+    memcpy(r.ptr, other->ptr, other->len);
     return r;
 }
 

@@ -20,11 +20,12 @@
 ///  - `k` the iteration number
 ///  - `it` the array itself (so `it->ptr[k-1]` the last parsed item, `it->ptr[k]` is not parsed yet)
 ///
-/// using one of the public macros will generate the associated functions:
+/// using one of the public macros will generate the associated:
 ///  - void bipa_dump_typename(cref self, FILE ref strm, int depth)
 ///  - bool bipa_build_typename(cref self, buf ref res)
 ///  - bool bipa_parse_typename(ref self, buf cref src, sz ref at)
 ///  - void bipa_free_typename(cref self)
+///  - sz bipa_bytesz_typename(cref self)
 ///
 /// short example:
 /// ```c
@@ -155,12 +156,14 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _build(__ty, ...)    _CALL(_build_##__ty, __VA_ARGS__)
 #define _parse(__ty, ...)    _CALL(_parse_##__ty, __VA_ARGS__)
 #define _free(__ty, ...)     _CALL(_free_##__ty, __VA_ARGS__)
+#define _bytesz(__ty, ...)   _CALL(_bytesz_##__ty, __VA_ARGS__)
 
 #define _typename_void() bool
 #define _dump_void()  (void)it; fprintf(strm, _hidump_kw("void"));
 #define _build_void() (void)it;
 #define _parse_void() (void)it;
 #define _free_void()  (void)it;
+#define _bytesz_void() 0
 
 #define _typename_u8() u8
 #define _dump_u8()  fprintf(strm, _hidump_nb("%hhu") _hidump_ex("u8"), *it);
@@ -170,6 +173,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _parse_u8() if (src->len == (*at)) goto fail;  \
                     *it = src->ptr[(*at)++];
 #define _free_u8()  (void)it;
+#define _bytesz_u8() 1
 
 #define _typename_u16le() u16
 #define _typename_u32le() u32
@@ -223,6 +227,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _free_u16le() (void)it;
 #define _free_u32le() (void)it;
 #define _free_u64le() (void)it;
+#define _bytesz_u16le() 2
+#define _bytesz_u32le() 4
+#define _bytesz_u64le() 8
 
 #define _typename_u16be() u16
 #define _typename_u32be() u32
@@ -276,6 +283,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _free_u16be() (void)it;
 #define _free_u32be() (void)it;
 #define _free_u64be() (void)it;
+#define _bytesz_u16be() 2
+#define _bytesz_u32be() 4
+#define _bytesz_u64be() 8
 
 #define _typename_cstr(__sentinel) u8*
 #define _dump_cstr(__sentinel) {                                         \
@@ -309,6 +319,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         (*at)+= len+1;                                           \
     }
 #define _free_cstr(__sentinel) free(*it);
+#define _bytesz_cstr(__sentinel) ((u8*)strchr((char*)*it, (__sentinel)) - *it)
 
 #define _typename_lstr(__length) u8*
 #define _dump_lstr(__length) {                                             \
@@ -333,7 +344,8 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         memcpy(*it, from, len);               \
         (*at)+= len;                          \
     }
-#define _free_lstr(__sentinel) free(*it);
+#define _free_lstr(__length) free(*it);
+#define _bytesz_lstr(__length) (__length)
 
 #define _struct_fields_typename_one(__k, __n, __inv, __ty, __nm) _typename __ty __nm;
 
@@ -357,6 +369,11 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _struct_fields_free_one(__k, __n, __inv, __ty, __nm) {  \
         _typename __ty const* const it = &self->__nm;           \
         _free __ty                                              \
+    }
+
+#define _struct_fields_bytesz_one(__k, __n, __inv, __ty, __nm) {  \
+        _typename __ty const* const it = &self->__nm;             \
+        r+= _bytesz __ty;                                         \
     }
 
 #define bipa_struct(__tname, __n_fields, ...)                                                          \
@@ -384,12 +401,18 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
     })                                                                                                 \
     void bipa_free_##__tname(struct __tname cref self) _declonly({                                     \
         _FOR_TYNM(__n_fields, _struct_fields_free_one, 0, __VA_ARGS__)                                 \
+    })                                                                                                 \
+    sz bipa_bytesz_##__tname(struct __tname cref self) _declonly({                                     \
+        sz r = 0;                                                                                      \
+        _FOR_TYNM(__n_fields, _struct_fields_bytesz_one, 0, __VA_ARGS__);                              \
+        return r;                                                                                      \
     })
 #define _typename_struct(__tname) struct __tname
 #define _dump_struct(__tname)   bipa_dump_##__tname(it, strm, depth+1);
 #define _build_struct(__tname)  if (!bipa_build_##__tname(it, res)) goto fail;
 #define _parse_struct(__tname)  if (!bipa_parse_##__tname(it, src, at)) goto fail;
 #define _free_struct(__tname)   bipa_free_##__tname(it);
+#define _bytesz_struct(__tname) bipa_bytesz_##__tname(it)
 
 #define _union_getvar_name(__tty, __tva, __nm)     __nm
 #define _union_getvar_tagtype(__tty, __tva, __nm)  __tty
@@ -454,6 +477,14 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         _free __ty                                            \
     } break;
 
+#define _union_kinds_bytesz_one(__k, __n, __tname, __ty, __nm)  \
+    case _XJOIN(__tname##_tag_, _union_getvar_name __nm): {     \
+        _typename __ty const* const it =                        \
+            &self->val._union_getvar_name __nm;                 \
+        return _bytesz __ty                                     \
+            + _XJOIN(_bytesz_, _union_getvar_tagtype __nm)();   \
+    }
+
 #define bipa_union(__tname, __n_kinds, ...)                                                            \
     struct __tname {                                                                                   \
         union {                                                                                        \
@@ -493,12 +524,19 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         switch (self->tag) {                                                                           \
             _FOR_TYNM(__n_kinds, _union_kinds_free_one, __tname, __VA_ARGS__)                          \
         }                                                                                              \
+    })                                                                                                 \
+    sz bipa_bytesz_##__tname(struct __tname cref self) _declonly({                                     \
+        switch (self->tag) {                                                                           \
+            _FOR_TYNM(__n_kinds, _union_kinds_bytesz_one, __tname, __VA_ARGS__);                       \
+            default: return 0;                                                                         \
+        }                                                                                              \
     })
 #define _typename_union(__tname) struct __tname
 #define _dump_union(__tname)    bipa_dump_##__tname(it, strm, depth+1);
 #define _build_union(__tname)   if (!bipa_build_##__tname(it, res)) goto fail;
 #define _parse_union(__tname)   if (!bipa_parse_##__tname(it, src, at)) goto fail;
 #define _free_union(__tname)    bipa_free_##__tname(it);
+#define _bytesz_union(__tname)  bipa_bytesz_##__tname(it)
 
 #define bipa_array(__tname, __of)                                                                      \
     struct __tname {                                                                                   \
@@ -543,6 +581,14 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
             _free __of                                                                                 \
         }                                                                                              \
         free(self->ptr);                                                                               \
+    })                                                                                                 \
+    sz bipa_bytesz_##__tname(struct __tname cref self) _declonly({                                     \
+        sz r = 0;                                                                                      \
+        for (sz k = 0; k < self->len; k++) {                                                           \
+            _typename __of const* const it = self->ptr + k;                                            \
+            r+= _bytesz __of;                                                                          \
+        }                                                                                              \
+        return r;                                                                                      \
     })
 #define _typename_array(__tname, __while) struct __tname
 #define _dump_array(__tname, __while)   bipa_dump_##__tname(it, strm, depth+1);
@@ -551,5 +597,6 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
                                         for (sz k = it->len = it->cap = 0; __while; k++)  \
                                             if (!bipa_parse_one_##__tname(it, src, at)) goto fail;
 #define _free_array(__tname, __while)   bipa_free_##__tname(it);
+#define _bytesz_array(__tname, __while) bipa_bytesz_##__tname(it)
 
 #endif // __BIPA_H__
