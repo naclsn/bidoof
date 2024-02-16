@@ -5,6 +5,7 @@
 #undef BIDOOF_IMPLEMENTATION
 #endif
 
+#include <dirent.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -18,7 +19,7 @@
 
 #define mkbuf(__c) (buf){.ptr= (u8*)__c, .len= strlen(__c)}
 #define mkbufa(...) (buf){.ptr= (u8[])__VA_ARGS__, .len= countof(((u8[])__VA_ARGS__))}
-#define mkbufsl(__p, __st, __ed) (buf){.ptr= (__p)+(__st), .len= (__ed)-(__st)}
+#define mkbufsl(__p, __st, __ed) (buf){.ptr= (u8*)(__p)+(__st), .len= (__ed)-(__st)}
 
 #define ref * const
 #define cref const ref
@@ -37,42 +38,52 @@ typedef double    f64;
 typedef size_t    sz;
 typedef dyarr(u8) buf;
 
-void xxd(buf cref b, sz const l);
-void xxdiff(buf cref a, buf cref b, sz const l);
+void xxd(buf const b, sz const l);
+void xxdiff(buf const a, buf const b, sz const l);
 char const* binstr(u64 n, unsigned const w);
 
-void buf_free(buf cref self);
+void buf_free(buf const self);
 
-#define with_buf_as_stream(__buf, __name, ...) do {         \
+#define with_buf_as_write_file(__buf, __name, ...) do {     \
     FILE* __name = tmpfile();                               \
     if (!__name) exitf("could not open a temporary file");  \
     { __VA_ARGS__; }                                        \
-    (__buf)->len = ftell(__name);                           \
-    (__buf)->ptr = malloc(r.len);                           \
-    if (!(__buf)->ptr) exitf("OOM");                        \
+    (__buf).len = ftell(__name);                            \
+    (__buf).ptr = malloc(r.len);                            \
+    if (!(__buf).ptr) exitf("OOM");                         \
     fseek(__name, 0, SEEK_SET);                             \
-    fread((__buf)->ptr, 1, (__buf)->len, __name);           \
+    fread((__buf).ptr, 1, (__buf).len, __name);             \
     fclose(__name);                                         \
 } while (0)
 
-buf bufcpy(buf cref other);
-void bufcat(buf ref to, buf cref other);
+#define with_buf_as_read_file(__buf, __name, ...) do {      \
+    FILE* __name = tmpfile();                               \
+    if (!__name) exitf("could not open a temporary file");  \
+    fwrite((__buf).ptr, 1, (__buf).len, __name);            \
+    fseek(__name, 0, SEEK_SET);                             \
+    { __VA_ARGS__; }                                        \
+    fclose(__name);                                         \
+} while (0)
 
-u16 peek16le(buf cref b, sz const k);
-u32 peek32le(buf cref b, sz const k);
-u64 peek64le(buf cref b, sz const k);
+buf bufcpy(buf const other);
+void bufcat(buf ref to, buf const other);
+
+u16 peek16le(buf const b, sz const k);
+u32 peek32le(buf const b, sz const k);
+u64 peek64le(buf const b, sz const k);
 void poke16le(buf ref b, sz const k, u16 const v);
 void poke32le(buf ref b, sz const k, u32 const v);
 void poke64le(buf ref b, sz const k, u64 const v);
-u16 peek16be(buf cref b, sz const k);
-u32 peek32be(buf cref b, sz const k);
-u64 peek64be(buf cref b, sz const k);
+u16 peek16be(buf const b, sz const k);
+u32 peek32be(buf const b, sz const k);
+u64 peek64be(buf const b, sz const k);
 void poke16be(buf ref b, sz const k, u16 const v);
 void poke32be(buf ref b, sz const k, u32 const v);
 void poke64be(buf ref b, sz const k, u64 const v);
 
-buf file_read(buf cref path);
-void file_write(buf cref path, buf cref b);
+buf file_read(buf const path);
+void file_write(buf const path, buf const b);
+buf dir_list(buf const path);
 
 #define _HERE_STR(__ln) #__ln
 #define _HERE_XSTR(__ln) _HERE_STR(__ln)
@@ -90,39 +101,39 @@ void file_write(buf cref path, buf cref b);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
-void xxd(buf cref b, sz const ln) {
-    if (0 == b->len) return;
-    for (sz j = 0; j < ln && j < (b->len-1)/16+1; j++) {
+void xxd(buf const b, sz const ln) {
+    if (0 == b.len) return;
+    for (sz j = 0; j < ln && j < (b.len-1)/16+1; j++) {
         printf("%07zx0:   ", j);
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (b->len <= k) printf("   ");
-            else printf("%02X ", b->ptr[k]);
+            if (b.len <= k) printf("   ");
+            else printf("%02X ", b.ptr[k]);
         }
         printf("       ");
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (b->len <= k) break;
-            char const it = b->ptr[i+16*j];
+            if (b.len <= k) break;
+            char const it = b.ptr[i+16*j];
             printf("%c", ' ' <= it && it <= '~' ? it : '.');
         }
         printf("\n");
     }
 }
 
-void xxdiff(buf cref l, buf cref r, sz const ln) {
-    sz const len = l->len < r->len ? r->len : l->len;
+void xxdiff(buf const l, buf const r, sz const ln) {
+    sz const len = l.len < r.len ? r.len : l.len;
     if (0 == len) return;
     sz first = -1;
     for (sz j = 0; j < ln && j < (len-1)/16+1; j++) {
         printf("%07zx0:   ", j);
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (l->len <= k) printf("   ");
+            if (l.len <= k) printf("   ");
             else {
-                bool const diff = r->len <= k || l->ptr[k] != r->ptr[k];
+                bool const diff = r.len <= k || l.ptr[k] != r.ptr[k];
                 if (diff) printf("\x1b[31m");
-                printf("%02X ", l->ptr[k]);
+                printf("%02X ", l.ptr[k]);
                 if (diff) printf("\x1b[m");
                 if (diff && (sz)-1 == first) first = k;
             }
@@ -130,11 +141,11 @@ void xxdiff(buf cref l, buf cref r, sz const ln) {
         printf("       ");
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
-            if (r->len <= k) printf("   ");
+            if (r.len <= k) printf("   ");
             else {
-                bool const diff = l->len <= k || l->ptr[k] != r->ptr[k];
+                bool const diff = l.len <= k || l.ptr[k] != r.ptr[k];
                 if (diff) printf("\x1b[32m");
-                printf("%02X ", r->ptr[k]);
+                printf("%02X ", r.ptr[k]);
                 if (diff) printf("\x1b[m");
                 if (diff && (sz)-1 == first) first = k;
             }
@@ -154,45 +165,45 @@ char const* binstr(u64 n, unsigned const w) {
     return r;
 }
 
-void buf_free(buf cref self) {
-    if (self->cap) free(self->ptr);
+void buf_free(buf const self) {
+    if (self.cap) free(self.ptr);
 }
 
-buf bufcpy(buf cref other) {
-    buf r = {.ptr= malloc(other->len), .len= other->len, .cap= other->len};
+buf bufcpy(buf const other) {
+    buf r = {.ptr= malloc(other.len), .len= other.len, .cap= other.len};
     if (!r.ptr) exitf("OOM");
-    memcpy(r.ptr, other->ptr, other->len);
+    memcpy(r.ptr, other.ptr, other.len);
     return r;
 }
 
-void bufcat(buf ref to, buf cref other) {
-    //u8* dest = dyarr_insert(to, to->len, other->len); // FIXME: this no work, see why
+void bufcat(buf ref to, buf const other) {
+    //u8* dest = dyarr_insert(to, to->len, other.len); // FIXME: this no work, see why
     //if (!dest) exitf("OOM");
-    //memcpy(dest, other->ptr, other->len);
-    if (!dyarr_resize(to, to->len+other->len)) exitf("OOM");
-    memcpy(to->ptr+to->len, other->ptr, other->len);
-    to->len+= other->len;
+    //memcpy(dest, other.ptr, other.len);
+    if (!dyarr_resize(to, to->len+other.len)) exitf("OOM");
+    memcpy(to->ptr+to->len, other.ptr, other.len);
+    to->len+= other.len;
 }
 
-u16 peek16le(buf cref b, sz const k) {
-    return (u16)b->ptr[k]
-         | (u16)b->ptr[k+1]<<8;
+u16 peek16le(buf const b, sz const k) {
+    return (u16)b.ptr[k]
+         | (u16)b.ptr[k+1]<<8;
 }
-u32 peek32le(buf cref b, sz const k) {
-    return (u32)b->ptr[k]
-         | (u32)b->ptr[k+1]<<8
-         | (u32)b->ptr[k+2]<<16
-         | (u32)b->ptr[k+3]<<24;
+u32 peek32le(buf const b, sz const k) {
+    return (u32)b.ptr[k]
+         | (u32)b.ptr[k+1]<<8
+         | (u32)b.ptr[k+2]<<16
+         | (u32)b.ptr[k+3]<<24;
 }
-u64 peek64le(buf cref b, sz const k) {
-    return (u64)b->ptr[k]
-         | (u64)b->ptr[k+1]<<8
-         | (u64)b->ptr[k+2]<<16
-         | (u64)b->ptr[k+3]<<24
-         | (u64)b->ptr[k+4]<<32
-         | (u64)b->ptr[k+5]<<40
-         | (u64)b->ptr[k+6]<<48
-         | (u64)b->ptr[k+7]<<56;
+u64 peek64le(buf const b, sz const k) {
+    return (u64)b.ptr[k]
+         | (u64)b.ptr[k+1]<<8
+         | (u64)b.ptr[k+2]<<16
+         | (u64)b.ptr[k+3]<<24
+         | (u64)b.ptr[k+4]<<32
+         | (u64)b.ptr[k+5]<<40
+         | (u64)b.ptr[k+6]<<48
+         | (u64)b.ptr[k+7]<<56;
 }
 
 void poke16le(buf ref b, sz const k, u16 const v) {
@@ -216,25 +227,25 @@ void poke64le(buf ref b, sz const k, u64 const v) {
     b->ptr[k+7] = (v>>56)&0xff;
 }
 
-u16 peek16be(buf cref b, sz const k) {
-    return (u16)b->ptr[k]<<8
-         | (u16)b->ptr[k+1];
+u16 peek16be(buf const b, sz const k) {
+    return (u16)b.ptr[k]<<8
+         | (u16)b.ptr[k+1];
 }
-u32 peek32be(buf cref b, sz const k) {
-    return (u32)b->ptr[k]<<24
-         | (u32)b->ptr[k+1]<<16
-         | (u32)b->ptr[k+2]<<8
-         | (u32)b->ptr[k+3];
+u32 peek32be(buf const b, sz const k) {
+    return (u32)b.ptr[k]<<24
+         | (u32)b.ptr[k+1]<<16
+         | (u32)b.ptr[k+2]<<8
+         | (u32)b.ptr[k+3];
 }
-u64 peek64be(buf cref b, sz const k) {
-    return (u64)b->ptr[k]<<56
-         | (u64)b->ptr[k+1]<<48
-         | (u64)b->ptr[k+2]<<40
-         | (u64)b->ptr[k+3]<<32
-         | (u64)b->ptr[k+4]<<24
-         | (u64)b->ptr[k+5]<<16
-         | (u64)b->ptr[k+6]<<8
-         | (u64)b->ptr[k+7];
+u64 peek64be(buf const b, sz const k) {
+    return (u64)b.ptr[k]<<56
+         | (u64)b.ptr[k+1]<<48
+         | (u64)b.ptr[k+2]<<40
+         | (u64)b.ptr[k+3]<<32
+         | (u64)b.ptr[k+4]<<24
+         | (u64)b.ptr[k+5]<<16
+         | (u64)b.ptr[k+6]<<8
+         | (u64)b.ptr[k+7];
 }
 
 void poke16be(buf ref b, sz const k, u16 const v) {
@@ -258,14 +269,14 @@ void poke64be(buf ref b, sz const k, u64 const v) {
     b->ptr[k+7] = v&0xff;
 }
 
-buf file_read(buf cref path) {
+buf file_read(buf const path) {
     buf r = {0};
-    char local[path->len+1];
-    memcpy(local, path->ptr, path->len);
-    local[path->len] = '\0';
+    char local[path.len+1];
+    memcpy(local, path.ptr, path.len);
+    local[path.len] = '\0';
     FILE* f = fopen(local, "rb");
-    if (!f) exitf("could not open file %.*s", (int)path->len, path->ptr);
-    if (0 != fseek(f, 0, SEEK_END)) exitf("could not read file %.*s", (int)path->len, path->ptr);
+    if (!f) exitf("could not open file %.*s", (int)path.len, path.ptr);
+    if (0 != fseek(f, 0, SEEK_END)) exitf("could not read file %.*s", (int)path.len, path.ptr);
     r.len = ftell(f);
     r.ptr = malloc(r.len);
     if (!r.ptr) exitf("OOM");
@@ -275,14 +286,29 @@ buf file_read(buf cref path) {
     return r;
 }
 
-void file_write(buf cref path, buf cref b) {
-    char local[path->len+1];
-    memcpy(local, path->ptr, path->len);
-    local[path->len] = '\0';
+void file_write(buf const path, buf const b) {
+    char local[path.len+1];
+    memcpy(local, path.ptr, path.len);
+    local[path.len] = '\0';
     FILE* f = fopen(local, "wb");
-    if (!f) exitf("could not open file %.*s", (int)path->len, path->ptr);
-    fwrite(b->ptr, 1, b->len, f);
+    if (!f) exitf("could not open file %.*s", (int)path.len, path.ptr);
+    fwrite(b.ptr, 1, b.len, f);
     fclose(f);
+}
+
+buf dir_list(buf const path) {
+    char local[path.len+1];
+    memcpy(local, path.ptr, path.len);
+    local[path.len] = '\0';
+    buf r = {0};
+    DIR* d = opendir(local);
+    struct dirent const* en;
+    while ((en = readdir(d))) {
+        bufcat(&r, mkbufsl(en->d_name, 0, strlen(en->d_name)+1));
+        r.ptr[r.len-1] = '\n';
+    }
+    closedir(d);
+    return r;
 }
 
 #endif // BIDOOF_IMPLEMENTATION
@@ -306,10 +332,10 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
 #define BIDOOF_IMPLEMENTATION
 #endif
 
-#define make_arg_buf(__name, __information)                                                  \
-    buf cref __name = (_is_h ? puts("\t" #__name ":\t" __information), NULL                  \
-                    : !argc ? exitf("expected value for argument '" #__name "'"), NULL       \
-                    : (argc--, argv++, &(buf){.ptr= (u8*)argv[-1], .len= strlen(argv[-1])})  \
+#define make_arg_buf(__name, __information)                                                 \
+    buf const __name = (_is_h ? puts("\t" #__name ":\t" __information), (buf){0}            \
+                    : !argc ? exitf("expected value for argument '" #__name "'"), (buf){0}  \
+                    : (argc--, argv++, (buf){.ptr= (u8*)argv[-1], .len= strlen(argv[-1])})  \
                     );
 #define make_arg_int(__name, __information)                                            \
     int const __name = (_is_h ? puts("\t" #__name ":\t" __information), 0              \
@@ -369,10 +395,10 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
             exitf("could not build a " #__tname);  \
         return r;                                  \
     }                                              \
-    __tname __tname##_parse(buf cref buf) {        \
+    __tname __tname##_parse(buf const buf) {       \
         struct __tname r;                          \
         sz at = 0;                                 \
-        if (!bipa_parse_##__tname(&r, buf, &at))   \
+        if (!bipa_parse_##__tname(&r, &buf, &at))  \
             exitf("could not parse a " #__tname);  \
         return r;                                  \
     }                                              \
@@ -384,6 +410,6 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
     typedef struct __tname __tname;                \
     void __tname##_dump(__tname cref self);        \
     buf __tname##_build(__tname cref self);        \
-    __tname __tname##_parse(buf cref buf);         \
+    __tname __tname##_parse(buf const buf);        \
     void __tname##_free(__tname cref self);
 #endif

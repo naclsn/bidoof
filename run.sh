@@ -1,5 +1,0 @@
-#!/bin/sh
-test -z "$1" && { echo 'Usage: ./run.sh <file[.c]>'; exit 1; }
-test -d build/ || mkdir build/
-name=${1%.c}; shift
-make build/$name && exec build/$name "$@"

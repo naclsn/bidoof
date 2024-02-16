@@ -96,7 +96,7 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
         _h+= sprintf(_h, "%*.s; %08zx:  ", (unsigned)(24-(_h-_buf)), "", loc+at);  \
         for (unsigned k = 0; k < _k; k++) _h+= sprintf(_h, " %02X", bytes[k]);     \
         _h+= sprintf(_h, "\n");                                                    \
-        bufcat(res, &(buf){.ptr= (u8*)_buf, .len= _h-_buf});                       \
+        bufcat(res, (buf){.ptr= (u8*)_buf, .len= _h-_buf});                        \
         at+= _k;                                                                   \
         continue;                                                                  \
     }
@@ -109,7 +109,7 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
             bool valid = true;                                                 \
             u8 const _bytes[countof(codes)] = {__rem_par __encode};            \
             if (valid) {                                                       \
-                bufcat(res, &(buf){.ptr= (u8*)_bytes, .len= countof(codes)});  \
+                bufcat(res, (buf){.ptr= (u8*)_bytes, .len= countof(codes)});   \
                 continue;                                                      \
             } else at = _pat;                                                  \
         }                                                                      \

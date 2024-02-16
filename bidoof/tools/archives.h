@@ -137,20 +137,20 @@ typedef struct zip_entry {
     struct central_directory_header* header;
 } zip_entry;
 
-buf zip_data_find_by_path(zip_data cref zip, buf cref path);
+buf zip_find_by_path(zip_data cref zip, buf const path);
 
 zip_entry zip_add_entry(zip_data ref zip);
-void zip_entry_file_name(zip_entry ref en, buf cref file_name);
+void zip_entry_file_name(zip_entry ref en, buf const file_name);
 void zip_entry_extra_field(zip_entry ref en, unsigned const n, u16 const ids[n], buf const data[n]);
-void zip_entry_file_data(zip_entry ref en, buf cref file_data);
+void zip_entry_file_data(zip_entry ref en, buf const file_data);
 void zip_fix_entry(zip_entry ref en);
 
 void zip_fix_central_dir(zip_data ref zip);
-void zip_central_dir_comment(zip_data ref zip, buf ref com);
+void zip_central_dir_comment(zip_data ref zip, buf const com);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
-buf zip_data_find_by_path(zip_data cref zip, buf cref path) {
+buf zip_find_by_path(zip_data cref zip, buf const path) {
     (void)zip;
     (void)path;
     return (buf){0};
@@ -167,16 +167,16 @@ zip_entry zip_add_entry(zip_data ref zip) {
     return (zip_entry){.zip= zip, .file= file, .header= header};
 }
 
-void zip_entry_file_name(zip_entry ref en, buf cref file_name) {
-    en->file->local_file_header.file_name_length = file_name->len;
+void zip_entry_file_name(zip_entry ref en, buf const file_name) {
+    en->file->local_file_header.file_name_length = file_name.len;
     en->file->local_file_header.file_name = bufcpy(file_name).ptr;
-    en->header->file_name_length = file_name->len;
+    en->header->file_name_length = file_name.len;
     en->header->file_name = bufcpy(file_name).ptr;
 }
 
 void zip_entry_extra_field(zip_entry ref en, unsigned const n, u16 const ids[n], buf const data[n]) {
-    struct extra_fields_wrap f = {.w= {.len= n, .ptr= calloc(n, sizeof *f.w.ptr)}};
-    if (!f.w.ptr) exitf("OOM");
+    struct extra_field p[n];
+    struct extra_fields_wrap f = {.w= {.len= n, .ptr= p}};
 
     for (unsigned k = 0; k < n; k++)
         f.w.ptr[k] = (struct extra_field){
@@ -190,21 +190,20 @@ void zip_entry_extra_field(zip_entry ref en, unsigned const n, u16 const ids[n],
     buf b = {0};
     if (bipa_build_extra_fields_wrap(&f, &b)) {
         en->file->local_file_header.extra_field_length = b.len;
-        en->file->local_file_header.extra_field = bufcpy(&b).ptr;
+        en->file->local_file_header.extra_field = bufcpy(b).ptr;
         en->header->extra_field_length = b.len;
-        en->header->extra_field = bufcpy(&b).ptr;
+        en->header->extra_field = bufcpy(b).ptr;
     }
-    free(f.w.ptr);
-    buf_free(&b);
+    buf_free(b);
 }
 
-void zip_entry_file_data(zip_entry ref en, buf cref file_data) {
-    en->file->local_file_header.compressed_size = file_data->len;
+void zip_entry_file_data(zip_entry ref en, buf const file_data) {
+    en->file->local_file_header.compressed_size = file_data.len;
     en->file->file_data = bufcpy(file_data).ptr;
 }
 
 void zip_fix_entry(zip_entry ref en) {
-    u32 crc = crc32(&mkbufsl(en->file->file_data, 0, en->file->local_file_header.compressed_size));
+    u32 crc = crc32(mkbufsl(en->file->file_data, 0, en->file->local_file_header.compressed_size));
     en->file->local_file_header.crc_32 = crc;
     en->header->crc_32 = crc;
 
@@ -236,12 +235,12 @@ void zip_fix_central_dir(zip_data ref zip) {
         bipa_bytesz_local_files(&zip->local_files);
 }
 
-void zip_central_dir_comment(zip_data ref zip, buf ref com) {
+void zip_central_dir_comment(zip_data ref zip, buf const com) {
     struct end_of_central_directory_record* const d = &zip->end_of_central_directory_record;
 
     free(d->zip_file_comment);
 
-    d->zip_file_comment_length = com->len;
+    d->zip_file_comment_length = com.len;
     d->zip_file_comment = bufcpy(com).ptr;
 }
 

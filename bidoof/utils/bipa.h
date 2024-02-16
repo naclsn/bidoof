@@ -545,12 +545,13 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
     };                                                                                                 \
     void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _declonly({  \
         if (!self->len) {                                                                              \
-            fprintf(strm, _hidump_kw("array") " " _hidump_ty(#__tname) " []");                         \
+            fprintf(strm, _hidump_kw("array") "(" _hidump_nb("0") ") " _hidump_ty(#__tname) " []");    \
             return;                                                                                    \
         }                                                                                              \
-        fprintf(strm, _hidump_kw("array") " " _hidump_ty(#__tname) " [\n%*.s",                         \
-                (depth+1)*2, "");                                                                      \
+        fprintf(strm, _hidump_kw("array") "(" _hidump_nb("%zu") ") " _hidump_ty(#__tname) " [\n%*.s",  \
+                self->len, (depth+1)*2, "");                                                           \
         for (sz k = 0; k < self->len; k++) {                                                           \
+            fprintf(strm, "[%zu]= ", k);                                                               \
             _typename __of const* const it = self->ptr + k;                                            \
             _dump __of                                                                                 \
             fprintf(strm, ",\n%*.s", (depth+(k+1!=self->len))*2, "");                                  \

@@ -19,23 +19,24 @@ struct inflate_extra_info {
 
 // https://www.ietf.org/rfc/rfc1950.txt
 // https://www.ietf.org/rfc/rfc1951.txt
-buf inflate(buf cref source, struct inflate_extra_info opref xnfo);
+buf inflate(buf const source, struct inflate_extra_info opref xnfo);
+buf deflate_dumb(buf const source);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
-buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
+buf inflate(buf const source, struct inflate_extra_info opref xnfo) {
     buf r = {0};
     sz at = 0;
 
-    if (source->len < 2) exitf("not enough bytes for inflate header");
+    if (source.len < 2) exitf("not enough bytes for inflate header");
 
-    u8 cmf = source->ptr[at++];
+    u8 const cmf = source.ptr[at++];
     unsigned const cm = cmf & 0x0f, cinfo = (cmf & 0xf0) >> 4;
     if (8 != cm) exitf("compression method is not 8: cm=%d", cm);
     if (7 < cinfo) exitf("windo size bigger than 7: cinfo=%d", cinfo);
     if (xnfo) xnfo->winsize = 1 << (cinfo+8);
 
-    u8 flg = source->ptr[at++];
+    u8 const flg = source.ptr[at++];
     unsigned const /*fcheck = flg & 0x1f,*/ fdict = flg & 1<<5, flevel = (flg & 0xc) >> 6;
 
     if (xnfo) switch (flevel) {
@@ -47,7 +48,7 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
 
     u32 dictid = 0;
     if (fdict) {
-        if (source->len < 6) exitf("not enough bytes for inflate header");
+        if (source.len < 6) exitf("not enough bytes for inflate header");
         dictid = peek32be(source, at);
         at+= 2;
         if (xnfo) xnfo->dictid = dictid;
@@ -59,11 +60,11 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
 #   define _accbits(__n) do {                             \
             unsigned const wants = (__n);                 \
             while (has < wants) {                         \
-                if (source->len <= at) {                  \
+                if (source.len <= at) {                   \
                     free(r.ptr);                          \
                     exitf("not enough bits to inflate");  \
                 }                                         \
-                acc|= source->ptr[at++] << has;           \
+                acc|= source.ptr[at++] << has;            \
                 has+= 8;                                  \
             }                                             \
         } while (0)
@@ -83,15 +84,13 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
         switch (btype) {
             case 0: // no compression
                 _dropbits(has & 7);
-                while (has != 0) { has-= 8; at--; }
-                acc = 0;
-                if (source->len < at+4) {
+                if (source.len < at+4) {
                     free(r.ptr);
                     exitf("not enough bytes in no compression block for len/nlen");
                 }
-                u16 len = peek32le(source, at) & 0xffff;
+                u16 const len = peek32le(source, at) & 0xffff;
                 at+= 4;
-                if (source->len < at+len) {
+                if (source.len < at+len) {
                     free(r.ptr);
                     exitf("not enough bytes in no compression block");
                 }
@@ -99,7 +98,7 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
                     free(r.ptr);
                     exitf("OOM");
                 }
-                memcpy(r.ptr, source->ptr+at, len);
+                memcpy(r.ptr, source.ptr+at, len);
                 r.len+= len;
                 at+= len;
                 break;
@@ -302,6 +301,43 @@ buf inflate(buf cref source, struct inflate_extra_info opref xnfo) {
 
 #   undef _dropbits
 #   undef _accbits
+
+    return r;
+}
+
+buf deflate_dumb(buf const source) {
+    buf r = {0};
+    static sz const BLOCK_MAX = (1<<16) -1;
+    if (!dyarr_resize(&r, 2 + source.len + 5*(source.len/(BLOCK_MAX +1) +1))) exitf("OOM");
+
+    unsigned const
+        cinfo = 0, // max 7 (free)
+        cm = 8; // fixed
+    u8 const cmf = cinfo<<4 | cm;
+    r.ptr[r.len++] = cmf;
+
+    unsigned const
+        flevel = 0, // [0, 3] (free)
+        fdict = 0, // 0|1, better 0 for now
+        fcheck = 31 - (cmf<<8 | flevel<<6 | fdict<<5)%31; // 5 bits, must verify: (cmf<<8 | flg) % 31 == 0
+    u8 const flg = flevel<<6 | fdict<<5 | fcheck;
+    r.ptr[r.len++] = flg;
+
+    for (sz k = 0; k < source.len; k+= BLOCK_MAX) {
+        unsigned const
+            btype = 0, // 2 bits, "no compression"
+            bfinal = 1; // 0|1, 1 for last block
+        r.ptr[r.len++] = btype<<1 | bfinal; // (3 bits, rest free in case of "no compression")
+
+        u16 const len = source.len-k < BLOCK_MAX ? source.len-k : BLOCK_MAX;
+        poke16le(&r, r.len, len);
+        r.len+= 2;
+        poke16le(&r, r.len, ~len);
+        r.len+= 2;
+
+        memcpy(r.ptr+r.len, source.ptr+k, len);
+        r.len+= len;
+    }
 
     return r;
 }

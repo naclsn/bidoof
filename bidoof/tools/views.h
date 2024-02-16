@@ -13,8 +13,8 @@ static struct _list_deps_item const _list_deps_me_views = {_list_deps_first, "vi
 #define _list_deps_first &_list_deps_me_views
 #endif
 
-void view_rgba(buf cref pixels, unsigned const width, unsigned const height, char opcref title);
-void view_rgb(buf cref pixels, unsigned const width, unsigned const height, char opcref title);
+void view_rgba(buf const pixels, unsigned const width, unsigned const height, char opcref title);
+void view_rgb(buf const pixels, unsigned const width, unsigned const height, char opcref title);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
@@ -36,7 +36,7 @@ static void _view_render_texture(Frame ref self) {
     glDisable(GL_TEXTURE_2D);
 }
 
-static void _view_makeframe_texture(buf cref pixels, unsigned const width, unsigned const height, char cref title, GLint gl_internalFormat, GLenum gl_format) {
+static void _view_makeframe_texture(buf const pixels, unsigned const width, unsigned const height, char cref title, GLint gl_internalFormat, GLenum gl_format) {
     unsigned const small = width < height ? width : height;
     float const scale = small < 256 ? 256./small : 1;
     Frame frame = {
@@ -58,7 +58,7 @@ static void _view_makeframe_texture(buf cref pixels, unsigned const width, unsig
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, gl_internalFormat, width, height, 0, gl_format, GL_UNSIGNED_BYTE, pixels->ptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, gl_internalFormat, width, height, 0, gl_format, GL_UNSIGNED_BYTE, pixels.ptr);
     frame.userdata = (void*)(sz)tex;
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -66,13 +66,13 @@ static void _view_makeframe_texture(buf cref pixels, unsigned const width, unsig
     frame_destroy(&frame);
 }
 
-void view_rgba(buf cref pixels, unsigned const width, unsigned const height, char opcref title) {
-    if (pixels->len < width*height*4) exitf("not enough data for view");
+void view_rgba(buf const pixels, unsigned const width, unsigned const height, char opcref title) {
+    if (pixels.len < width*height*4) exitf("not enough data for view");
     _view_makeframe_texture(pixels, width, height, title ? title : "Untitled RGBA view", GL_RGBA8, GL_RGBA);
 }
 
-void view_rgb(buf cref pixels, unsigned const width, unsigned const height, char opcref title) {
-    if (pixels->len < width*height*3) exitf("not enough data for view");
+void view_rgb(buf const pixels, unsigned const width, unsigned const height, char opcref title) {
+    if (pixels.len < width*height*3) exitf("not enough data for view");
     _view_makeframe_texture(pixels, width, height, title ? title : "Untitled RGB view", GL_RGB8, GL_RGB);
 }
 

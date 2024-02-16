@@ -6,6 +6,7 @@
 #undef BIDOOF_IMPLEMENTATION
 #undef BIDOOF_T_IMPLEMENTATION
 #endif
+#include "checks.h"
 #include "compressions.h"
 #ifdef _redef_after_images
 #undef _redef_after_images
@@ -42,7 +43,7 @@ bipa_union(interlace_method, 2
         , (void,), (u8, 0, no_interlacing)
         , (void,), (u8, 1, adam_7)
         )
-bipa_struct(png_chunk_header, 7
+bipa_struct(png_header, 7
         , (u32be,), width
         , (u32be,), height
         , (u8,), bit_depth
@@ -68,17 +69,22 @@ bipa_struct(png_data, 2
 
 // https://www.w3.org/TR/2003/REC-PNG-20031110/
 adapt_bipa_type(png_data)
-adapt_bipa_type(png_chunk_header)
+adapt_bipa_type(png_header)
 
-buf png_data_chunknames(png_data cref png);
-buf png_data_find(png_data cref png, u32 const type);
-buf png_data_get_all_data(png_data cref png);
-buf png_unfilter(png_chunk_header cref png_h, buf cref source);
-buf png_get_pixels(png_data cref png, png_chunk_header opcref header);
+buf png_chunknames(png_data cref png);
+buf png_find_chunk(png_data cref png, u32 const type);
+buf png_get_all_data(png_data cref png);
+
+buf png_unfilter(png_header cref png_h, buf const source);
+buf png_filter_dumb(png_header cref png_h, buf const source);
+
+buf png_get_pixels(png_data cref png, png_header opcref header);
+
+void png_add_chunk(png_data ref png, u32 const type, buf const data);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
-buf png_data_chunknames(png_data cref png) {
+buf png_chunknames(png_data cref png) {
     buf r = {0};
     if (!dyarr_resize(&r, png->chunks.len*5)) exitf("OOM");
     for (sz k = 0; k < png->chunks.len; k++) {
@@ -87,24 +93,28 @@ buf png_data_chunknames(png_data cref png) {
         r.ptr[r.len++] = type>>16 & 0xff;
         r.ptr[r.len++] = type>> 8 & 0xff;
         r.ptr[r.len++] = type>> 0 & 0xff;
-        r.ptr[r.len++] = '\0';
+        r.ptr[r.len++] = '\n';
     }
     return r;
 }
 
-buf png_data_find(png_data cref png, u32 const type) {
+buf png_find_chunk(png_data cref png, u32 const type) {
     for (sz k = 0; k < png->chunks.len; k++)
         if (type == png->chunks.ptr[k].type)
-            return bufcpy(&mkbufsl(png->chunks.ptr[k].data, 0, png->chunks.ptr[k].length));
-    exitf("no chunk in png_data for given type %c%c%c%c", type<<24 & 0xff, type<<16 & 0xff, type<< 8 & 0xff, type<< 0 & 0xff);
+            return bufcpy(mkbufsl(png->chunks.ptr[k].data, 0, png->chunks.ptr[k].length));
+    exitf("no chunk in png_data for given type %c%c%c%c",
+            type>>24 & 0xff,
+            type>>16 & 0xff,
+            type>> 8 & 0xff,
+            type>> 0 & 0xff);
     return (buf){0};
 }
 
-buf png_data_get_all_data(png_data cref png) {
+buf png_get_all_data(png_data cref png) {
     buf r = {0};
     for (sz k = 0; k < png->chunks.len; k++)
         if (png_chunk_type_str("IDAT") == png->chunks.ptr[k].type)
-            bufcat(&r, &(buf const){
+            bufcat(&r, (buf){
                 .ptr= png->chunks.ptr[k].data,
                 .len= png->chunks.ptr[k].length
             });
@@ -113,7 +123,7 @@ buf png_data_get_all_data(png_data cref png) {
 
 // TODO: interlacing
 
-buf png_unfilter(png_chunk_header cref png_h, buf cref source) {
+buf png_unfilter(png_header cref png_h, buf const source) {
     buf r = {0};
 
     sz const chan = 4;
@@ -125,22 +135,22 @@ buf png_unfilter(png_chunk_header cref png_h, buf cref source) {
 #   define _a (r.ptr[r.len+(j-1)*chan+k])
 #   define _b (r.ptr[r.len+(j-w)*chan+k])
 #   define _c (r.ptr[r.len+(j-w-1)*chan+k])
-#   define _f (source->ptr[at+j*chan+k])
+#   define _f (source.ptr[at+j*chan+k])
 #   define for_chan(...) do for (sz k = 0; k < chan; k++) { __VA_ARGS__; } while (0)
 
     sz const w = png_h->width, h = png_h->height;
     sz at = 0;
     sz const j = 0; // (for the macro)
-    for (sz i = 0; i < h; i++, at+= w*chan, r.len+= w*chan) switch (source->ptr[at++]) {
+    for (sz i = 0; i < h; i++, at+= w*chan, r.len+= w*chan) switch (source.ptr[at++]) {
         case 0: // none
-            memcpy(r.ptr+r.len, source->ptr+at, w*chan);
+            memcpy(r.ptr+r.len, source.ptr+at, w*chan);
             break;
         case 1: // sub
             for_chan(_x = _f);
             for (sz j = 1; j < w; j++) for_chan(_x = _f + _a);
             break;
         case 2: // up
-            if (!i) memcpy(r.ptr+r.len, source->ptr+at, w*chan);
+            if (!i) memcpy(r.ptr+r.len, source.ptr+at, w*chan);
             else for (sz j = 0; j < w; j++) for_chan(_x = _f + _b);
             break;
         case 3: // average
@@ -167,7 +177,7 @@ buf png_unfilter(png_chunk_header cref png_h, buf cref source) {
             break;
         default:
             free(r.ptr);
-            exitf("unknown filter type: %d\n", source->ptr[at-1]);
+            exitf("unknown filter type: %d\n", source.ptr[at-1]);
     }
 
 #   undef for_chan
@@ -180,18 +190,56 @@ buf png_unfilter(png_chunk_header cref png_h, buf cref source) {
     return r;
 }
 
-buf png_get_pixels(png_data cref png, png_chunk_header opcref header) {
-    buf idat = png_data_get_all_data(png);
-    buf infl = inflate(&idat, NULL);
+buf png_filter_dumb(png_header cref png_h, buf const source) {
+    buf r = {0};
+
+    sz const chan = 4;
+    if (color_type_tag_truecolor_with_alpha != png_h->color_type.tag || 8 != png_h->bit_depth)
+        exitf("NIY: only 8 bits truecolor with alpha is supported");
+
+    sz const w = png_h->width, h = png_h->height, sq = w*h*chan;
+    if (source.len < sq) exitf("not enough bytes for pixel data, need %zub got %zub", sq, source.len);
+    if (!dyarr_resize(&r, h+sq)) exitf("OOM");
+
+    for (sz i = 0; i < h; i++) {
+        r.ptr[r.len++] = 0; // filter type "none"
+        memcpy(r.ptr+r.len, source.ptr+i*w*chan, w*chan);
+        r.len+= w*chan;
+    }
+
+    return r;
+}
+
+buf png_get_pixels(png_data cref png, png_header opcref header) {
+    buf const idat = png_get_all_data(png);
+    buf const infl = inflate(idat, NULL);
 
     buf r;
     if (!header) {
-        buf ihdr = png_data_find(png, png_chunk_type_str("IHDR"));
-        png_chunk_header info = png_chunk_header_parse(&ihdr);
-        r = png_unfilter(&info, &infl);
-    } else r = png_unfilter(header, &infl);
+        buf const ihdr = png_find_chunk(png, png_chunk_type_str("IHDR"));
+        png_header const info = png_header_parse(ihdr);
+        buf_free(ihdr);
+        r = png_unfilter(&info, infl);
+    } else r = png_unfilter(header, infl);
 
     return r;
+}
+
+void png_add_chunk(png_data ref png, u32 const type, buf const data) {
+    struct png_chunk* const ch = dyarr_push(&png->chunks);
+    if (!ch) exitf("OOM");
+    ch->type = type;
+    ch->length = data.len;
+    ch->data = bufcpy(data).ptr;
+
+    // yeah, I know, whatever :-(
+    u8 all[4+data.len];
+    all[0] = type>>24 & 0xff;
+    all[1] = type>>16 & 0xff;
+    all[2] = type>> 8 & 0xff;
+    all[3] = type>> 0 & 0xff;
+    memcpy(all+4, data.ptr, data.len);
+    ch->crc = crc32(mkbufsl(all, 0, 4+data.len));
 }
 
 #endif // BIDOOF_IMPLEMENTATION

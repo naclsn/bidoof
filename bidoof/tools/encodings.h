@@ -9,15 +9,15 @@ static struct _list_deps_item const _list_deps_me_encodings = {_list_deps_first,
 #define _list_deps_first &_list_deps_me_encodings
 #endif
 
-buf b64_decode(buf cref source);
-buf b64_encode(buf cref source);
-typedef dyarr(u32) codepoints;
-codepoints utf8_decode(buf cref source);
-buf utf8_encode(codepoints cref source);
+buf b64_decode(buf const source);
+buf b64_encode(buf const source);
+typedef dyarr(u32) codepoints; // YYY
+codepoints utf8_decode(buf const source);
+buf utf8_encode(codepoints const source);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
-buf b64_decode(buf cref source) {
+buf b64_decode(buf const source) {
     static u8 const from64[] = {
         66,66,66,66,66,66,66,66,66,66,64,66,66,66,66,66,66,66,66,66,66,66,66,66,66,
         66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,62,66,66,66,63,52,53,
@@ -34,30 +34,30 @@ buf b64_decode(buf cref source) {
 
     buf r = {0};
 
-    if (0 == source->len)
+    if (0 == source.len)
         exitf("source is empty");
-    if (0 != source->len%4)
-        exitf("length (%zu) is not a multiple of 4", source->len);
-    for (sz k = 0; k < source->len; k++)
-        if (66 == from64[source->ptr[k]])
-            exitf("invalid character 0x%02X at index %zu (/%zu)", source->ptr[k], k, source->len);
-    if (2 < source->len && '=' == source->ptr[source->len-3])
+    if (0 != source.len%4)
+        exitf("length (%zu) is not a multiple of 4", source.len);
+    for (sz k = 0; k < source.len; k++)
+        if (66 == from64[source.ptr[k]])
+            exitf("invalid character 0x%02X at index %zu (/%zu)", source.ptr[k], k, source.len);
+    if (2 < source.len && '=' == source.ptr[source.len-3])
         exitf("invalid padding");
 
     u8 const pad
-        = '=' == source->ptr[source->len-2] ? 2
-        : '=' == source->ptr[source->len-1] ? 1
+        = '=' == source.ptr[source.len-2] ? 2
+        : '=' == source.ptr[source.len-1] ? 1
         : 0;
-    r.len = source->len/4*3 - pad;
+    r.len = source.len/4*3 - pad;
     if (!dyarr_resize(&r, r.len)) exitf("OOM");
 
     sz i = 0, j = 0;
     if (1 < r.len) for (; i < r.len-2; i+= 3, j+= 4) {
         u32 const n
-            = (from64[source->ptr[j+0]] << (6*3))
-            | (from64[source->ptr[j+1]] << (6*2))
-            | (from64[source->ptr[j+2]] << (6*1))
-            | (from64[source->ptr[j+3]] << (6*0))
+            = (from64[source.ptr[j+0]] << (6*3))
+            | (from64[source.ptr[j+1]] << (6*2))
+            | (from64[source.ptr[j+2]] << (6*1))
+            | (from64[source.ptr[j+3]] << (6*0))
             ;
 
         r.ptr[i+0] = (n >> (8*2))&0xff;
@@ -67,12 +67,12 @@ buf b64_decode(buf cref source) {
 
     if (0 != pad) {
         u32 const n = 1 == pad
-            ? (from64[source->ptr[j+0]] << (6*3))
-            | (from64[source->ptr[j+1]] << (6*2))
-            | (from64[source->ptr[j+2]] << (6*1))
+            ? (from64[source.ptr[j+0]] << (6*3))
+            | (from64[source.ptr[j+1]] << (6*2))
+            | (from64[source.ptr[j+2]] << (6*1))
             | 0
-            : (from64[source->ptr[j+0]] << (6*3))
-            | (from64[source->ptr[j+1]] << (6*2))
+            : (from64[source.ptr[j+0]] << (6*3))
+            | (from64[source.ptr[j+1]] << (6*2))
             | 0
             | 0
             ;
@@ -84,23 +84,23 @@ buf b64_decode(buf cref source) {
     return r;
 }
 
-buf b64_encode(buf cref source) {
+buf b64_encode(buf const source) {
     static u8 const to64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     buf r = {0};
 
-    u8 const mod = source->len%3;
+    u8 const mod = source.len%3;
     u8 const pad = 0 != mod ? 3-mod : 0;
 
-    r.len = (source->len + pad) * 4/3;
+    r.len = (source.len + pad) * 4/3;
     if (!dyarr_resize(&r, r.len)) exitf("OOM");
 
     sz i = 0, j = 0;
-    if (1 < source->len) for (; i < source->len-2; i+= 3, j+= 4) {
+    if (1 < source.len) for (; i < source.len-2; i+= 3, j+= 4) {
         unsigned const n
-            = (source->ptr[i+0] << (8*2))
-            | (source->ptr[i+1] << (8*1))
-            | (source->ptr[i+2] << (8*0))
+            = (source.ptr[i+0] << (8*2))
+            | (source.ptr[i+1] << (8*1))
+            | (source.ptr[i+2] << (8*0))
             ;
 
         r.ptr[j+0] = to64[(n >> (6*3)) & 63];
@@ -111,10 +111,10 @@ buf b64_encode(buf cref source) {
 
     if (0 != pad) {
         unsigned const n = 1 == pad
-            ? (source->ptr[i+0] << (8*2))
-            | (source->ptr[i+1] << (8*1))
+            ? (source.ptr[i+0] << (8*2))
+            | (source.ptr[i+1] << (8*1))
             | 0
-            : (source->ptr[i+0] << (8*2))
+            : (source.ptr[i+0] << (8*2))
             | 0
             | 0
             ;
@@ -131,35 +131,35 @@ buf b64_encode(buf cref source) {
     return r;
 }
 
-codepoints utf8_decode(buf cref source) {
+codepoints utf8_decode(buf const source) {
     codepoints r = {0};
-    if (!dyarr_resize(&r, source->len/2)) exitf("OOM");
+    if (!dyarr_resize(&r, source.len/2)) exitf("OOM");
 
-    for (sz k = 0; k < source->len; k++) {
+    for (sz k = 0; k < source.len; k++) {
         u32* const u = dyarr_push(&r);
         if (!u) {
             free(r.ptr);
             exitf("OOM");
         }
-        *u = source->ptr[k];
+        *u = source.ptr[k];
 
         if (0 == (128 & *u))
             ;
-        else if (0 == (32 & *u) && k+1 < source->len) {
-            u8 x = source->ptr[++k];
+        else if (0 == (32 & *u) && k+1 < source.len) {
+            u8 x = source.ptr[++k];
             *u = ((*u & 31) << 6) | (x & 63);
         }
-        else if (0 == (16 & *u) && k+2 < source->len) {
-            u8 x = source->ptr[++k], y = source->ptr[++k];
+        else if (0 == (16 & *u) && k+2 < source.len) {
+            u8 x = source.ptr[++k], y = source.ptr[++k];
             *u = ((*u & 15) << 12) | ((x & 63) << 6) | (y & 63);
         }
-        else if (0 == (8 & *u) && k+3 < source->len) {
-            u8 x = source->ptr[++k], y = source->ptr[++k], z = source->ptr[++k];
+        else if (0 == (8 & *u) && k+3 < source.len) {
+            u8 x = source.ptr[++k], y = source.ptr[++k], z = source.ptr[++k];
             *u = ((*u & 7) << 18) | ((x & 63) << 12) | ((y & 63) << 6) | (z & 63);
         }
         else {
             free(r.ptr);
-            exitf("unexpected byte 0x%02X or end of stream at index %zu (/%zu)", *u, k, source->len);
+            exitf("unexpected byte 0x%02X or end of stream at index %zu (/%zu)", *u, k, source.len);
         }
     }
 
@@ -167,9 +167,9 @@ codepoints utf8_decode(buf cref source) {
 }
 
 
-buf utf8_encode(codepoints cref source) {
+buf utf8_encode(codepoints const source) {
     buf r = {0};
-    if (!dyarr_resize(&r, source->len)) exitf("OOM");
+    if (!dyarr_resize(&r, source.len)) exitf("OOM");
 
 #   define _push(__val) do {          \
             u8* at = dyarr_push(&r);  \
@@ -180,8 +180,8 @@ buf utf8_encode(codepoints cref source) {
             *at = __val;              \
         } while (false)
 
-    for (sz k = 0; k < source->len; k++) {
-        u32 val = source->ptr[k];
+    for (sz k = 0; k < source.len; k++) {
+        u32 val = source.ptr[k];
 
         if (val < 128) _push(val);
         else {
