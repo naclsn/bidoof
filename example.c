@@ -39,16 +39,15 @@ void chunk(buf cref filepath, buf cref chunk, buf cref outfile) {
     }
 }
 
-// TODO: make it accept with a space after the function name
 make_main("png tool to get channels or chunks",
     make_cmd(chans(infile, channels, outfile), "read png, extract channels",
-        make_arg_buf(infile, "path to a RGBA png file");
-        make_arg_buf(channels, "which channels to extract, eg. 'BRA' for blue, red, alpha");
-        make_arg_buf(outfile, "result");
-    );
+        make_arg_buf(infile, "path to a RGBA png file")
+        make_arg_buf(channels, "which channels to extract, eg. 'BRA' for blue, red, alpha")
+        make_arg_buf(outfile, "result")
+    )
     make_cmd(chunk(infile, chunkname, outfile), "read png, extract chunk",
-        make_arg_buf(infile, "path to a png file");
-        make_arg_buf(chunkname, "a 4-character chunk name, or -l for a list");
-        make_arg_buf(outfile, "result");
-    );
+        make_arg_buf(infile, "path to a png file")
+        make_arg_buf(chunkname, "a 4-character chunk name, or -l for a list")
+        make_arg_buf(outfile, "result")
+    )
 )

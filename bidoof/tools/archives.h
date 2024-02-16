@@ -141,12 +141,12 @@ buf zip_data_find_by_path(zip_data cref zip, buf cref path);
 
 zip_entry zip_add_entry(zip_data ref zip);
 void zip_entry_file_name(zip_entry ref en, buf cref file_name);
-void zip_entry_extra_field(zip_entry ref en, buf cref extra_field);
+void zip_entry_extra_field(zip_entry ref en, unsigned const n, u16 const ids[n], buf const data[n]);
 void zip_entry_file_data(zip_entry ref en, buf cref file_data);
 void zip_fix_entry(zip_entry ref en);
 
 void zip_fix_central_dir(zip_data ref zip);
-void zip_swap_central_dir_comment(zip_data ref zip, buf ref com);
+void zip_central_dir_comment(zip_data ref zip, buf ref com);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
@@ -174,11 +174,28 @@ void zip_entry_file_name(zip_entry ref en, buf cref file_name) {
     en->header->file_name = bufcpy(file_name).ptr;
 }
 
-void zip_entry_extra_field(zip_entry ref en, buf cref extra_field) {
-    en->file->local_file_header.extra_field_length = extra_field->len;
-    en->file->local_file_header.extra_field = bufcpy(extra_field).ptr;
-    en->header->extra_field_length = extra_field->len;
-    en->header->extra_field = bufcpy(extra_field).ptr;
+void zip_entry_extra_field(zip_entry ref en, unsigned const n, u16 const ids[n], buf const data[n]) {
+    struct extra_fields_wrap f = {.w= {.len= n, .ptr= calloc(n, sizeof *f.w.ptr)}};
+    if (!f.w.ptr) exitf("OOM");
+
+    for (unsigned k = 0; k < n; k++)
+        f.w.ptr[k] = (struct extra_field){
+            .header= (struct extra_field_header){
+                .id= ids[k],
+                .size= data[k].len,
+            },
+            .data= data[k].ptr,
+        };
+
+    buf b = {0};
+    if (bipa_build_extra_fields_wrap(&f, &b)) {
+        en->file->local_file_header.extra_field_length = b.len;
+        en->file->local_file_header.extra_field = bufcpy(&b).ptr;
+        en->header->extra_field_length = b.len;
+        en->header->extra_field = bufcpy(&b).ptr;
+    }
+    free(f.w.ptr);
+    buf_free(&b);
 }
 
 void zip_entry_file_data(zip_entry ref en, buf cref file_data) {
@@ -201,33 +218,31 @@ void zip_fix_entry(zip_entry ref en) {
     for (struct local_file const* it = en->zip->local_files.ptr; it != en->file; it++)
         off+= bipa_bytesz_local_file(it);
     en->header->relative_offset_of_local_header = off;
-
-    // please
-    en->file->local_file_header.last_mod_file_time = en->header->last_mod_file_time = 44642;
-    en->file->local_file_header.last_mod_file_date = en->header->last_mod_file_date = 22350;
-    en->header->internal_file_attributes= 0;
-    en->header->external_file_attributes= 2175008768;
 }
 
 void zip_fix_central_dir(zip_data ref zip) {
-    zip->end_of_central_directory_record.number_of_this_disk = 0;
-    zip->end_of_central_directory_record.number_of_the_disk_with_the_start_of_the_central_directory = 0;
+    struct end_of_central_directory_record* const d = &zip->end_of_central_directory_record;
 
-    zip->end_of_central_directory_record.size_of_the_central_directory =
+    d->number_of_this_disk = 0;
+    d->number_of_the_disk_with_the_start_of_the_central_directory = 0;
+
+    d->total_number_of_entries_in_the_central_directory_on_this_disk = zip->local_files.len;
+    d->total_number_of_entries_in_the_central_directory = zip->local_files.len;
+
+    d->size_of_the_central_directory =
         bipa_bytesz_central_directory_headers(&zip->central_directory_headers);
 
-    zip->end_of_central_directory_record.offset_of_start_of_central_directory_with_respect_to_the_starting_disk_number =
+    d->offset_of_start_of_central_directory_with_respect_to_the_starting_disk_number =
         bipa_bytesz_local_files(&zip->local_files);
 }
 
-void zip_swap_central_dir_comment(zip_data ref zip, buf ref com) {
-    buf const tmp = *com;
+void zip_central_dir_comment(zip_data ref zip, buf ref com) {
+    struct end_of_central_directory_record* const d = &zip->end_of_central_directory_record;
 
-    com->len = zip->end_of_central_directory_record.zip_file_comment_length;
-    com->ptr = zip->end_of_central_directory_record.zip_file_comment;
+    free(d->zip_file_comment);
 
-    zip->end_of_central_directory_record.zip_file_comment_length = tmp.len;
-    zip->end_of_central_directory_record.zip_file_comment = tmp.ptr;
+    d->zip_file_comment_length = com->len;
+    d->zip_file_comment = bufcpy(com).ptr;
 }
 
 #endif // BIDOOF_IMPLEMENTATION
