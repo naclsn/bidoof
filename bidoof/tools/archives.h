@@ -132,7 +132,7 @@ bipa_struct(zip_data, 3
 adapt_bipa_type(zip_data)
 
 typedef struct zip_entry {
-    struct zip_data* zip;
+    struct zip_data const* zip;
     struct local_file* file;
     struct central_directory_header* header;
 } zip_entry;
@@ -140,6 +140,7 @@ typedef struct zip_entry {
 buf zip_find_by_path(zip_data cref zip, buf const path);
 
 zip_entry zip_add_entry(zip_data ref zip);
+zip_entry zip_get_entry(zip_data cref zip, sz const k);
 void zip_entry_file_name(zip_entry ref en, buf const file_name);
 void zip_entry_extra_field(zip_entry ref en, unsigned const n, u16 const ids[n], buf const data[n]);
 void zip_entry_file_data(zip_entry ref en, buf const file_data);
@@ -161,9 +162,18 @@ zip_entry zip_add_entry(zip_data ref zip) {
     struct central_directory_header* header = dyarr_push(&zip->central_directory_headers);
     if (!file || !header) exitf("OOM");
 
+    *file = (struct local_file){0};
+    *header = (struct central_directory_header){0};
+
     file->local_file_header.version_needed_to_extract = 10;
     header->version_needed_to_extract = 10;
 
+    return (zip_entry){.zip= zip, .file= file, .header= header};
+}
+
+zip_entry zip_get_entry(zip_data cref zip, sz const k) {
+    struct local_file* file = zip->local_files.ptr+k;
+    struct central_directory_header* header = zip->central_directory_headers.ptr+k;
     return (zip_entry){.zip= zip, .file= file, .header= header};
 }
 
@@ -208,6 +218,7 @@ void zip_fix_entry(zip_entry ref en) {
     en->header->crc_32 = crc;
 
     // for now
+    // XXX: !! (TODO: proper handling of compression and encryption)
     en->file->local_file_header.uncompressed_size =
     en->header->compressed_size =
     en->header->uncompressed_size =

@@ -41,6 +41,7 @@ typedef dyarr(u8) buf;
 void xxd(buf const b, sz const l);
 void xxdiff(buf const a, buf const b, sz const l);
 char const* binstr(u64 n, unsigned const w);
+void putb(char opref h, buf const b, char opref t);
 
 void buf_free(buf const self);
 
@@ -84,6 +85,9 @@ void poke64be(buf ref b, sz const k, u64 const v);
 buf file_read(buf const path);
 void file_write(buf const path, buf const b);
 buf dir_list(buf const path);
+buf path_basename(buf const path);
+buf path_dirname(buf const path);
+void path_join(buf ref to, buf const other);
 
 #define _HERE_STR(__ln) #__ln
 #define _HERE_XSTR(__ln) _HERE_STR(__ln)
@@ -98,6 +102,11 @@ buf dir_list(buf const path);
     memcpy(&(__x), tmp, _sz);       \
 } while (0)
 #define swap(__x, __y) swapn((__x), (__y), sizeof(__x))
+
+#define for_lines(__sl, __inbuf) for (                                            \
+    buf _inbuf = (__inbuf), __sl = {.ptr= memchr(_inbuf.ptr, '\n', _inbuf.len)};  \
+    __sl.ptr && (__sl.len = __sl.ptr - _inbuf.ptr, __sl.ptr = _inbuf.ptr);        \
+    __sl.ptr = memchr(_inbuf.ptr+= __sl.len+1, '\n', _inbuf.len-= __sl.len+1))
 
 #ifdef BIDOOF_IMPLEMENTATION
 
@@ -153,6 +162,12 @@ void xxdiff(buf const l, buf const r, sz const ln) {
         printf("\n");
     }
     if ((sz)-1 != first) printf("first diff at offset %zu\n", first);
+}
+
+void putb(char opref h, buf const b, char opref t) {
+    if (h) printf("%s", h);
+    printf("%.*s", (unsigned)b.len, b.ptr);
+    if (t) printf("%s", t);
 }
 
 char const* binstr(u64 n, unsigned const w) {
@@ -303,12 +318,39 @@ buf dir_list(buf const path) {
     buf r = {0};
     DIR* d = opendir(local);
     struct dirent const* en;
-    while ((en = readdir(d))) {
+    while ((en = readdir(d))) if (strcmp(".", en->d_name) && strcmp("..", en->d_name)) {
         bufcat(&r, mkbufsl(en->d_name, 0, strlen(en->d_name)+1));
         r.ptr[r.len-1] = '\n';
     }
     closedir(d);
     return r;
+}
+
+buf path_basename(buf const path) {
+    if (!path.len) return path;
+    sz const l = path.len-1;
+    bool const e = '/' == path.ptr[l] || '\\' == path.ptr[l];
+    sz k;
+    for (k = e; k < path.len; k++) if ('/' == path.ptr[l-k] || '\\' == path.ptr[l-k]) break;
+    return mkbufsl(path.ptr, l-(k-1), path.len-e);
+}
+
+buf path_dirname(buf const path) {
+    if (!path.len) return path;
+    sz const l = path.len-1;
+    bool const e = '/' == path.ptr[l] || '\\' == path.ptr[l];
+    sz k;
+    for (k = e; k < path.len; k++) if ('/' == path.ptr[l-k] || '\\' == path.ptr[l-k]) break;
+    return mkbufsl(path.ptr, 0, path.len-1-k);
+}
+
+void path_join(buf ref to, buf const other) {
+    bool const
+        a = to->len && '/' == to->ptr[to->len-1],
+        b = other.len && '/' == other.ptr[0];
+    if (a && b) to->len--;
+    else if (!a && !b) *dyarr_push(to) = '/';
+    bufcat(to, other);
 }
 
 #endif // BIDOOF_IMPLEMENTATION

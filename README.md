@@ -13,8 +13,8 @@ $ make build/example
 $ build/example
 ```
 
-also provided for convenience: `./run.sh example.c`
-(with or without the .c, but bash completion will have it)
+also provided for convenience: `./run example.c`
+(with or without the .c, but your shell's completion will probably put it)
 
 or without `make`: `cc example.c -DBIDOOF_IMPLEMENTATION && ./a.out`
 
@@ -41,7 +41,7 @@ but basically the things are in [bidoof/tools/](bidoof/tools/)
 - `bipa.h`: builder+parser generator for (byte-wise) binary formats
 - `dyarr.h`: the backing things for the `buf` type
 - `frame.h`: minimal open a window with GL context (tested with Win32, X11)
-- `paras.h`: (limited) parse+assemble generator
+- `paras.h`: (limited) parser+assembler generator
 
 ---
 

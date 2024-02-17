@@ -178,9 +178,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _typename_u16le() u16
 #define _typename_u32le() u32
 #define _typename_u64le() u64
-#define _dump_u16le()   fprintf(strm, _hidump_nb("%hu") _hidump_ex("u16le"), *it);
-#define _dump_u32le()   fprintf(strm, _hidump_nb("%u" ) _hidump_ex("u32le"), *it);
-#define _dump_u64le()   fprintf(strm, _hidump_nb("%lu") _hidump_ex("u64le"), *it);
+#define _dump_u16le()   fprintf(strm, _hidump_nb("0x%02hx") "/" _hidump_nb("%hu") _hidump_ex("u16le"), *it, *it);
+#define _dump_u32le()   fprintf(strm, _hidump_nb("0x%04x" ) "/" _hidump_nb("%u" ) _hidump_ex("u32le"), *it, *it);
+#define _dump_u64le()   fprintf(strm, _hidump_nb("0x%08lx") "/" _hidump_nb("%lu") _hidump_ex("u64le"), *it, *it);
 #define _build_u16le()  if (res->cap <= res->len+1 &&                    \
                             !dyarr_resize(res,                           \
                                 res->cap ? res->cap*2 : 16)) goto fail;  \
@@ -234,9 +234,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _typename_u16be() u16
 #define _typename_u32be() u32
 #define _typename_u64be() u64
-#define _dump_u16be()   fprintf(strm, _hidump_nb("%hu") _hidump_ex("u16be"), *it);
-#define _dump_u32be()   fprintf(strm, _hidump_nb("%u" ) _hidump_ex("u32be"), *it);
-#define _dump_u64be()   fprintf(strm, _hidump_nb("%lu") _hidump_ex("u64be"), *it);
+#define _dump_u16be()   fprintf(strm, _hidump_nb("0x%02hx") "/" _hidump_nb("%hu") _hidump_ex("u16be"), *it, *it);
+#define _dump_u32be()   fprintf(strm, _hidump_nb("0x%04x" ) "/" _hidump_nb("%u" ) _hidump_ex("u32be"), *it, *it);
+#define _dump_u64be()   fprintf(strm, _hidump_nb("0x%08lx") "/" _hidump_nb("%lu") _hidump_ex("u64be"), *it, *it);
 #define _build_u16be()  if (res->cap <= res->len+1 &&                    \
                             !dyarr_resize(res,                           \
                                 res->cap ? res->cap*2 : 16)) goto fail;  \
@@ -288,15 +288,15 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _bytesz_u64be() 8
 
 #define _typename_cstr(__sentinel) u8*
-#define _dump_cstr(__sentinel) {                                         \
-        u8 s = (__sentinel);                                             \
-        sz len = 0;                                                      \
-        for (sz k = 0; s != (*it)[k]; k++) len++;                        \
-        fprintf(strm, _hidump_kw("cstr")                                 \
-                "(" _hidump_nb("%zu") _hidump_ex("+1") ")", len);        \
-        bipa_xxd(strm, *it, len, depth);                                 \
-        if (!(len & 0xf)) fprintf(strm, "\n%*.s", (depth+2)*2-1, "");    \
-        fprintf(strm, _hidump_ex(" %02X"), s);                           \
+#define _dump_cstr(__sentinel) {                                       \
+        u8 s = (__sentinel);                                           \
+        sz len = 0;                                                    \
+        for (sz k = 0; s != (*it)[k]; k++) len++;                      \
+        fprintf(strm, _hidump_kw("cstr")                               \
+                "(" _hidump_nb("%zu") _hidump_ex("+1") ")", len);      \
+        bipa_xxd(strm, *it, len, depth);                               \
+        if (!(len & 0xf)) fprintf(strm, "\n%*.s", (depth+2)*2-1, "");  \
+        fprintf(strm, _hidump_ex(" %02X"), s);                         \
     }
 #define _build_cstr(__sentinel) {                            \
         u8 s = (__sentinel);                                 \
@@ -327,22 +327,26 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         fprintf(strm, _hidump_kw("lstr") "(" _hidump_nb("%zu") ")", len);  \
         bipa_xxd(strm, *it, len, depth);                                   \
     }
-#define _build_lstr(__length) {                              \
-        sz len = (__length);                                 \
-        while (res->cap <= res->len+len+1)                   \
-            if (!dyarr_resize(res,                           \
-                    res->cap ? res->cap*2 : 16)) goto fail;  \
-        memcpy(res->ptr+res->len, *it, len);                 \
-        res->len+= len;                                      \
+#define _build_lstr(__length) {                                  \
+        sz len = (__length);                                     \
+        if (len) {                                               \
+            while (res->cap <= res->len+len)                     \
+                if (!dyarr_resize(res,                           \
+                        res->cap ? res->cap*2 : 16)) goto fail;  \
+            memcpy(res->ptr+res->len, *it, len);                 \
+            res->len+= len;                                      \
+        }                                                        \
     }
-#define _parse_lstr(__length) {               \
-        u8* from = src->ptr+(*at);            \
-        sz len = (__length);                  \
-        if (src->len < (*at)+len) goto fail;  \
-        *it = malloc(len);                    \
-        if (!*it) goto fail;                  \
-        memcpy(*it, from, len);               \
-        (*at)+= len;                          \
+#define _parse_lstr(__length) {                   \
+        u8* from = src->ptr+(*at);                \
+        sz len = (__length);                      \
+        if (len) {                                \
+            if (src->len < (*at)+len) goto fail;  \
+            *it = malloc(len);                    \
+            if (!*it) goto fail;                  \
+            memcpy(*it, from, len);               \
+            (*at)+= len;                          \
+        }                                         \
     }
 #define _free_lstr(__length) free(*it);
 #define _bytesz_lstr(__length) (__length)
