@@ -1,6 +1,18 @@
 #ifndef __BIDOOF_T_COMPRESSIONS__
 #define __BIDOOF_T_COMPRESSIONS__
 
+#ifdef BIDOOF_T_IMPLEMENTATION
+#define _redef_after_compressions
+#undef BIDOOF_IMPLEMENTATION
+#undef BIDOOF_T_IMPLEMENTATION
+#endif
+#include "checks.h"
+#ifdef _redef_after_compressions
+#undef _redef_after_compressions
+#define BIDOOF_IMPLEMENTATION
+#define BIDOOF_T_IMPLEMENTATION
+#endif
+
 #include "../base.h"
 
 #ifdef BIDOOF_LIST_DEPS
@@ -88,7 +100,7 @@ buf inflate(buf const source, struct inflate_extra_info opref xnfo) {
                     free(r.ptr);
                     exitf("not enough bytes in no compression block for len/nlen");
                 }
-                u16 const len = peek32le(source, at) & 0xffff;
+                u16 const len = peek16le(source, at);
                 at+= 4;
                 if (source.len < at+len) {
                     free(r.ptr);
@@ -98,7 +110,7 @@ buf inflate(buf const source, struct inflate_extra_info opref xnfo) {
                     free(r.ptr);
                     exitf("OOM");
                 }
-                memcpy(r.ptr, source.ptr+at, len);
+                memcpy(r.ptr+r.len, source.ptr+at, len);
                 r.len+= len;
                 at+= len;
                 break;
@@ -293,10 +305,11 @@ buf inflate(buf const source, struct inflate_extra_info opref xnfo) {
         }
     } while (!bfinal);
 
+    // FIXME: potential jank found :/
     if (xnfo) {
         _dropbits(has & 7);
-        xnfo->adler32 = peek32be(source, at);
-        xnfo->last_at = at;
+        xnfo->adler32 = peek32be(source, at); // :/ `at` may not be correct if more in acc
+        xnfo->last_at = at; // :/ not updated if no xnfo
     }
 
 #   undef _dropbits
@@ -308,7 +321,7 @@ buf inflate(buf const source, struct inflate_extra_info opref xnfo) {
 buf deflate_dumb(buf const source) {
     buf r = {0};
     static sz const BLOCK_MAX = (1<<16) -1;
-    if (!dyarr_resize(&r, 2 + source.len + 5*(source.len/(BLOCK_MAX +1) +1))) exitf("OOM");
+    if (!dyarr_resize(&r, 2 + source.len + 5*(source.len/(BLOCK_MAX +1) +1) + 4)) exitf("OOM");
 
     unsigned const
         cinfo = 0, // max 7 (free)
@@ -324,12 +337,13 @@ buf deflate_dumb(buf const source) {
     r.ptr[r.len++] = flg;
 
     for (sz k = 0; k < source.len; k+= BLOCK_MAX) {
+        u16 const len = source.len-k < BLOCK_MAX ? source.len-k : BLOCK_MAX;
+
         unsigned const
             btype = 0, // 2 bits, "no compression"
-            bfinal = 1; // 0|1, 1 for last block
+            bfinal = len < BLOCK_MAX; // 0|1, 1 for last block
         r.ptr[r.len++] = btype<<1 | bfinal; // (3 bits, rest free in case of "no compression")
 
-        u16 const len = source.len-k < BLOCK_MAX ? source.len-k : BLOCK_MAX;
         poke16le(&r, r.len, len);
         r.len+= 2;
         poke16le(&r, r.len, ~len);
@@ -338,6 +352,9 @@ buf deflate_dumb(buf const source) {
         memcpy(r.ptr+r.len, source.ptr+k, len);
         r.len+= len;
     }
+
+    poke32be(&r, r.len, adler32(source));
+    r.len+= 4;
 
     return r;
 }

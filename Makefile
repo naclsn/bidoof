@@ -1,5 +1,5 @@
 warnings = -Wall -Wextra -Wpedantic -Werror -Wno-unused-function -Wno-unused-variable -Wno-unused-value -Wno-unused-parameter
-CFLAGS += -std=c99 $(warnings)
+CFLAGS += -ggdb -std=c99 $(warnings)
 
 builddir = build
 toolnames = archives checks compressions encodings encryptions images views

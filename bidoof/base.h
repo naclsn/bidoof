@@ -438,7 +438,7 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
         return r;                                  \
     }                                              \
     __tname __tname##_parse(buf const buf) {       \
-        struct __tname r;                          \
+        __tname r = {0};                           \
         sz at = 0;                                 \
         if (!bipa_parse_##__tname(&r, &buf, &at))  \
             exitf("could not parse a " #__tname);  \

@@ -574,6 +574,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         sz at_before = (*at);                                                                          \
         _typename __of* const it = dyarr_push(self);                                                   \
         if (!it) return false;                                                                         \
+        *it = (_typename __of){0};                                                                     \
         _parse __of                                                                                    \
         return true;                                                                                   \
     fail:                                                                                              \
