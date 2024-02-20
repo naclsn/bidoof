@@ -14,12 +14,16 @@
 #define _declonly(...) __VA_ARGS__
 #endif
 
+#ifndef PARAS_NOTIFY
+#define PARAS_NOTIFY(...) ((void)0)
+#endif
+
 #define __rem_par(...) __VA_ARGS__
 #define __first_arg_(h, ...) h
 #define __first_arg(...) __first_arg_(__VA_ARGS__, _)
 
 union paras_generic { char const* s; int i; unsigned u; };
-static bool _paras_scan(buf cref src, sz ref at, char cref f, union paras_generic* args) _declonly({
+static bool _paras_scan(buf cref src, sz ref at, unsigned const _ln, char cref f, union paras_generic* args) _declonly({
     sz i = *at, j = 0, k = 0;
     while (f[j] && i < src->len && '\n' != src->ptr[i] && ';' != src->ptr[i]) switch (f[j++]) {
         case ' ':
@@ -37,7 +41,10 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, union paras_generi
 
             case 'u':
             case 'x':
-                if ('-' == src->ptr[i]) return false;
+                if ('-' == src->ptr[i]) {
+                    PARAS_NOTIFY("expected unsigned (%%%c in format) but got '-' at offset %zu (line %u)", f[j-1], i, _ln);
+                    return false;
+                }
                 // fallthrough
             case 'i': {
                 bool const minus = '-' == src->ptr[i];
@@ -51,17 +58,26 @@ static bool _paras_scan(buf cref src, sz ref at, char cref f, union paras_generi
                 }
                 args[k].i = 0;
                 char const* v = strchr(dgts, src->ptr[i++]|32);
-                if (!v) return false;
+                if (!v) {
+                    PARAS_NOTIFY("expected digit in \"%s\" (%%%c in format) but got '%c' at offset %zu (line %u)", dgts, f[j-1], src->ptr[i-1], i-1, _ln);
+                    return false;
+                }
                 do args[k].i = (!shft ? args[k].i*10 : args[k].i<<shft) + (v-dgts);
                 while (i < src->len && (v = strchr(dgts, src->ptr[i++]|32)));
                 if (minus) args[k].i*= -1;
                 k++;
             } break;
 
-            case '%': if ('%' != src->ptr[i++]) return false;
+            case '%': if ('%' != src->ptr[i++]) {
+                PARAS_NOTIFY("expected literal '%%' but got '%c' at offset %zu (line %u)", src->ptr[i-1], i-1, _ln);
+                return false;
+            }
         } break;
 
-        default: if (f[j-1] != src->ptr[i++]) return false;
+        default: if (f[j-1] != src->ptr[i++]) {
+            PARAS_NOTIFY("expected literal '%c' but got '%c' at offset %zu (line %u)", f[j-1], src->ptr[i-1], i-1, _ln);
+            return false;
+        }
     }
 
     if (f[j]) return false;
@@ -105,7 +121,7 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
     if (!memcmp(#__name, word, strlen(#__name))) {                             \
         union paras_generic args[4];                                           \
         sz _pat = at;                                                          \
-        if (_paras_scan(src, &at, __first_arg __format, args)) {               \
+        if (_paras_scan(src, &at, _ln, __first_arg __format, args)) {          \
             bool valid = true;                                                 \
             u8 const _bytes[countof(codes)] = {__rem_par __encode};            \
             if (valid) {                                                       \
@@ -125,10 +141,14 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
     sz paras_disasm_##__name(buf cref src, buf ref res, sz const loc) _declonly({  \
         static bool const _disasm = true;                                          \
         static char const* const word;                                             \
+        unsigned const _ln;                                                        \
         sz at = 0;                                                                 \
         while (at < src->len) {                                                    \
             u8 const* const bytes = src->ptr+at;                                   \
             __VA_ARGS__                                                            \
+            PARAS_NOTIFY(                                                          \
+                "not a known valid instruction byte 0x%02X at offset %zu",         \
+                src->ptr[at], at);                                                 \
             break;                                                                 \
         }                                                                          \
         return at;                                                                 \
@@ -151,8 +171,10 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
             if (at < src->len && ';' != *word) {                                   \
                 __VA_ARGS__                                                        \
                 while (at < src->len && '\n' != src->ptr[at]) at++;                \
-                exitf("unknown mnemonic with given args line %u: '%.*s'",          \
+                PARAS_NOTIFY(                                                      \
+                    "unknown mnemonic for the given arguments line %u: '%.*s'",    \
                     _ln, (int)(src->ptr+at - (u8*)word), word);                    \
+                return 0;                                                          \
             }                                                                      \
             while (at < src->len && '\n' != src->ptr[at]) at++;                    \
         }                                                                          \

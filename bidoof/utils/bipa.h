@@ -50,11 +50,14 @@
 /// also:
 ///  - define BIPA_DECLONLY to only have declaration, no implementation
 ///  - define BIPA_HIDUMP to use ANSI-escape coloration with bipa_dump_xyz
+///  - define BIPA_NOTIFY to a function/macro for much verbose
 ///
 /// ---
 ///
 /// internal types are defined with a set of macro:
 ///  - _typename_xyz(...)
+///  - _litrname_xyz(...)
+///  - _bytesz_xyz(...)
 ///  - _dump_xyz(...)
 ///  - _build_xyz(...)
 ///  - _parse_xyz(...)
@@ -90,6 +93,10 @@
 #define _hidump_st(__c) __c
 #define _hidump_ex(__c) __c
 #define _hidump_id(__c) __c
+#endif
+
+#ifndef BIPA_NOTIFY
+#define BIPA_NOTIFY(...) ((void)0)
 #endif
 
 static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declonly({
@@ -152,20 +159,24 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _FOR_TYNM(__n, __macro, __inv, ...)  _FOR_TYNM_##__n(__n, __macro, __inv, __VA_ARGS__)
 
 #define _typename(__ty, ...) _CALL(_typename_##__ty, __VA_ARGS__)
+#define _litrname(__ty, ...) _CALL(_litrname_##__ty, __VA_ARGS__)
+#define _bytesz(__ty, ...)   _CALL(_bytesz_##__ty, __VA_ARGS__)
 #define _dump(__ty, ...)     _CALL(_dump_##__ty, __VA_ARGS__)
 #define _build(__ty, ...)    _CALL(_build_##__ty, __VA_ARGS__)
 #define _parse(__ty, ...)    _CALL(_parse_##__ty, __VA_ARGS__)
 #define _free(__ty, ...)     _CALL(_free_##__ty, __VA_ARGS__)
-#define _bytesz(__ty, ...)   _CALL(_bytesz_##__ty, __VA_ARGS__)
 
 #define _typename_void() bool
+#define _litrname_void() "void"
+#define _bytesz_void() 0
 #define _dump_void()  (void)it; fprintf(strm, _hidump_kw("void"));
 #define _build_void() (void)it;
 #define _parse_void() (void)it;
 #define _free_void()  (void)it;
-#define _bytesz_void() 0
 
 #define _typename_u8() u8
+#define _litrname_u8() "u8"
+#define _bytesz_u8() 1
 #define _dump_u8()  fprintf(strm, _hidump_nb("%hhu") _hidump_ex("u8"), *it);
 #define _build_u8() { u8* p = dyarr_push(res);  \
                     if (!p) goto fail;  \
@@ -173,11 +184,16 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _parse_u8() if (src->len == (*at)) goto fail;  \
                     *it = src->ptr[(*at)++];
 #define _free_u8()  (void)it;
-#define _bytesz_u8() 1
 
 #define _typename_u16le() u16
 #define _typename_u32le() u32
 #define _typename_u64le() u64
+#define _litrname_u16le() "u16le"
+#define _litrname_u32le() "u32le"
+#define _litrname_u64le() "u64le"
+#define _bytesz_u16le() 2
+#define _bytesz_u32le() 4
+#define _bytesz_u64le() 8
 #define _dump_u16le()   fprintf(strm, _hidump_nb("0x%02hx") "/" _hidump_nb("%hu") _hidump_ex("u16le"), *it, *it);
 #define _dump_u32le()   fprintf(strm, _hidump_nb("0x%04x" ) "/" _hidump_nb("%u" ) _hidump_ex("u32le"), *it, *it);
 #define _dump_u64le()   fprintf(strm, _hidump_nb("0x%08lx") "/" _hidump_nb("%lu") _hidump_ex("u64le"), *it, *it);
@@ -227,13 +243,16 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _free_u16le() (void)it;
 #define _free_u32le() (void)it;
 #define _free_u64le() (void)it;
-#define _bytesz_u16le() 2
-#define _bytesz_u32le() 4
-#define _bytesz_u64le() 8
 
 #define _typename_u16be() u16
 #define _typename_u32be() u32
 #define _typename_u64be() u64
+#define _litrname_u16be() "u16be"
+#define _litrname_u32be() "u32be"
+#define _litrname_u64be() "u64be"
+#define _bytesz_u16be() 2
+#define _bytesz_u32be() 4
+#define _bytesz_u64be() 8
 #define _dump_u16be()   fprintf(strm, _hidump_nb("0x%02hx") "/" _hidump_nb("%hu") _hidump_ex("u16be"), *it, *it);
 #define _dump_u32be()   fprintf(strm, _hidump_nb("0x%04x" ) "/" _hidump_nb("%u" ) _hidump_ex("u32be"), *it, *it);
 #define _dump_u64be()   fprintf(strm, _hidump_nb("0x%08lx") "/" _hidump_nb("%lu") _hidump_ex("u64be"), *it, *it);
@@ -283,11 +302,10 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _free_u16be() (void)it;
 #define _free_u32be() (void)it;
 #define _free_u64be() (void)it;
-#define _bytesz_u16be() 2
-#define _bytesz_u32be() 4
-#define _bytesz_u64be() 8
 
 #define _typename_cstr(__sentinel) u8*
+#define _litrname_cstr(__sentinel) "cstr(" #__sentinel ")"
+#define _bytesz_cstr(__sentinel) ((u8*)strchr((char*)*it, (__sentinel)) - *it)
 #define _dump_cstr(__sentinel) {                                       \
         u8 s = (__sentinel);                                           \
         sz len = 0;                                                    \
@@ -319,9 +337,10 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         (*at)+= len+1;                                           \
     }
 #define _free_cstr(__sentinel) free(*it);
-#define _bytesz_cstr(__sentinel) ((u8*)strchr((char*)*it, (__sentinel)) - *it)
 
 #define _typename_lstr(__length) u8*
+#define _litrname_lstr(__length) "lstr(" #__length ")"
+#define _bytesz_lstr(__length) (__length)
 #define _dump_lstr(__length) {                                             \
         sz len = (__length);                                               \
         fprintf(strm, _hidump_kw("lstr") "(" _hidump_nb("%zu") ")", len);  \
@@ -346,10 +365,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
             if (!*it) goto fail;                  \
             memcpy(*it, from, len);               \
             (*at)+= len;                          \
-        }                                         \
+        } else *it = NULL;                        \
     }
 #define _free_lstr(__length) free(*it);
-#define _bytesz_lstr(__length) (__length)
 
 #define _struct_fields_typename_one(__k, __n, __inv, __ty, __nm) _typename __ty __nm;
 
@@ -365,9 +383,10 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         _build __ty                                              \
     }
 
-#define _struct_fields_parse_one(__k, __n, __inv, __ty, __nm) {  \
-        _typename __ty* const it = &self->__nm;                  \
-        _parse __ty                                              \
+#define _struct_fields_parse_one(__k, __n, __tname, __ty, __nm) {  \
+        _curr = "`" _litrname __ty " " #__tname "." #__nm "`";     \
+        _typename __ty* const it = &self->__nm;                    \
+        _parse __ty                                                \
     }
 
 #define _struct_fields_free_one(__k, __n, __inv, __ty, __nm) {  \
@@ -396,10 +415,13 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
     fail: return false;                                                                                \
     })                                                                                                 \
     bool bipa_parse_##__tname(struct __tname ref self, buf cref src, sz ref at) _declonly({            \
+        char const* _curr = "";                                                                        \
+        (void)_curr;                                                                                   \
         sz at_before = (*at);                                                                          \
-        _FOR_TYNM(__n_fields, _struct_fields_parse_one, 0, __VA_ARGS__)                                \
+        _FOR_TYNM(__n_fields, _struct_fields_parse_one, __tname, __VA_ARGS__)                          \
         return true;                                                                                   \
     fail:                                                                                              \
+        BIPA_NOTIFY("could not parse field %s at offset %zu", _curr, *at);                             \
         (*at) = at_before;                                                                             \
         return false;                                                                                  \
     })                                                                                                 \
@@ -412,11 +434,12 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         return r;                                                                                      \
     })
 #define _typename_struct(__tname) struct __tname
+#define _litrname_struct(__tname) "struct " #__tname
+#define _bytesz_struct(__tname) bipa_bytesz_##__tname(it)
 #define _dump_struct(__tname)   bipa_dump_##__tname(it, strm, depth+1);
 #define _build_struct(__tname)  if (!bipa_build_##__tname(it, res)) goto fail;
 #define _parse_struct(__tname)  if (!bipa_parse_##__tname(it, src, at)) goto fail;
 #define _free_struct(__tname)   bipa_free_##__tname(it);
-#define _bytesz_struct(__tname) bipa_bytesz_##__tname(it)
 
 #define _union_getvar_name(__tty, __tva, __nm)     __nm
 #define _union_getvar_tagtype(__tty, __tva, __nm)  __tty
@@ -522,6 +545,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
             return true;                                                                               \
         fail: (*at) = at_before;                                                                       \
         }                                                                                              \
+        BIPA_NOTIFY("could not parse a variant of `union " #__tname "` at offset %zu", *at);           \
         return false;                                                                                  \
     })                                                                                                 \
     void bipa_free_##__tname(struct __tname cref self) _declonly({                                     \
@@ -536,11 +560,12 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         }                                                                                              \
     })
 #define _typename_union(__tname) struct __tname
+#define _litrname_union(__tname) "union " #__tname
+#define _bytesz_union(__tname)  bipa_bytesz_##__tname(it)
 #define _dump_union(__tname)    bipa_dump_##__tname(it, strm, depth+1);
 #define _build_union(__tname)   if (!bipa_build_##__tname(it, res)) goto fail;
 #define _parse_union(__tname)   if (!bipa_parse_##__tname(it, src, at)) goto fail;
 #define _free_union(__tname)    bipa_free_##__tname(it);
-#define _bytesz_union(__tname)  bipa_bytesz_##__tname(it)
 
 #define bipa_array(__tname, __of)                                                                      \
     struct __tname {                                                                                   \
@@ -578,6 +603,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         _parse __of                                                                                    \
         return true;                                                                                   \
     fail:                                                                                              \
+        BIPA_NOTIFY("could not parse an item of `" _litrname __of "` at offset %zu", *at);             \
         (*at) = at_before;                                                                             \
         return false;                                                                                  \
     })                                                                                                 \
@@ -597,12 +623,13 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         return r;                                                                                      \
     })
 #define _typename_array(__tname, __while) struct __tname
+#define _litrname_array(__tname, __while) "array " #__tname
+#define _bytesz_array(__tname, __while) bipa_bytesz_##__tname(it)
 #define _dump_array(__tname, __while)   bipa_dump_##__tname(it, strm, depth+1);
 #define _build_array(__tname, __while)  if (!bipa_build_##__tname(it, res)) goto fail;
 #define _parse_array(__tname, __while)  it->ptr = NULL;  \
                                         for (sz k = it->len = it->cap = 0; __while; k++)  \
                                             if (!bipa_parse_one_##__tname(it, src, at)) goto fail;
 #define _free_array(__tname, __while)   bipa_free_##__tname(it);
-#define _bytesz_array(__tname, __while) bipa_bytesz_##__tname(it)
 
 #endif // __BIPA_H__

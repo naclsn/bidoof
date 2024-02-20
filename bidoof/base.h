@@ -89,11 +89,6 @@ buf path_basename(buf const path);
 buf path_dirname(buf const path);
 void path_join(buf ref to, buf const other);
 
-#define _HERE_STR(__ln) #__ln
-#define _HERE_XSTR(__ln) _HERE_STR(__ln)
-#define HERE __FILE__ ":" _HERE_XSTR(__LINE__)
-#define exitf(...) (printf(HERE ": " __VA_ARGS__), putchar('\n'), exit(1))
-
 #define swapn(__x, __y, __sz) do {  \
     sz _sz = __sz;                  \
     u8 tmp[__sz];                   \
@@ -108,7 +103,17 @@ void path_join(buf ref to, buf const other);
     __sl.ptr && (__sl.len = __sl.ptr - _inbuf.ptr, __sl.ptr = _inbuf.ptr);        \
     __sl.ptr = memchr(_inbuf.ptr+= __sl.len+1, '\n', _inbuf.len-= __sl.len+1))
 
+#define _HERE_STR(__ln) #__ln
+#define _HERE_XSTR(__ln) _HERE_STR(__ln)
+#define HERE __FILE__ ":" _HERE_XSTR(__LINE__)
+#define exitf(...) (printf(HERE ": " __VA_ARGS__), putchar('\n'), exit(1))
+#define notif(...) (notify_stream ? fprintf(notify_stream, HERE ": " __VA_ARGS__), fputc('\n', notify_stream) : 0)
+
+extern FILE* notify_stream;
+
 #ifdef BIDOOF_IMPLEMENTATION
+
+FILE* notify_stream = NULL;
 
 void xxd(buf const b, sz const ln) {
     if (0 == b.len) return;
@@ -406,6 +411,7 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
 
 #define make_main(__summary, ...)                  \
     int main(int argc, char** argv) {              \
+        notify_stream = stdout;                    \
         char cref proc = (argc--, *argv++);        \
         if (!argc || !strcmp("-h", *argv)) {       \
             printf("%s: " __summary "\n", proc);   \

@@ -19,6 +19,7 @@
 #define BIPA_DECLONLY
 #endif
 #define BIPA_HIDUMP
+#define BIPA_NOTIFY notif
 #include "../utils/bipa.h"
 
 #ifdef BIDOOF_LIST_DEPS
