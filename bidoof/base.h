@@ -20,11 +20,13 @@
 #define mkbuf(__c) (buf){.ptr= (u8*)__c, .len= strlen(__c)}
 #define mkbufa(...) (buf){.ptr= (u8[])__VA_ARGS__, .len= countof(((u8[])__VA_ARGS__))}
 #define mkbufsl(__p, __st, __ed) (buf){.ptr= (u8*)(__p)+(__st), .len= (__ed)-(__st)}
+#define mkbrmapa(...) (brmap){.ptr= (brmap_en[])__VA_ARGS__, .len= countof(((brmap_en[])__VA_ARGS__))}
 
 #define ref * const
 #define cref const ref
 #define opref * const
 #define opcref const opref
+
 typedef uint8_t   u8;
 typedef uint16_t  u16;
 typedef uint32_t  u32;
@@ -38,10 +40,31 @@ typedef double    f64;
 typedef size_t    sz;
 typedef dyarr(u8) buf;
 
+typedef struct brmap_en {
+    sz start, stop;
+    char const* const name;
+} brmap_en;
+typedef dyarr(brmap_en) brmap;
+
 void xxd(buf const b, sz const l);
 void xxdiff(buf const a, buf const b, sz const l);
+void xxdhi(buf const b, brmap const m);
 char const* binstr(u64 n, unsigned const w);
 void putb(char opref h, buf const b, char opref t);
+void putbhi(buf const b, char cref ref keywords, char cref ref string_pairs, char cref ref comment_pairs);
+
+#define HI_C_KEYWORDS      "auto", "bool", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern", "false", "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed", "sizeof", "static", "struct", "switch", "true", "typedef", "typeof", "union", "unsigned", "void", "volatile", "while", "NULL", "size_t", "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t", "uint32_t", "int64_t", "uint64_t"
+#define HI_C_STRING_PAIRS  "\"", "\"", "'", "'"
+#define HI_C_COMMENT_PAIRS "/*", "*/", "//", "\n", "#", "\n"
+#define HI_LUA_KEYWORDS      "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"
+#define HI_LUA_STRING_PAIRS  "\"", "\"", "'", "'", "[[", "]]", "[=[", "]=]", "[==[", "]==]", "[===[", "]===]"
+#define HI_LUA_COMMENT_PAIRS "--", "\n", "--[[", "]]", "--[=[", "]=]", "--[==[", "]==]", "--[===[", "]===]"
+#define HI_PY_KEYWORDS      "False", "await", "else", "import", "pass", "None", "break", "except", "in", "raise", "True", "class", "finally", "is", "return", "and", "continue", "for", "lambda", "try", "as", "def", "from", "nonlocal", "while", "assert", "del", "global", "not", "with", "async", "elif", "if", "or", "yield"
+#define HI_PY_STRING_PAIRS  "\"", "\"", "'", "'", "\"\"\"", "\"\"\"", "'''", "'''", "f\"", "f\"", "f'", "f'", "f\"\"\"", "f\"\"\"", "f'''", "f'''"
+#define HI_PY_COMMENT_PAIRS "#", "\n"
+#define HI_JS_KEYWORDS      "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "let", "static", "yield", "await"
+#define HI_JS_STRING_PAIRS  "\"", "\"", "'", "'", "`", "`"
+#define HI_JS_COMMENT_PAIRS "/*", "*/", "//", "\n", "#!", "\n"
 
 void buf_free(buf const self);
 
@@ -128,7 +151,7 @@ void xxd(buf const b, sz const ln) {
         for (sz i = 0; i < 16; i++) {
             sz const k = i+16*j;
             if (b.len <= k) break;
-            char const it = b.ptr[i+16*j];
+            char const it = b.ptr[k];
             printf("%c", ' ' <= it && it <= '~' ? it : '.');
         }
         printf("\n");
@@ -169,10 +192,130 @@ void xxdiff(buf const l, buf const r, sz const ln) {
     if ((sz)-1 != first) printf("first diff at offset %zu\n", first);
 }
 
+void xxdhi(buf const b, brmap const m) {
+    static char const* const colors[] = {"\x1b[31m", "\x1b[32m", "\x1b[33m", "\x1b[34m", "\x1b[35m", "\x1b[36m"};
+    unsigned cs = 0, cc = 2;
+    bool isin = false;
+    if (0 == b.len) return;
+    for (sz j = 0; j < (b.len-1)/16+1; j++) {
+        unsigned pcs = cs, pcc = cc;
+        bool pisin = isin;
+        printf("%07zx0:   %s", j, isin ? colors[cc] : "");
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (b.len <= k) printf("   ");
+            else {
+                if (cs < m.len && isin && !(isin = m.ptr[cs].stop != k)) {
+                    printf("\x1b[m");
+                    cs++;
+                    if (countof(colors) == ++cc) cc = 0;
+                }
+                if (cs < m.len && !isin && (isin = m.ptr[cs].start == k)) printf("%s", colors[cc]);
+                printf("%02X ", b.ptr[k]);
+            }
+        }
+        cs = pcs, cc = pcc;
+        isin = pisin;
+        unsigned encount = 0;
+        printf("\x1b[m       %s", isin ? colors[cc] : "");
+        for (sz i = 0; i < 16; i++) {
+            sz const k = i+16*j;
+            if (b.len <= k) printf(" ");
+            else {
+                if (cs < m.len && isin && !(isin = m.ptr[cs].stop != k)) {
+                    printf("\x1b[m");
+                    cs++;
+                    if (countof(colors) == ++cc) cc = 0;
+                }
+                if (cs < m.len && !isin && (isin = m.ptr[cs].start == k)) printf("%s", colors[cc]), encount++;
+                printf("%c", ' ' <= b.ptr[k] && b.ptr[k] <= '~' ? b.ptr[k] : '.');
+            }
+        }
+        printf("\x1b[m       ");
+        while (encount--) {
+            while (16*j == m.ptr[pcs].stop) {
+                pcs++;
+                if (countof(colors) == ++pcc) pcc = 0;
+            }
+            printf("%s%s (%zub)\x1b[m ", colors[pcc], m.ptr[pcs].name, m.ptr[pcs].stop-m.ptr[pcs].start);
+            pcs++;
+            if (countof(colors) == ++pcc) pcc = 0;
+        }
+        printf("\n");
+    }
+}
+
 void putb(char opref h, buf const b, char opref t) {
     if (h) printf("%s", h);
     printf("%.*s", (unsigned)b.len, b.ptr);
     if (t) printf("%s", t);
+}
+
+void putbhi(buf const b, char cref ref keywords, char cref ref string_pairs, char cref ref comment_pairs) {
+    bool canstartw = true;
+    for (sz k = 0; k < b.len; k++) {
+        if (canstartw) for (char cref* w = keywords; *w; w++) {
+            sz const len = strlen(*w);
+            if (( (k+len < b.len && !(
+                            ('0' <= b.ptr[k+len] && b.ptr[k+len] <= '9') ||
+                            ('A' <= b.ptr[k+len] && b.ptr[k+len] <= 'Z') ||
+                            ('a' <= b.ptr[k+len] && b.ptr[k+len] <= 'z') ||
+                            '_' == b.ptr[k+len]))
+                        || k+len == b.len )
+                    && !memcmp(*w, b.ptr+k, len)) {
+                printf("\x1b[34m%s\x1b[m", *w);
+                k+= len-1;
+                canstartw = false;
+                goto next;
+            }
+        }
+        for (char cref* t = string_pairs; *t; t+= 2) if (!memcmp(*t, b.ptr+k, strlen(*t))) {
+            printf("\x1b[36m%c", **t);
+            sz const elen = strlen(*++t);
+            if (1 == elen && **t == **(t-1)) while (++k < b.len && **t != b.ptr[k]) {
+                putchar(b.ptr[k]);
+                if ('\\' == b.ptr[k]) putchar(b.ptr[++k]);
+            } else while (++k+elen <= b.len && memcmp(*t, b.ptr+k, elen)) putchar(b.ptr[k]);
+            printf("%s\x1b[m", *t);
+            k+= elen-1;
+            canstartw = true;
+            goto next;
+        }
+        for (char cref* t = comment_pairs; *t; t+= 2) if (!memcmp(*t, b.ptr+k, strlen(*t))) {
+            printf("\x1b[32m%c", **t);
+            sz const elen = strlen(*++t);
+            while (++k+elen <= b.len && memcmp(*t, b.ptr+k, elen)) putchar(b.ptr[k]);
+            printf("%s\x1b[m", *t);
+            k+= elen-1;
+            canstartw = true;
+            goto next;
+        }
+        if (canstartw && (('0' <= b.ptr[k] && b.ptr[k] <= '9') || '.' == b.ptr[k])) {
+            printf("\x1b[33m");
+            while (k < b.len && (
+                        ('0' <= b.ptr[k] && b.ptr[k] <= '9') ||
+                        ('A' <= b.ptr[k] && b.ptr[k] <= 'F') ||
+                        ('a' <= b.ptr[k] && b.ptr[k] <= 'f') ||
+                        'b' == b.ptr[k] || 'o' == b.ptr[k] || 'x' == b.ptr[k] ||
+                        '_' == b.ptr[k])) putchar(b.ptr[k++]);
+            if ('.' == b.ptr[k]) while (k < b.len && (
+                        ('0' <= b.ptr[k] && b.ptr[k] <= '9') ||
+                        ('A' <= b.ptr[k] && b.ptr[k] <= 'F') ||
+                        ('a' <= b.ptr[k] && b.ptr[k] <= 'f') ||
+                        '_' == b.ptr[k])) putchar(b.ptr[k++]);
+            k--;
+            printf("\x1b[m");
+            canstartw = false;
+            goto next;
+        }
+        canstartw = !(
+                ('0' <= b.ptr[k] && b.ptr[k] <= '9') ||
+                ('A' <= b.ptr[k] && b.ptr[k] <= 'Z') ||
+                ('a' <= b.ptr[k] && b.ptr[k] <= 'z') ||
+                '_' == b.ptr[k]);
+        putchar(b.ptr[k]);
+    next:;
+    }
 }
 
 char const* binstr(u64 n, unsigned const w) {
