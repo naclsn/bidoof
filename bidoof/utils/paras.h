@@ -103,7 +103,7 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
 
 #define _paras_make_disasm(__name, __codes, __masks, __format, __encode)           \
     unsigned _k;                                                                   \
-    for (_k = 0; _k < countof(codes); _k++)                                        \
+    for (_k = 0; _k < countof(codes) && _k < _ln; _k++)                            \
         if ((bytes[_k] & masks[_k]) != codes[_k]) break;                           \
     if (countof(codes) == _k) {                                                    \
         char _buf[256], *_h = _buf;                                                \
@@ -141,14 +141,16 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
     sz paras_disasm_##__name(buf cref src, buf ref res, sz const loc) _declonly({  \
         static bool const _disasm = true;                                          \
         static char const* const word;                                             \
-        unsigned const _ln;                                                        \
+        unsigned _ln;                                                              \
         sz at = 0;                                                                 \
         while (at < src->len) {                                                    \
             u8 const* const bytes = src->ptr+at;                                   \
+            _ln = src->len-at;                                                     \
             __VA_ARGS__                                                            \
             PARAS_NOTIFY(                                                          \
-                "not a known valid instruction byte 0x%02X at offset %zu",         \
-                src->ptr[at], at);                                                 \
+                "not a known valid instruction byte sequence"                      \
+                " at offset %zu/%zu starting with 0x%02X",                         \
+                at, src->len, src->ptr[at]);                                       \
             break;                                                                 \
         }                                                                          \
         return at;                                                                 \
