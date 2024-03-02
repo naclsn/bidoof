@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+from sys import argv
+from os import path
+
+_ = argv.pop(0)
+
+if not argv or not argv[0].islower() or not argv[0].isalnum():
+    print("Usage: mktool <lower-alnum> [+bipa] [+paras] [+deps <lower-alnum...>]")
+    exit(1)
+
+if path.exists('bidoof/tools/'+argv[0]+'.h') or path.exists('unreleased/bidoof/tools/'+argv[0]+'.h'):
+    print("A tool with this name already exists");
+    exit(1)
+
+args = {
+    'lname': argv[0],
+    'uname': argv[0].upper()}
+bipa = False
+paras = False
+deps = False
+
+for k in range(1, len(argv)):
+    if '+bipa' == argv[k]:  bipa = True
+    elif '+paras' == argv[k]: paras = True
+    elif '+deps' == argv[k]: deps = []
+    elif list == type(deps) and argv[k].islower() and argv[k].isalpha(): deps.append(argv[k])
+    else:
+        print("Unexpected argument '%s'" % argv[k])
+        exit(1)
+
+with open('bidoof/tools/'+args['lname']+'.h', "w") as file:
+
+    print('''#ifndef __BIDOOF_T_{uname}__
+#define __BIDOOF_T_{uname}__
+'''.format(**args), file=file)
+
+    if deps: print('''#ifdef BIDOOF_T_IMPLEMENTATION
+#define _redef_after_{lname}
+#undef BIDOOF_IMPLEMENTATION
+#undef BIDOOF_T_IMPLEMENTATION
+#endif
+%s
+#ifdef _redef_after_{lname}
+#undef _redef_after_{lname}
+#define BIDOOF_IMPLEMENTATION
+#define BIDOOF_T_IMPLEMENTATION
+#endif
+'''.format(**args) % '\n'.join('#include "%s.h"'%n for n in deps), file=file)
+
+    print('#include "../base.h"', file=file)
+    if bipa: print('#include "../_common_conf/bipa.h"', file=file)
+    if paras: print('#include "../_common_conf/paras.h"', file=file)
+
+    print('''#ifdef BIDOOF_LIST_DEPS
+static struct _list_deps_item const _list_deps_me_{lname} = {{_list_deps_first, "{lname}"}};
+#undef _list_deps_first
+#define _list_deps_first &_list_deps_me_{lname}
+#endif'''.format(**args), file=file)
+
+    print('''
+#error "NIY: declarations in tool {lname}.h"
+
+#ifdef BIDOOF_IMPLEMENTATION
+
+#error "NIY: implementations in tool {lname}.h"
+
+#endif // BIDOOF_IMPLEMENTATION
+
+#endif // __BIDOOF_T_{uname}__'''.format(**args), file=file)
+
+print('''TODO:
+ - edit 'bidoof/tools/{lname}.h' to remove the '#error's
+ - add '{lname}' to Makefile toolnames
+'''.format(**args))

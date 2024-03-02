@@ -1,29 +1,23 @@
-#ifndef __PARAS_H__
-#define __PARAS_H__
-
 // TODO: doc
 
 /// (here)
 
-// uNN/sz typedefs, buf typedef and dyarr_ macros, ref/cref macros
-#include "../base.h"
-
+#undef _paras_declonly
 #ifdef PARAS_DECLONLY
-#define _declonly(...) ;
+#define _paras_declonly(...) ;
 #else
-#define _declonly(...) __VA_ARGS__
+#define _paras_declonly(...) __VA_ARGS__
 #endif
 
 #ifndef PARAS_NOTIFY
 #define PARAS_NOTIFY(...) ((void)0)
 #endif
 
-#define __rem_par(...) __VA_ARGS__
-#define __first_arg_(h, ...) h
-#define __first_arg(...) __first_arg_(__VA_ARGS__, _)
+// uNN/sz typedefs, buf typedef and dyarr_ macros, ref/cref macros
+#include "../base.h"
 
 union paras_generic { char const* s; int i; unsigned u; };
-static bool _paras_scan(buf cref src, sz ref at, unsigned const _ln, char cref f, union paras_generic* args) _declonly({
+static bool _paras_scan(buf cref src, sz ref at, unsigned const _ln, char cref f, union paras_generic* args) _paras_declonly({
     sz i = *at, j = 0, k = 0;
     while (f[j] && i < src->len && '\n' != src->ptr[i] && ';' != src->ptr[i]) switch (f[j++]) {
         case ' ':
@@ -93,6 +87,13 @@ static bool _paras_scan(buf cref src, sz ref at, unsigned const _ln, char cref f
     return true;
 })
 
+#ifndef __PARAS_H__
+#define __PARAS_H__
+
+#define __rem_par(...) __VA_ARGS__
+#define __first_arg_(h, ...) h
+#define __first_arg(...) __first_arg_(__VA_ARGS__, _)
+
 static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
 #define paras_mark_invalid() _paras_mark_invalid(&valid)
 #define _paras_sprintf_h(...) sprintf(_h, " " __VA_ARGS__)
@@ -137,50 +138,50 @@ static inline int _paras_mark_invalid(bool* valid) { return *valid = false; }
         else { _paras_make_asmbl(__VA_ARGS__) }           \
     }
 
-#define paras_make_instrset(__name, ...)                                           \
-    sz paras_disasm_##__name(buf cref src, buf ref res, sz const loc) _declonly({  \
-        static bool const _disasm = true;                                          \
-        static char const* const word;                                             \
-        unsigned _ln;                                                              \
-        sz at = 0;                                                                 \
-        while (at < src->len) {                                                    \
-            u8 const* const bytes = src->ptr+at;                                   \
-            _ln = src->len-at;                                                     \
-            __VA_ARGS__                                                            \
-            PARAS_NOTIFY(                                                          \
-                "not a known valid instruction byte sequence"                      \
-                " at offset %zu/%zu starting with 0x%02X",                         \
-                at, src->len, src->ptr[at]);                                       \
-            break;                                                                 \
-        }                                                                          \
-        return at;                                                                 \
-    })                                                                             \
-                                                                                   \
-    sz paras_asmbl_##__name(buf cref src, buf ref res) _declonly({                 \
-        static bool const _disasm = false;                                         \
-        static u8 const* const bytes;                                              \
-        unsigned _ln = 0;                                                          \
-        sz at = 0, loc;                                                            \
-        while (at < src->len) {                                                    \
-            _ln++;                                                                 \
-            while (at < src->len && strchr(" \t\n", src->ptr[at])) {               \
-                if ('\n' == src->ptr[at]) _ln++;                                   \
-                at++;                                                              \
-            }                                                                      \
-            char const* const word = (char*)src->ptr+at;                           \
-            while (at < src->len && !strchr(" \t\n", src->ptr[at])) at++;          \
-            while (at < src->len && strchr(" \t", src->ptr[at])) at++;             \
-            if (at < src->len && ';' != *word) {                                   \
-                __VA_ARGS__                                                        \
-                while (at < src->len && '\n' != src->ptr[at]) at++;                \
-                PARAS_NOTIFY(                                                      \
-                    "unknown mnemonic for the given arguments line %u: '%.*s'",    \
-                    _ln, (int)(src->ptr+at - (u8*)word), word);                    \
-                return 0;                                                          \
-            }                                                                      \
-            while (at < src->len && '\n' != src->ptr[at]) at++;                    \
-        }                                                                          \
-        return at;                                                                 \
+#define paras_make_instrset(__name, ...)                                                 \
+    sz paras_disasm_##__name(buf cref src, buf ref res, sz const loc) _paras_declonly({  \
+        static bool const _disasm = true;                                                \
+        static char const* const word;                                                   \
+        unsigned _ln;                                                                    \
+        sz at = 0;                                                                       \
+        while (at < src->len) {                                                          \
+            u8 const* const bytes = src->ptr+at;                                         \
+            _ln = src->len-at;                                                           \
+            __VA_ARGS__                                                                  \
+            PARAS_NOTIFY(                                                                \
+                "not a known valid instruction byte sequence"                            \
+                " at offset %zu/%zu starting with 0x%02X",                               \
+                at, src->len, src->ptr[at]);                                             \
+            break;                                                                       \
+        }                                                                                \
+        return at;                                                                       \
+    })                                                                                   \
+                                                                                         \
+    sz paras_asmbl_##__name(buf cref src, buf ref res) _paras_declonly({                 \
+        static bool const _disasm = false;                                               \
+        static u8 const* const bytes;                                                    \
+        unsigned _ln = 0;                                                                \
+        sz at = 0, loc;                                                                  \
+        while (at < src->len) {                                                          \
+            _ln++;                                                                       \
+            while (at < src->len && strchr(" \t\n", src->ptr[at])) {                     \
+                if ('\n' == src->ptr[at]) _ln++;                                         \
+                at++;                                                                    \
+            }                                                                            \
+            char const* const word = (char*)src->ptr+at;                                 \
+            while (at < src->len && !strchr(" \t\n", src->ptr[at])) at++;                \
+            while (at < src->len && strchr(" \t", src->ptr[at])) at++;                   \
+            if (at < src->len && ';' != *word) {                                         \
+                __VA_ARGS__                                                              \
+                while (at < src->len && '\n' != src->ptr[at]) at++;                      \
+                PARAS_NOTIFY(                                                            \
+                    "unknown mnemonic for the given arguments line %u: '%.*s'",          \
+                    _ln, (int)(src->ptr+at - (u8*)word), word);                          \
+                return 0;                                                                \
+            }                                                                            \
+            while (at < src->len && '\n' != src->ptr[at]) at++;                          \
+        }                                                                                \
+        return at;                                                                       \
     })
 
 #endif // __PARAS_H__

@@ -14,12 +14,7 @@
 #endif
 
 #include "../base.h"
-#ifndef BIDOOF_IMPLEMENTATION
-#define BIPA_DECLONLY
-#endif
-#define BIPA_HIDUMP
-#define BIPA_NOTIFY notif
-#include "../utils/bipa.h"
+#include "../_common_conf/bipa.h"
 
 #ifdef BIDOOF_LIST_DEPS
 static struct _list_deps_item const _list_deps_me_archives = {_list_deps_first, "archives"};

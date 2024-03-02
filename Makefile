@@ -2,7 +2,7 @@ warnings = -Wall -Wextra -Wpedantic -Werror -Wno-unused-function -Wno-unused-var
 CFLAGS += -ggdb -std=c99 $(warnings)
 
 builddir = build
-toolnames = archives checks compressions encodings encryptions images views
+toolnames = archives checks compressions encodings encryptions images jvm views
 
 all: list
 

@@ -1,6 +1,3 @@
-#ifndef __BIPA_H__
-#define __BIPA_H__
-
 // TODO: add bitset/flags, backed by a num
 
 /// public macros:
@@ -70,15 +67,19 @@
 ///  - writing a byte: `res->ptr[res->len++] = *it`
 ///  - reading a byte: `*it = src->ptr[(*at)++]`
 
-// uNN/sz typedefs, buf typedef and dyarr_ macros, ref/cref macros
-#include "../base.h"
-
+#undef _bipa_declonly
 #ifdef BIPA_DECLONLY
-#define _declonly(...) ;
+#define _bipa_declonly(...) ;
 #else
-#define _declonly(...) __VA_ARGS__
+#define _bipa_declonly(...) __VA_ARGS__
 #endif
 
+#undef _hidump_kw
+#undef _hidump_ty
+#undef _hidump_nb
+#undef _hidump_st
+#undef _hidump_ex
+#undef _hidump_id
 #ifdef BIPA_HIDUMP
 #define _hidump_kw(__c) "\x1b[34m" __c "\x1b[m"
 #define _hidump_ty(__c) "\x1b[32m" __c "\x1b[m"
@@ -99,7 +100,10 @@
 #define BIPA_NOTIFY(...) ((void)0)
 #endif
 
-static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declonly({
+// uNN/sz typedefs, buf typedef and dyarr_ macros, ref/cref macros
+#include "../base.h"
+
+static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_declonly({
     if (0 == len) return;
     sz const top = (len-1)/16+1;
     for (sz j = 0; j < top; j++) {
@@ -120,6 +124,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         }
     }
 })
+
+#ifndef __BIPA_H__
+#define __BIPA_H__
 
 #define _STR(__ln) #__ln
 #define _XSTR(__ln) _HERE_STR(__ln)
@@ -399,39 +406,39 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
         r+= _bytesz __ty;                                         \
     }
 
-#define bipa_struct(__tname, __n_fields, ...)                                                          \
-    struct __tname {                                                                                   \
-        _FOR_TYNM(__n_fields, _struct_fields_typename_one, 0, __VA_ARGS__)                             \
-    };                                                                                                 \
-    void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _declonly({  \
-        (void)depth;                                                                                   \
-        fprintf(strm, _hidump_kw("struct") " " _hidump_ty(#__tname) " {\n%*.s", (depth+1)*2, "");      \
-        _FOR_TYNM(__n_fields, _struct_fields_dump_one, 0, __VA_ARGS__)                                 \
-        fprintf(strm, "}");                                                                            \
-    })                                                                                                 \
-    bool bipa_build_##__tname(struct __tname cref self, buf ref res) _declonly({                       \
-        _FOR_TYNM(__n_fields, _struct_fields_build_one, 0, __VA_ARGS__)                                \
-        return true;                                                                                   \
-    fail: return false;                                                                                \
-    })                                                                                                 \
-    bool bipa_parse_##__tname(struct __tname ref self, buf cref src, sz ref at) _declonly({            \
-        char const* _curr = "";                                                                        \
-        (void)_curr;                                                                                   \
-        sz at_before = (*at);                                                                          \
-        _FOR_TYNM(__n_fields, _struct_fields_parse_one, __tname, __VA_ARGS__)                          \
-        return true;                                                                                   \
-    fail:                                                                                              \
-        BIPA_NOTIFY("could not parse field %s at offset %zu", _curr, *at);                             \
-        (*at) = at_before;                                                                             \
-        return false;                                                                                  \
-    })                                                                                                 \
-    void bipa_free_##__tname(struct __tname cref self) _declonly({                                     \
-        _FOR_TYNM(__n_fields, _struct_fields_free_one, 0, __VA_ARGS__)                                 \
-    })                                                                                                 \
-    sz bipa_bytesz_##__tname(struct __tname cref self) _declonly({                                     \
-        sz r = 0;                                                                                      \
-        _FOR_TYNM(__n_fields, _struct_fields_bytesz_one, 0, __VA_ARGS__);                              \
-        return r;                                                                                      \
+#define bipa_struct(__tname, __n_fields, ...)                                                               \
+    struct __tname {                                                                                        \
+        _FOR_TYNM(__n_fields, _struct_fields_typename_one, 0, __VA_ARGS__)                                  \
+    };                                                                                                      \
+    void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _bipa_declonly({  \
+        (void)depth;                                                                                        \
+        fprintf(strm, _hidump_kw("struct") " " _hidump_ty(#__tname) " {\n%*.s", (depth+1)*2, "");           \
+        _FOR_TYNM(__n_fields, _struct_fields_dump_one, 0, __VA_ARGS__)                                      \
+        fprintf(strm, "}");                                                                                 \
+    })                                                                                                      \
+    bool bipa_build_##__tname(struct __tname cref self, buf ref res) _bipa_declonly({                       \
+        _FOR_TYNM(__n_fields, _struct_fields_build_one, 0, __VA_ARGS__)                                     \
+        return true;                                                                                        \
+    fail: return false;                                                                                     \
+    })                                                                                                      \
+    bool bipa_parse_##__tname(struct __tname ref self, buf cref src, sz ref at) _bipa_declonly({            \
+        char const* _curr = "";                                                                             \
+        (void)_curr;                                                                                        \
+        sz at_before = (*at);                                                                               \
+        _FOR_TYNM(__n_fields, _struct_fields_parse_one, __tname, __VA_ARGS__)                               \
+        return true;                                                                                        \
+    fail:                                                                                                   \
+        BIPA_NOTIFY("could not parse field %s at offset %zu", _curr, *at);                                  \
+        (*at) = at_before;                                                                                  \
+        return false;                                                                                       \
+    })                                                                                                      \
+    void bipa_free_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        _FOR_TYNM(__n_fields, _struct_fields_free_one, 0, __VA_ARGS__)                                      \
+    })                                                                                                      \
+    sz bipa_bytesz_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        sz r = 0;                                                                                           \
+        _FOR_TYNM(__n_fields, _struct_fields_bytesz_one, 0, __VA_ARGS__);                                   \
+        return r;                                                                                           \
     })
 #define _typename_struct(__tname) struct __tname
 #define _litrname_struct(__tname) "struct " #__tname
@@ -512,52 +519,52 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
             + _XJOIN(_bytesz_, _union_getvar_tagtype __nm)();   \
     }
 
-#define bipa_union(__tname, __n_kinds, ...)                                                            \
-    struct __tname {                                                                                   \
-        union {                                                                                        \
-            _FOR_TYNM(__n_kinds, _union_kinds_typename_one, 0, __VA_ARGS__)                            \
-        } val;                                                                                         \
-        enum {                                                                                         \
-            _FOR_TYNM(__n_kinds, _union_kinds_tagname_one, __tname, __VA_ARGS__)                       \
-        } tag;                                                                                         \
-    };                                                                                                 \
-    void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _declonly({  \
-        (void)depth;                                                                                   \
-        switch (self->tag) {                                                                           \
-            _FOR_TYNM(__n_kinds, _union_kinds_dump_one, __tname, __VA_ARGS__)                          \
-            default: fprintf(strm, "|erroneous|");                                                     \
-        }                                                                                              \
-    })                                                                                                 \
-    bool bipa_build_##__tname(struct __tname cref self, buf ref res) _declonly({                       \
-        switch (self->tag) {                                                                           \
-            _FOR_TYNM(__n_kinds, _union_kinds_build_one, __tname, __VA_ARGS__)                         \
-            default: goto fail;                                                                        \
-        }                                                                                              \
-        return true;                                                                                   \
-    fail: return false;                                                                                \
-    })                                                                                                 \
-    bool bipa_parse_##__tname(struct __tname ref self, buf cref src, sz ref at) _declonly({            \
-        sz at_before = (*at);                                                                          \
-        for (sz _k_kinds = 0; _k_kinds < __n_kinds; _k_kinds++) {                                      \
-            switch (_k_kinds) {                                                                        \
-                _FOR_TYNM(__n_kinds, _union_kinds_parse_one, __tname, __VA_ARGS__)                     \
-            }                                                                                          \
-            return true;                                                                               \
-        fail: (*at) = at_before;                                                                       \
-        }                                                                                              \
-        BIPA_NOTIFY("could not parse a variant of `union " #__tname "` at offset %zu", *at);           \
-        return false;                                                                                  \
-    })                                                                                                 \
-    void bipa_free_##__tname(struct __tname cref self) _declonly({                                     \
-        switch (self->tag) {                                                                           \
-            _FOR_TYNM(__n_kinds, _union_kinds_free_one, __tname, __VA_ARGS__)                          \
-        }                                                                                              \
-    })                                                                                                 \
-    sz bipa_bytesz_##__tname(struct __tname cref self) _declonly({                                     \
-        switch (self->tag) {                                                                           \
-            _FOR_TYNM(__n_kinds, _union_kinds_bytesz_one, __tname, __VA_ARGS__);                       \
-            default: return 0;                                                                         \
-        }                                                                                              \
+#define bipa_union(__tname, __n_kinds, ...)                                                                 \
+    struct __tname {                                                                                        \
+        union {                                                                                             \
+            _FOR_TYNM(__n_kinds, _union_kinds_typename_one, 0, __VA_ARGS__)                                 \
+        } val;                                                                                              \
+        enum {                                                                                              \
+            _FOR_TYNM(__n_kinds, _union_kinds_tagname_one, __tname, __VA_ARGS__)                            \
+        } tag;                                                                                              \
+    };                                                                                                      \
+    void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _bipa_declonly({  \
+        (void)depth;                                                                                        \
+        switch (self->tag) {                                                                                \
+            _FOR_TYNM(__n_kinds, _union_kinds_dump_one, __tname, __VA_ARGS__)                               \
+            default: fprintf(strm, "|erroneous|");                                                          \
+        }                                                                                                   \
+    })                                                                                                      \
+    bool bipa_build_##__tname(struct __tname cref self, buf ref res) _bipa_declonly({                       \
+        switch (self->tag) {                                                                                \
+            _FOR_TYNM(__n_kinds, _union_kinds_build_one, __tname, __VA_ARGS__)                              \
+            default: goto fail;                                                                             \
+        }                                                                                                   \
+        return true;                                                                                        \
+    fail: return false;                                                                                     \
+    })                                                                                                      \
+    bool bipa_parse_##__tname(struct __tname ref self, buf cref src, sz ref at) _bipa_declonly({            \
+        sz at_before = (*at);                                                                               \
+        for (sz _k_kinds = 0; _k_kinds < __n_kinds; _k_kinds++) {                                           \
+            switch (_k_kinds) {                                                                             \
+                _FOR_TYNM(__n_kinds, _union_kinds_parse_one, __tname, __VA_ARGS__)                          \
+            }                                                                                               \
+            return true;                                                                                    \
+        fail: (*at) = at_before;                                                                            \
+        }                                                                                                   \
+        BIPA_NOTIFY("could not parse a variant of `union " #__tname "` at offset %zu", *at);                \
+        return false;                                                                                       \
+    })                                                                                                      \
+    void bipa_free_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        switch (self->tag) {                                                                                \
+            _FOR_TYNM(__n_kinds, _union_kinds_free_one, __tname, __VA_ARGS__)                               \
+        }                                                                                                   \
+    })                                                                                                      \
+    sz bipa_bytesz_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        switch (self->tag) {                                                                                \
+            _FOR_TYNM(__n_kinds, _union_kinds_bytesz_one, __tname, __VA_ARGS__);                            \
+            default: return 0;                                                                              \
+        }                                                                                                   \
     })
 #define _typename_union(__tname) struct __tname
 #define _litrname_union(__tname) "union " #__tname
@@ -567,60 +574,60 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _declo
 #define _parse_union(__tname)   if (!bipa_parse_##__tname(it, src, at)) goto fail;
 #define _free_union(__tname)    bipa_free_##__tname(it);
 
-#define bipa_array(__tname, __of)                                                                      \
-    struct __tname {                                                                                   \
-        _typename __of* ptr;                                                                           \
-        sz len, cap;                                                                                   \
-    };                                                                                                 \
-    void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _declonly({  \
-        if (!self->len) {                                                                              \
-            fprintf(strm, _hidump_kw("array") "(" _hidump_nb("0") ") " _hidump_ty(#__tname) " []");    \
-            return;                                                                                    \
-        }                                                                                              \
-        fprintf(strm, _hidump_kw("array") "(" _hidump_nb("%zu") ") " _hidump_ty(#__tname) " [\n%*.s",  \
-                self->len, (depth+1)*2, "");                                                           \
-        for (sz k = 0; k < self->len; k++) {                                                           \
-            fprintf(strm, "[%zu]= ", k);                                                               \
-            _typename __of const* const it = self->ptr + k;                                            \
-            _dump __of                                                                                 \
-            fprintf(strm, ",\n%*.s", (depth+(k+1!=self->len))*2, "");                                  \
-        }                                                                                              \
-        fprintf(strm, "]");                                                                            \
-    })                                                                                                 \
-    bool bipa_build_##__tname(struct __tname cref self, buf ref res) _declonly({                       \
-        for (sz k = 0; k < self->len; k++) {                                                           \
-            _typename __of const* const it = self->ptr + k;                                            \
-            _build __of                                                                                \
-        }                                                                                              \
-        return true;                                                                                   \
-    fail: return false;                                                                                \
-    })                                                                                                 \
-    bool bipa_parse_one_##__tname(struct __tname ref self, buf cref src, sz ref at) _declonly({        \
-        sz at_before = (*at);                                                                          \
-        _typename __of* const it = dyarr_push(self);                                                   \
-        if (!it) return false;                                                                         \
-        *it = (_typename __of){0};                                                                     \
-        _parse __of                                                                                    \
-        return true;                                                                                   \
-    fail:                                                                                              \
-        BIPA_NOTIFY("could not parse an item of `" _litrname __of "` at offset %zu", *at);             \
-        (*at) = at_before;                                                                             \
-        return false;                                                                                  \
-    })                                                                                                 \
-    void bipa_free_##__tname(struct __tname cref self) _declonly({                                     \
-        for (sz k = 0; k < self->len; k++) {                                                           \
-            _typename __of const* const it = self->ptr + k;                                            \
-            _free __of                                                                                 \
-        }                                                                                              \
-        free(self->ptr);                                                                               \
-    })                                                                                                 \
-    sz bipa_bytesz_##__tname(struct __tname cref self) _declonly({                                     \
-        sz r = 0;                                                                                      \
-        for (sz k = 0; k < self->len; k++) {                                                           \
-            _typename __of const* const it = self->ptr + k;                                            \
-            r+= _bytesz __of;                                                                          \
-        }                                                                                              \
-        return r;                                                                                      \
+#define bipa_array(__tname, __of)                                                                           \
+    struct __tname {                                                                                        \
+        _typename __of* ptr;                                                                                \
+        sz len, cap;                                                                                        \
+    };                                                                                                      \
+    void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _bipa_declonly({  \
+        if (!self->len) {                                                                                   \
+            fprintf(strm, _hidump_kw("array") "(" _hidump_nb("0") ") " _hidump_ty(#__tname) " []");         \
+            return;                                                                                         \
+        }                                                                                                   \
+        fprintf(strm, _hidump_kw("array") "(" _hidump_nb("%zu") ") " _hidump_ty(#__tname) " [\n%*.s",       \
+                self->len, (depth+1)*2, "");                                                                \
+        for (sz k = 0; k < self->len; k++) {                                                                \
+            fprintf(strm, "[%zu]= ", k);                                                                    \
+            _typename __of const* const it = self->ptr + k;                                                 \
+            _dump __of                                                                                      \
+            fprintf(strm, ",\n%*.s", (depth+(k+1!=self->len))*2, "");                                       \
+        }                                                                                                   \
+        fprintf(strm, "]");                                                                                 \
+    })                                                                                                      \
+    bool bipa_build_##__tname(struct __tname cref self, buf ref res) _bipa_declonly({                       \
+        for (sz k = 0; k < self->len; k++) {                                                                \
+            _typename __of const* const it = self->ptr + k;                                                 \
+            _build __of                                                                                     \
+        }                                                                                                   \
+        return true;                                                                                        \
+    fail: return false;                                                                                     \
+    })                                                                                                      \
+    bool bipa_parse_one_##__tname(struct __tname ref self, buf cref src, sz ref at) _bipa_declonly({        \
+        sz at_before = (*at);                                                                               \
+        _typename __of* const it = dyarr_push(self);                                                        \
+        if (!it) return false;                                                                              \
+        *it = (_typename __of){0};                                                                          \
+        _parse __of                                                                                         \
+        return true;                                                                                        \
+    fail:                                                                                                   \
+        BIPA_NOTIFY("could not parse an item of `" _litrname __of "` at offset %zu", *at);                  \
+        (*at) = at_before;                                                                                  \
+        return false;                                                                                       \
+    })                                                                                                      \
+    void bipa_free_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        for (sz k = 0; k < self->len; k++) {                                                                \
+            _typename __of const* const it = self->ptr + k;                                                 \
+            _free __of                                                                                      \
+        }                                                                                                   \
+        free(self->ptr);                                                                                    \
+    })                                                                                                      \
+    sz bipa_bytesz_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        sz r = 0;                                                                                           \
+        for (sz k = 0; k < self->len; k++) {                                                                \
+            _typename __of const* const it = self->ptr + k;                                                 \
+            r+= _bytesz __of;                                                                               \
+        }                                                                                                   \
+        return r;                                                                                           \
     })
 #define _typename_array(__tname, __while) struct __tname
 #define _litrname_array(__tname, __while) "array " #__tname
