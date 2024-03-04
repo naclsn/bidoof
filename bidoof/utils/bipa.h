@@ -1,16 +1,16 @@
-// TODO: add bitset/flags, backed by a num
-
 /// public macros:
 ///  - bipa_struct(typename, fields count, ... fields type+name pairs)
 ///  - bipa_union(typename, kinds count, ... kinds type+(tag type, tag value, name) pairs)
 ///  - bipa_array(typename, item type)
+///  - bipa_packed(typename, underlying type, fields count, ... fields bits+name pairs)
 ///
 /// types for fields can be:
 ///  - integral types: (u8, uNNle or uNNbe up to NN=64 bits little/big endian)
 ///  - string types: `(cstr, sentinel byte)` or `(lstr, length expression)`
 ///  - struct types: `(struct, typename)` where typename is a `bipa_struct(typename, ...)`
 ///  - union types: `(union, typename)` where ...
-///  - array types: `(array, typename, while)` where ...
+///  - array types: `(array, typename, while)` where ... (see below for while)
+///  - packed types: `(packed, typename)` where ...
 ///
 /// in an `(array, typename, while)`, the while is an expression with:
 ///  - `self` the encompassing struct
@@ -184,7 +184,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
 #define _typename_u8() u8
 #define _litrname_u8() "u8"
 #define _bytesz_u8() 1
-#define _dump_u8()  fprintf(strm, _hidump_nb("%hhu") _hidump_ex("u8"), *it);
+#define _dump_u8()  fprintf(strm, _hidump_nb("0x%02hhx") "/" _hidump_nb("%hhu") _hidump_ex("u8"), *it, *it);
 #define _build_u8() { u8* p = dyarr_push(res);  \
                     if (!p) goto fail;  \
                     *p = *it; }
@@ -201,9 +201,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
 #define _bytesz_u16le() 2
 #define _bytesz_u32le() 4
 #define _bytesz_u64le() 8
-#define _dump_u16le()   fprintf(strm, _hidump_nb("0x%02hx") "/" _hidump_nb("%hu") _hidump_ex("u16le"), *it, *it);
-#define _dump_u32le()   fprintf(strm, _hidump_nb("0x%04x" ) "/" _hidump_nb("%u" ) _hidump_ex("u32le"), *it, *it);
-#define _dump_u64le()   fprintf(strm, _hidump_nb("0x%08lx") "/" _hidump_nb("%lu") _hidump_ex("u64le"), *it, *it);
+#define _dump_u16le()   fprintf(strm, _hidump_nb("0x%04hx")  "/" _hidump_nb("%hu") _hidump_ex("u16le"), *it, *it);
+#define _dump_u32le()   fprintf(strm, _hidump_nb("0x%08x" )  "/" _hidump_nb("%u" ) _hidump_ex("u32le"), *it, *it);
+#define _dump_u64le()   fprintf(strm, _hidump_nb("0x%016lx") "/" _hidump_nb("%lu") _hidump_ex("u64le"), *it, *it);
 #define _build_u16le()  if (res->cap <= res->len+1 &&                    \
                             !dyarr_resize(res,                           \
                                 res->cap ? res->cap*2 : 16)) goto fail;  \
@@ -260,9 +260,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
 #define _bytesz_u16be() 2
 #define _bytesz_u32be() 4
 #define _bytesz_u64be() 8
-#define _dump_u16be()   fprintf(strm, _hidump_nb("0x%02hx") "/" _hidump_nb("%hu") _hidump_ex("u16be"), *it, *it);
-#define _dump_u32be()   fprintf(strm, _hidump_nb("0x%04x" ) "/" _hidump_nb("%u" ) _hidump_ex("u32be"), *it, *it);
-#define _dump_u64be()   fprintf(strm, _hidump_nb("0x%08lx") "/" _hidump_nb("%lu") _hidump_ex("u64be"), *it, *it);
+#define _dump_u16be()   fprintf(strm, _hidump_nb("0x%04hx")  "/" _hidump_nb("%hu") _hidump_ex("u16be"), *it, *it);
+#define _dump_u32be()   fprintf(strm, _hidump_nb("0x%08x" )  "/" _hidump_nb("%u" ) _hidump_ex("u32be"), *it, *it);
+#define _dump_u64be()   fprintf(strm, _hidump_nb("0x%016lx") "/" _hidump_nb("%lu") _hidump_ex("u64be"), *it, *it);
 #define _build_u16be()  if (res->cap <= res->len+1 &&                    \
                             !dyarr_resize(res,                           \
                                 res->cap ? res->cap*2 : 16)) goto fail;  \
@@ -530,6 +530,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
     };                                                                                                      \
     void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _bipa_declonly({  \
         (void)depth;                                                                                        \
+        fprintf(strm, _hidump_kw("union") " " _hidump_ty(#__tname) " ");                                    \
         switch (self->tag) {                                                                                \
             _FOR_TYNM(__n_kinds, _union_kinds_dump_one, __tname, __VA_ARGS__)                               \
             default: fprintf(strm, "|erroneous|");                                                          \
@@ -638,5 +639,87 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
                                         for (sz k = it->len = it->cap = 0; __while; k++)  \
                                             if (!bipa_parse_one_##__tname(it, src, at)) goto fail;
 #define _free_array(__tname, __while)   bipa_free_##__tname(it);
+
+#define _packed_total_bitsz_u8 8
+#define _packed_total_bitsz_u16le 16
+#define _packed_total_bitsz_u32le 32
+#define _packed_total_bitsz_u64le 64
+#define _packed_total_bitsz_u16be 16
+#define _packed_total_bitsz_u32be 32
+#define _packed_total_bitsz_u64be 64
+#define _packed_total_bitsz(__under_ty) _packed_total_bitsz_##__under_ty
+#define _packed_fields_bitsz_one(__k, __n, __inv, __sz, __nm)  +__sz
+
+#define _packed_fields_typename_one(__k, __n, __inv, __sz, __nm)  unsigned __nm :__sz;
+
+#define _packed_fields_dump_one(__k, __n, __inv, __sz, __nm)    \
+        fprintf(strm, "." _hidump_id(#__nm) "= "                \
+                _hidump_nb("%u") _hidump_ex(":%u") ",\n%*.s",   \
+                self->__nm, __sz,                               \
+                (depth+(__k+1!=__n))*2, "");                    \
+
+
+#define _packed_fields_isflags_one(__k, __n, __inv, __sz, __nm)  1 == __sz &&
+#define _packed_fields_asflags_one(__k, __n, __inv, __sz, __nm)  if (self->__nm) fprintf(strm, "%s", first ? first = false, #__nm : " " #__nm);
+
+#define _packed_fields_build_one(__k, __n, __inv, __sz, __nm) _it|= self->__nm<<bits; bits+= __sz;
+
+#define _packed_fields_parse_one(__k, __n, __inv, __sz, __nm) self->__nm = _it & ((1<<__sz) -1); _it>>= __sz;
+
+#define bipa_packed(__tname, __under_ty, __n_fields, ...)                                                   \
+    struct __tname {                                                                                        \
+        _FOR_TYNM(__n_fields, _packed_fields_typename_one, 0, __VA_ARGS__)                                  \
+    };                                                                                                      \
+    void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _bipa_declonly({  \
+        static char const _san_check[                                                                       \
+            2*(_packed_total_bitsz(__under_ty)                                                              \
+            -(_FOR_TYNM(__n_fields, _packed_fields_bitsz_one, 0, __VA_ARGS__)))                             \
+            +1];                                                                                            \
+        _typename(__under_ty,) _it = 0, * const it = &_it;                                                  \
+        unsigned bits = 0;                                                                                  \
+        _FOR_TYNM(__n_fields, _packed_fields_build_one, 0, __VA_ARGS__)                                     \
+        fprintf(strm, _hidump_kw("packed") " " _hidump_ty(#__tname) " (");                                  \
+        _dump(__under_ty,);                                                                                 \
+        fprintf(strm, ") ");                                                                                \
+        if (_FOR_TYNM(__n_fields, _packed_fields_isflags_one, 0, __VA_ARGS__) true) {                       \
+            bool first = true;                                                                              \
+            fprintf(strm, "{");                                                                             \
+            _FOR_TYNM(__n_fields, _packed_fields_asflags_one, 0, __VA_ARGS__)                               \
+            fprintf(strm, "}");                                                                             \
+        } else {                                                                                            \
+            (void)depth;                                                                                    \
+            fprintf(strm, "{\n%*.s", (depth+1)*2, "");                                                      \
+            _FOR_TYNM(__n_fields, _packed_fields_dump_one, 0, __VA_ARGS__)                                  \
+            fprintf(strm, "}");                                                                             \
+        }                                                                                                   \
+    })                                                                                                      \
+    bool bipa_build_##__tname(struct __tname cref self, buf ref res) _bipa_declonly({                       \
+        _typename(__under_ty,) _it = 0, * const it = &_it;                                                  \
+        unsigned bits = 0;                                                                                  \
+        _FOR_TYNM(__n_fields, _packed_fields_build_one, 0, __VA_ARGS__)                                     \
+        _build(__under_ty,)                                                                                 \
+        return true;                                                                                        \
+    fail: return false;                                                                                     \
+    })                                                                                                      \
+    bool bipa_parse_##__tname(struct __tname ref self, buf cref src, sz ref at) _bipa_declonly({            \
+        _typename(__under_ty,) _it = 0, * const it = &_it;                                                  \
+        _parse(__under_ty,)                                                                                 \
+        _FOR_TYNM(__n_fields, _packed_fields_parse_one, 0, __VA_ARGS__)                                     \
+        return true;                                                                                        \
+    fail: return false;                                                                                     \
+    })                                                                                                      \
+    void bipa_free_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        (void)self;                                                                                         \
+    })                                                                                                      \
+    sz bipa_bytesz_##__tname(struct __tname cref self) _bipa_declonly({                                     \
+        return _bytesz(__under_ty,);                                                                        \
+    })
+#define _typename_packed(__tname) struct __tname
+#define _litrname_packed(__tname) "packed " #__tname
+#define _bytesz_packed(__tname) bipa_bytesz_##__tname(it)
+#define _dump_packed(__tname)   bipa_dump_##__tname(it, strm, depth+1);
+#define _build_packed(__tname)  if (!bipa_build_##__tname(it, res)) goto fail;
+#define _parse_packed(__tname)  if (!bipa_parse_##__tname(it, src, at)) goto fail;
+#define _free_packed(__tname)   (void)it;
 
 #endif // __BIPA_H__
