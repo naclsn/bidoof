@@ -23,9 +23,282 @@ static struct _list_deps_item const _list_deps_me_jvm = {_list_deps_first, "jvm"
 #define _list_deps_first &_list_deps_me_jvm
 #endif
 
+#define _op_u16_f(k) (u16)(bytes[k]<<8 | bytes[k+1])
+#define _op_u16_e(k) args[k].u>>8 & 0xff, args[k].u & 0xff
+#define _op_i16_f(k) (i16)(bytes[k]<<8 | bytes[k+1])
+#define _op_i16_e(k) args[k].i>>8 & 0xff, args[k].i & 0xff
+#define _op_i32_f(k) (i32)(bytes[k]<<24 | bytes[k+1]<<16 | bytes[k+2]<<8 | bytes[k+3])
+#define _op_i32_e(k) args[k].i>>24 & 0xff, args[k].i>>16 & 0xff, args[k].i>>8 & 0xff, args[k].i & 0xff
+#define _arr_ty_f(k) bytes[k] < 4 || 11 < bytes[k] ? "???" : ((char*[]){"boolean", "char", "float", "double", "byte", "short", "int", "long"})[bytes[k]-4]
+#define _arr_ty_e(k) ( !memcmp("boolean", args[k].s, 7) ?  4  \
+                     : !memcmp("char",    args[k].s, 4) ?  5  \
+                     : !memcmp("float",   args[k].s, 5) ?  6  \
+                     : !memcmp("double",  args[k].s, 6) ?  7  \
+                     : !memcmp("byte",    args[k].s, 4) ?  8  \
+                     : !memcmp("short",   args[k].s, 5) ?  9  \
+                     : !memcmp("int",     args[k].s, 3) ? 10  \
+                     : !memcmp("long",    args[k].s, 4) ? 11  \
+                     : paras_mark_invalid())
+
+// TODO: tableswitch, lookupswitch and wide (variable width instructions)
 // https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html
-paras_make_instrset(jvm_iset,
-    paras_make_instr(debug, (0xca), (0xff), (""), (codes[0]))
+paras_make_instrset(jvm_bytecode,
+    paras_make_instr(nop,             (0x00),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(aconst_null,     (0x01),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iconst_m1,       (0x02),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iconst_0,        (0x03),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iconst_1,        (0x04),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iconst_2,        (0x05),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iconst_3,        (0x06),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iconst_4,        (0x07),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iconst_5,        (0x08),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lconst_0,        (0x09),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lconst_1,        (0x0a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fconst_0,        (0x0b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fconst_1,        (0x0c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fconst_2,        (0x0d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dconst_0,        (0x0e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dconst_1,        (0x0f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(bipush,          (0x10, 0),          (0xff, 0),                ("%i", bytes[1]),                    (codes[0], args[0].i))
+    paras_make_instr(sipush,          (0x11, 0, 0),       (0xff, 0, 0),             ("%i", _op_i16_f(1)),                (codes[0], _op_i16_e(0)))
+    paras_make_instr(ldc,             (0x12, 0),          (0xff, 0),                ("#%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(ldc_w,           (0x13, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(ldc2_w,          (0x14, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(iload,           (0x15, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(lload,           (0x16, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(fload,           (0x17, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(dload,           (0x18, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(aload,           (0x19, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(iload_0,         (0x1a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iload_1,         (0x1b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iload_2,         (0x1c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iload_3,         (0x1d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lload_0,         (0x1e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lload_1,         (0x1f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lload_2,         (0x20),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lload_3,         (0x21),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fload_0,         (0x22),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fload_1,         (0x23),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fload_2,         (0x24),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fload_3,         (0x25),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dload_0,         (0x26),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dload_1,         (0x27),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dload_2,         (0x28),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dload_3,         (0x29),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(aload_0,         (0x2a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(aload_1,         (0x2b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(aload_2,         (0x2c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(aload_3,         (0x2d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iaload,          (0x2e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(laload,          (0x2f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(faload,          (0x30),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(daload,          (0x31),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(aaload,          (0x32),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(baload,          (0x33),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(caload,          (0x34),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(saload,          (0x35),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(istore,          (0x36, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(lstore,          (0x37, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(fstore,          (0x38, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(dstore,          (0x39, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(astore,          (0x3a, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    paras_make_instr(istore_0,        (0x3b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(istore_1,        (0x3c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(istore_2,        (0x3d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(istore_3,        (0x3e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lstore_0,        (0x3f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lstore_1,        (0x40),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lstore_2,        (0x41),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lstore_3,        (0x42),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fstore_0,        (0x43),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fstore_1,        (0x44),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fstore_2,        (0x45),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fstore_3,        (0x46),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dstore_0,        (0x47),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dstore_1,        (0x48),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dstore_2,        (0x49),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dstore_3,        (0x4a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(astore_0,        (0x4b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(astore_1,        (0x4c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(astore_2,        (0x4d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(astore_3,        (0x4e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iastore,         (0x4f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lastore,         (0x50),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fastore,         (0x51),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dastore,         (0x52),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(aastore,         (0x53),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(bastore,         (0x54),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(castore,         (0x55),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(sastore,         (0x56),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(pop,             (0x57),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(pop2,            (0x58),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dup,             (0x59),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dup_x1,          (0x5a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dup_x2,          (0x5b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dup2,            (0x5c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dup2_x1,         (0x5d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dup2_x2,         (0x5e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(swap,            (0x5f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iadd,            (0x60),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ladd,            (0x61),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fadd,            (0x62),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dadd,            (0x63),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(isub,            (0x64),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lsub,            (0x65),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fsub,            (0x66),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dsub,            (0x67),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(imul,            (0x68),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lmul,            (0x69),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fmul,            (0x6a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dmul,            (0x6b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(idiv,            (0x6c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ldiv,            (0x6d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fdiv,            (0x6e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ddiv,            (0x6f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(irem,            (0x70),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lrem,            (0x71),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(frem,            (0x72),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(drem,            (0x73),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ineg,            (0x74),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lneg,            (0x75),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fneg,            (0x76),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dneg,            (0x77),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ishl,            (0x78),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lshl,            (0x79),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ishr,            (0x7a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lshr,            (0x7b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iushr,           (0x7c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lushr,           (0x7d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iand,            (0x7e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(land,            (0x7f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ior,             (0x80),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lor,             (0x81),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ixor,            (0x82),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lxor,            (0x83),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(iinc,            (0x84, 0, 0),       (0xff, 0, 0),             ("_%u, %i", bytes[1], bytes[2]),     (codes[0], args[0].u, args[1].i))
+    paras_make_instr(i2l,             (0x85),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(i2f,             (0x86),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(i2d,             (0x87),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(l2i,             (0x88),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(l2f,             (0x89),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(l2d,             (0x8a),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(f2i,             (0x8b),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(f2l,             (0x8c),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(f2d,             (0x8d),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(d2i,             (0x8e),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(d2l,             (0x8f),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(d2f,             (0x90),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(i2b,             (0x91),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(i2c,             (0x92),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(i2s,             (0x93),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lcmp,            (0x94),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fcmpl,           (0x95),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(fcmpg,           (0x96),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dcmpl,           (0x97),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dcmpg,           (0x98),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ifeq,            (0x99, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(ifne,            (0x9a, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(iflt,            (0x9b, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(ifge,            (0x9c, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(ifgt,            (0x9d, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(ifle,            (0x9e, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_icmpeq,       (0x9f, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_icmpne,       (0xa0, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_icmplt,       (0xa1, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_icmpge,       (0xa2, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_icmpgt,       (0xa3, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_icmple,       (0xa4, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_acmpeq,       (0xa5, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(if_acmpne,       (0xa6, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(goto,            (0xa7, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(jsr,             (0xa8, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(ret,             (0xa9, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
+    //paras_make_instr(tableswitch,     (0xaa),             (0xff),                   (""),                                (codes[0]))
+    //paras_make_instr(lookupswitch,    (0xab),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(ireturn,         (0xac),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(lreturn,         (0xad),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(freturn,         (0xae),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(dreturn,         (0xaf),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(areturn,         (0xb0),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(return,          (0xb1),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(getstatic,       (0xb2, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(putstatic,       (0xb3, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(getfield,        (0xb4, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(putfield,        (0xb5, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(invokevirtual,   (0xb6, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(invokespecial,   (0xb7, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(invokestatic,    (0xb8, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(invokeinterface, (0xb9, 0, 0, 0, 0), (0xff, 0, 0, 0, 0xff),    ("#%u, %u", _op_u16_f(1), bytes[3]), (codes[0], _op_u16_e(0), args[1].u))
+    paras_make_instr(invokedynamic,   (0xba, 0, 0, 0, 0), (0xff, 0, 0, 0xff, 0xff), ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(new,             (0xbb, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(newarray,        (0xbc, 0),          (0xff, 0),                ("%s", _arr_ty_f(1)),                (codes[0], _arr_ty_e(0)))
+    paras_make_instr(anewarray,       (0xbd, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(arraylength,     (0xbe),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(athrow,          (0xbf),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(checkcast,       (0xc0, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(instanceof,      (0xc1, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
+    paras_make_instr(monitorenter,    (0xc2),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(monitorexit,     (0xc3),             (0xff),                   (""),                                (codes[0]))
+    //paras_make_instr(wide,            (0xc4),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(multianewarray,  (0xc5, 0, 0, 0),    (0xff, 0, 0, 0),          ("#%u, %u", _op_u16_f(1), bytes[2]), (codes[0], _op_u16_e(0), args[1].u))
+    paras_make_instr(ifnull,          (0xc6, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(ifnonnull,       (0xc7, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
+    paras_make_instr(goto_w,          (0xc8, 0, 0, 0, 0), (0xff, 0, 0, 0, 0),       ("%+i", _op_i32_f(1)),               (codes[0], _op_i32_e(0)))
+    paras_make_instr(jsr_w,           (0xc9, 0, 0, 0, 0), (0xff, 0, 0, 0, 0),       ("%+i", _op_i32_f(1)),               (codes[0], _op_i32_e(0)))
+    paras_make_instr(breakpoint,      (0xca),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_cb,  (0xcb),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_cc,  (0xcc),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_cd,  (0xcd),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_ce,  (0xce),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_cf,  (0xcf),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d0,  (0xd0),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d1,  (0xd1),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d2,  (0xd2),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d3,  (0xd3),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d4,  (0xd4),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d5,  (0xd5),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d6,  (0xd6),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d7,  (0xd7),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d8,  (0xd8),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_d9,  (0xd9),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_da,  (0xda),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_db,  (0xdb),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_dc,  (0xdc),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_dd,  (0xdd),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_de,  (0xde),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_df,  (0xdf),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e0,  (0xe0),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e1,  (0xe1),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e2,  (0xe2),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e3,  (0xe3),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e4,  (0xe4),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e5,  (0xe5),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e6,  (0xe6),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e7,  (0xe7),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e8,  (0xe8),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_e9,  (0xe9),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_ea,  (0xea),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_eb,  (0xeb),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_ec,  (0xec),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_ed,  (0xed),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_ee,  (0xee),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_ef,  (0xef),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f0,  (0xf0),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f1,  (0xf1),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f2,  (0xf2),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f3,  (0xf3),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f4,  (0xf4),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f5,  (0xf5),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f6,  (0xf6),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f7,  (0xf7),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f8,  (0xf8),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_f9,  (0xf9),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_fa,  (0xfa),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_fb,  (0xfb),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_fc,  (0xfc),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(_unassigned_fd,  (0xfd),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(impdep1,         (0xfe),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(impdep2,         (0xff),             (0xff),                   (""),                                (codes[0]))
 )
 
 bipa_packed(jvm_class_access_flags, u16be, 15
@@ -138,11 +411,93 @@ bipa_struct(jvm_class, 16
         , (array, jvm_class_attribute_infos, k < self->attributes_count), attributes
         )
 
+bipa_struct(jvm_attr_ConstantValue, 1
+        , (u16be,), constantvalue_index
+        )
+bipa_struct(jvm_attr_Code_exception, 4
+        , (u16be,), start_pc
+        , (u16be,), end_pc
+        , (u16be,), handler_pc
+        , (u16be,), catch_type
+        )
+bipa_array(jvm_attr_Code_exceptions, (struct, jvm_attr_Code_exception))
+bipa_struct(jvm_attr_Code, 8
+        , (u16be,), max_stack
+        , (u16be,), max_locals
+        , (u32be,), code_length
+        , (lstr, self->code_length), code
+        , (u16be,), exception_table_length
+        , (array, jvm_attr_Code_exceptions, k < self->exception_table_length), exception_table
+        , (u16be,), attributes_count
+        , (array, jvm_class_attribute_infos, k < self->attributes_count), attributes
+        )
+// TODO: the madness shall never end.
+
 // https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html
 adapt_bipa_type(jvm_class)
+adapt_bipa_type(jvm_attr_ConstantValue)
+adapt_bipa_type(jvm_attr_Code)
+
+struct jvm_class_field_info* jvm_field(jvm_class cref cls, buf const name);
+struct jvm_class_method_info* jvm_method(jvm_class cref cls, buf const name);
+struct jvm_class_attribute_info* jvm_field_attribute(jvm_class cref cls, struct jvm_class_field_info cref m, buf const name);
+struct jvm_class_attribute_info* jvm_method_attribute(jvm_class cref cls, struct jvm_class_method_info cref m, buf const name);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
+struct jvm_class_field_info* jvm_field(jvm_class cref cls, buf const name) {
+    for (sz k = 0; k < cls->fields.len; k++) {
+        struct jvm_class_field_info ref it = cls->fields.ptr+k;
+        unsigned n = it->name_index-1;
+        if (n < cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
+            if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
+                return it;
+        }
+    }
+    exitf("field not found in class: '%.*s'", (unsigned)name.len, name.ptr);
+}
+
+struct jvm_class_method_info* jvm_method(jvm_class cref cls, buf const name) {
+    for (sz k = 0; k < cls->methods.len; k++) {
+        struct jvm_class_method_info ref it = cls->methods.ptr+k;
+        unsigned n = it->name_index-1;
+        if (n < cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
+            if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
+                return it;
+        }
+    }
+    exitf("method not found in class: '%.*s'", (unsigned)name.len, name.ptr);
+}
+
+struct jvm_class_attribute_info* jvm_field_attribute(jvm_class cref cls, struct jvm_class_field_info cref m, buf const name) {
+    for (sz k = 0; k < m->attributes.len; k++) {
+        struct jvm_class_attribute_info ref it = m->attributes.ptr+k;
+        unsigned n = it->attribute_name_index-1;
+        if (n < cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
+            if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
+                return it;
+        }
+    }
+    struct jvm_class_Utf8 ref ufo = &cls->constant_pool.ptr[m->name_index-1].val.Utf8;
+    exitf("attribute not found in field: '%.*s' in '%.*s'", (unsigned)name.len, name.ptr, ufo->length, ufo->bytes);
+}
+
+struct jvm_class_attribute_info* jvm_method_attribute(jvm_class cref cls, struct jvm_class_method_info cref m, buf const name) {
+    for (sz k = 0; k < m->attributes.len; k++) {
+        struct jvm_class_attribute_info ref it = m->attributes.ptr+k;
+        unsigned n = it->attribute_name_index-1;
+        if (n < cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
+            if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
+                return it;
+        }
+    }
+    struct jvm_class_Utf8 ref ufo = &cls->constant_pool.ptr[m->name_index-1].val.Utf8;
+    exitf("attribute not found in method: '%.*s' in '%.*s'", (unsigned)name.len, name.ptr, ufo->length, ufo->bytes);
+}
 
 #endif // BIDOOF_IMPLEMENTATION
 

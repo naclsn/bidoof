@@ -1,6 +1,13 @@
 // TODO: doc
 
 /// (here)
+///
+/// formats,
+/// are (intentionally) supported:
+///  - %s, args[k].s will point to the beginning of the matched text (not 0-terminated)
+///        (end delim are " \t\n;,]+-", if starts with '[', ']' is accepted)
+///  - %i or %+i, args[k].i will be the parsed integer (accepts leading +/- and 0b/0o/0x)
+///  - %u, %x or %#x, same but fails if number starts with a '-'
 
 #undef _paras_declonly
 #ifdef PARAS_DECLONLY
@@ -24,7 +31,7 @@ static bool _paras_scan(buf cref src, sz ref at, unsigned const _ln, char cref f
             while (i < src->len && strchr(" \t", src->ptr[i])) i++;
             break;
 
-        case '%': switch ('#' == f[j] ? j++, f[j++] : f[j++]) {
+        case '%': switch ('#' == f[j] || '+' == f[j] ? j++, f[j++] : f[j++]) {
             case 's':
                 args[k++].s = (char*)src->ptr+i;
                 for (char const* const endchs = '[' == src->ptr[i]
@@ -45,7 +52,7 @@ static bool _paras_scan(buf cref src, sz ref at, unsigned const _ln, char cref f
                 if (minus || '+' == src->ptr[i]) i++;
                 unsigned shft = 0;
                 char const* dgts = "0123456789";
-                if ('0' == src->ptr[i]) switch (src->ptr[i++]) {
+                if ('0' == src->ptr[i]) switch (src->ptr[++i]|32) {
                     case 'b': i++; shft = 1; dgts = "01";               break;
                     case 'o': i++; shft = 3; dgts = "01234567";         break;
                     case 'x': i++; shft = 4; dgts = "0123456789abcdef"; break;
