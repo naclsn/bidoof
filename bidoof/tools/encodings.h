@@ -158,8 +158,9 @@ codepoints utf8_decode(buf const source) {
             *u = ((*u & 7) << 18) | ((x & 63) << 12) | ((y & 63) << 6) | (z & 63);
         }
         else {
+            u8 b = *u;
             free(r.ptr);
-            exitf("unexpected byte 0x%02X or end of stream at index %zu (/%zu)", *u, k, source.len);
+            exitf("unexpected byte 0x%02X or end of stream at index %zu (/%zu)", b, k, source.len);
         }
     }
 

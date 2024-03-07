@@ -27,6 +27,8 @@ static struct _list_deps_item const _list_deps_me_jvm = {_list_deps_first, "jvm"
 #define _op_u16_e(k) args[k].u>>8 & 0xff, args[k].u & 0xff
 #define _op_i16_f(k) (i16)(bytes[k]<<8 | bytes[k+1])
 #define _op_i16_e(k) args[k].i>>8 & 0xff, args[k].i & 0xff
+#define _op_u32_f(k) (u32)(bytes[k]<<24 | bytes[k+1]<<16 | bytes[k+2]<<8 | bytes[k+3])
+#define _op_u32_e(k) args[k].u>>24 & 0xff, args[k].u>>16 & 0xff, args[k].u>>8 & 0xff, args[k].u & 0xff
 #define _op_i32_f(k) (i32)(bytes[k]<<24 | bytes[k+1]<<16 | bytes[k+2]<<8 | bytes[k+3])
 #define _op_i32_e(k) args[k].i>>24 & 0xff, args[k].i>>16 & 0xff, args[k].i>>8 & 0xff, args[k].i & 0xff
 #define _arr_ty_f(k) bytes[k] < 4 || 11 < bytes[k] ? "???" : ((char*[]){"boolean", "char", "float", "double", "byte", "short", "int", "long"})[bytes[k]-4]
@@ -39,8 +41,11 @@ static struct _list_deps_item const _list_deps_me_jvm = {_list_deps_first, "jvm"
                      : !memcmp("int",     args[k].s, 3) ? 10  \
                      : !memcmp("long",    args[k].s, 4) ? 11  \
                      : paras_mark_invalid())
+bool _jvm_tableswitch_f(buf cref src, sz ref at, buf ref res);
+bool _jvm_tableswitch_e(buf cref line, buf ref res);
+bool _jvm_lookupswitch_f(buf cref src, sz ref at, buf ref res);
+bool _jvm_lookupswitch_e(buf cref line, buf ref res);
 
-// TODO: tableswitch, lookupswitch and wide (variable width instructions)
 // https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html
 paras_make_instrset(jvm_bytecode,
     paras_make_instr(nop,             (0x00),             (0xff),                   (""),                                (codes[0]))
@@ -213,8 +218,8 @@ paras_make_instrset(jvm_bytecode,
     paras_make_instr(goto,            (0xa7, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
     paras_make_instr(jsr,             (0xa8, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
     paras_make_instr(ret,             (0xa9, 0),          (0xff, 0),                ("_%u", bytes[1]),                   (codes[0], args[0].u))
-    //paras_make_instr(tableswitch,     (0xaa),             (0xff),                   (""),                                (codes[0]))
-    //paras_make_instr(lookupswitch,    (0xab),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr_x(tableswitch,   (0xaa),             (0xff),                   _jvm_tableswitch_f,                  _jvm_tableswitch_e)
+    paras_make_instr_x(lookupswitch,  (0xab),             (0xff),                   _jvm_lookupswitch_f,                 _jvm_lookupswitch_e)
     paras_make_instr(ireturn,         (0xac),             (0xff),                   (""),                                (codes[0]))
     paras_make_instr(lreturn,         (0xad),             (0xff),                   (""),                                (codes[0]))
     paras_make_instr(freturn,         (0xae),             (0xff),                   (""),                                (codes[0]))
@@ -239,7 +244,18 @@ paras_make_instrset(jvm_bytecode,
     paras_make_instr(instanceof,      (0xc1, 0, 0),       (0xff, 0, 0),             ("#%u", _op_u16_f(1)),               (codes[0], _op_u16_e(0)))
     paras_make_instr(monitorenter,    (0xc2),             (0xff),                   (""),                                (codes[0]))
     paras_make_instr(monitorexit,     (0xc3),             (0xff),                   (""),                                (codes[0]))
-    //paras_make_instr(wide,            (0xc4),             (0xff),                   (""),                                (codes[0]))
+    paras_make_instr(wide_iload,      (0xc4, 0x15, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_lload,      (0xc4, 0x16, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_fload,      (0xc4, 0x17, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_dload,      (0xc4, 0x18, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_aload,      (0xc4, 0x19, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_istore,     (0xc4, 0x36, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_lstore,     (0xc4, 0x37, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_fstore,     (0xc4, 0x38, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_dstore,     (0xc4, 0x39, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_astore,     (0xc4, 0x3a, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
+    paras_make_instr(wide_iinc,       (0xc4, 0x84, 0, 0, 0, 0), (0xff, 0xff, 0, 0, 0, 0), ("_%u, %i", _op_u16_f(2), _op_i16_f(4)), (codes[0], codes[1], _op_u16_e(0), _op_i16_e(1)))
+    paras_make_instr(wide_ret,        (0xc4, 0xa9, 0, 0),       (0xff, 0xff, 0, 0),       ("_%u", _op_u16_f(2)),                   (codes[0], codes[1], _op_u16_e(0)))
     paras_make_instr(multianewarray,  (0xc5, 0, 0, 0),    (0xff, 0, 0, 0),          ("#%u, %u", _op_u16_f(1), bytes[2]), (codes[0], _op_u16_e(0), args[1].u))
     paras_make_instr(ifnull,          (0xc6, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
     paras_make_instr(ifnonnull,       (0xc7, 0, 0),       (0xff, 0, 0),             ("%+i", _op_i16_f(1)),               (codes[0], _op_i16_e(0)))
@@ -431,7 +447,6 @@ bipa_struct(jvm_attr_Code, 8
         , (u16be,), attributes_count
         , (array, jvm_class_attribute_infos, k < self->attributes_count), attributes
         )
-// TODO: the madness shall never end.
 
 // https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html
 adapt_bipa_type(jvm_class)
@@ -444,6 +459,79 @@ struct jvm_class_attribute_info* jvm_field_attribute(jvm_class cref cls, struct 
 struct jvm_class_attribute_info* jvm_method_attribute(jvm_class cref cls, struct jvm_class_method_info cref m, buf const name);
 
 #ifdef BIDOOF_IMPLEMENTATION
+
+bool _jvm_tableswitch_f(buf cref src, sz ref at, buf ref res) {
+    // TODO: overrun checks
+    char _buf[256], *_h = _buf;
+    u8 const* bytes = src->ptr;
+    while (++*at & 3);
+    i32 def = _op_i32_f(*at); *at+= 4;
+    i32 lo = _op_i32_f(*at); *at+= 4;
+    i32 hi = _op_i32_f(*at); *at+= 4;
+    _h+= sprintf(_h, "%+i, [%i..%i]", def, lo, hi);
+    for (int n = 0; n < hi-lo+1; n++) {
+        i32 off = _op_i32_f(*at); *at+= 4;
+        _h+= sprintf(_h, ", %+i", off);
+    }
+    bufcat(res, (buf){.ptr= (u8*)_buf, .len= _h-_buf});
+    return true;
+}
+bool _jvm_tableswitch_e(buf cref line, buf ref res) {
+    // TODO: true scan failures (`at` not changed)
+    sz at = 0;
+    union paras_generic def_lo_hi[3];
+    _paras_scan(line, &at, 0, "%+i, [%i..%i]", def_lo_hi);
+    i32 const lo = def_lo_hi[1].i, hi = def_lo_hi[2].i;
+    sz const isz = 1 + 3 + (3 + hi-lo+1) *4;
+    if (res->cap <= res->len+isz && !dyarr_resize(res, res->len+isz)) exitf("OOM");
+    res->ptr[res->len++] = 0xaa;
+    if (res->len & 3) res->len+= 4-(res->len&3);
+    poke32be(res, res->len, def_lo_hi[0].i); res->len+= 4;
+    poke32be(res, res->len, lo); res->len+= 4;
+    poke32be(res, res->len, hi); res->len+= 4;
+    for (int n = 0; n < hi-lo+1; n++) {
+        union paras_generic off;
+        _paras_scan(line, &at, 0, ", %+i", &off);
+        poke32be(res, res->len, off.i); res->len+= 4;
+    }
+    return true;
+}
+bool _jvm_lookupswitch_f(buf cref src, sz ref at, buf ref res) {
+    // TODO: overrun checks
+    char _buf[256], *_h = _buf;
+    u8 const* bytes = src->ptr;
+    while (++*at & 3);
+    i32 def = _op_i32_f(*at); *at+= 4;
+    i32 np = _op_i32_f(*at); *at+= 4;
+    _h+= sprintf(_h, "%+i, [%u]", def, np);
+    for (int n = 0; n < np; n++) {
+        i32 mat = _op_i32_f(*at); *at+= 4;
+        i32 off = _op_i32_f(*at); *at+= 4;
+        _h+= sprintf(_h, ", (%i, %+i)", mat, off);
+    }
+    bufcat(res, (buf){.ptr= (u8*)_buf, .len= _h-_buf});
+    return true;
+}
+bool _jvm_lookupswitch_e(buf cref line, buf ref res) {
+    // TODO: true scan failures (`at` not changed)
+    sz at = 0;
+    union paras_generic def_np[3];
+    _paras_scan(line, &at, 0, "%+i, [%u]", def_np);
+    i32 const np = def_np[1].u;
+    sz const isz = 1 + 3 + (2 + np*2) *4;
+    if (res->cap <= res->len+isz && !dyarr_resize(res, res->len+isz)) exitf("OOM");
+    res->ptr[res->len++] = 0xab;
+    if (res->len & 3) res->len+= 4-(res->len&3);
+    poke32be(res, res->len, def_np[0].i); res->len+= 4;
+    poke32be(res, res->len, np); res->len+= 4;
+    for (int n = 0; n < np; n++) {
+        union paras_generic mat_off[2];
+        _paras_scan(line, &at, 0, ", (%i, %+i)", mat_off);
+        poke32be(res, res->len, mat_off[0].i); res->len+= 4;
+        poke32be(res, res->len, mat_off[1].i); res->len+= 4;
+    }
+    return true;
+}
 
 struct jvm_class_field_info* jvm_field(jvm_class cref cls, buf const name) {
     for (sz k = 0; k < cls->fields.len; k++) {
