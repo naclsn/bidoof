@@ -9,48 +9,61 @@
 #define inline
 #endif
 
-static inline bool   _dyarr_resize(void* ptr, size_t isz, size_t* cap, size_t rsz);
-static inline size_t _dyarr_insert(void* ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n);
-static inline void   _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n);
+static inline bool  _dyarr_resize(void** ptr, size_t isz, size_t* cap, size_t rsz);
+static inline void* _dyarr_insert(void** ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n);
+static inline void  _dyarr_remove(void** ptr, size_t isz, size_t* len, size_t k, size_t n);
+static inline void* _dyarr_replace(void** ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n, void* spt, size_t sln);
 
+#ifdef inline
 #undef inline
+#endif
 
 #ifndef dyarr
 #include <string.h>
 
-#define dyarr(__elty) struct { __elty* ptr; size_t len, cap; }
+#define dyarr(...) struct { __VA_ARGS__* ptr; size_t len, cap; }
 
-/* sets it to zeros, doesn't actually free anything */
-#define dyarr_zero(__da)  ((__da)->ptr = NULL, (__da)->len = (__da)->cap = 0)
 /* clears it empty and free used memory */
-#define dyarr_clear(__da)  (free((__da)->ptr), dyarr_zero((__da)))
+#define dyarr_clear(__da)  ((__da)->len = (__da)->cap = (__da)->cap ? free((__da)->ptr), 0 : 0, (__da)->ptr = NULL)
 /* resizes exactly to given, new size should not be 0 */
-#define dyarr_resize(__da, __rsz)  _dyarr_resize(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, (__rsz))
+#define dyarr_resize(__da, __rsz)  _dyarr_resize((void**)&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, (__rsz))
+
 /* doubles the capacity if more memory is needed */
-#define dyarr_push(__da)  ((__da)->len < (__da)->cap || dyarr_resize((__da), (__da)->cap ? (__da)->cap * 2 : (_dyarr_emptyresize)) ? &(__da)->ptr[(__da)->len++] : NULL)
+#define dyarr_push(__da)  ((__da)->len < (__da)->cap || dyarr_resize((__da), (__da)->cap ? (__da)->cap*2 : (_dyarr_emptyresize)) ? &(__da)->ptr[(__da)->len++] : NULL)
 /* NULL if empty */
 #define dyarr_pop(__da)  ((__da)->len ? &(__da)->ptr[--(__da)->len] : NULL)
-/* NULL (or rather 0) if OOM, else pointer to the new sub-array (at k, of size n) */
-#define dyarr_insert(__da, __k, __n)  ((__da)->ptr + _dyarr_insert(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, &(__da)->len, (__k), (__n)))
-/* doesn't check bounds, pointer to where the sub-array was */
-#define dyarr_remove(__da, __k, __n)  _dyarr_remove(&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->len, (__k), (__n))
 
-bool _dyarr_resize(void* ptr, size_t isz, size_t* cap, size_t rsz) {
-    void* niw = realloc(*(void**)ptr, rsz * isz);
-    return niw ? *(void**)ptr = niw, *cap = rsz, true : false;
-    (void)_dyarr_insert;
-    (void)_dyarr_remove;
+/* insert spaces at [k : k+n], NULL if OOM else (void*)(da->ptr+k) */
+#define dyarr_insert(__da, __k, __n)  _dyarr_insert((void**)&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, &(__da)->len, (__k), (__n))
+/* removes [k : k+n], doesn't check bounds */
+#define dyarr_remove(__da, __k, __n)  _dyarr_remove((void**)&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->len, (__k), (__n))
+/* replace [k : k+n] with a copy of src (src->len can be different from n), NULL if OOM else (void*)(da->ptr+k) */
+#define dyarr_replace(__da, __k, __n, __src)  _dyarr_replace((void**)&(__da)->ptr, sizeof*(__da)->ptr, &(__da)->cap, &(__da)->len, (__k), (__n), (void*)(__src)->ptr, (__src)->len)
+
+bool _dyarr_resize(void** ptr, size_t isz, size_t* cap, size_t rsz) {
+    void* niw = realloc(*ptr, rsz * isz);
+    return niw ? *ptr = niw, *cap = rsz, true : false;
 }
 
-size_t _dyarr_insert(void* ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n) {
-    return *len+n < *cap || _dyarr_resize(ptr, isz, cap, *len+n)
-        ? memmove(*(char**)ptr+(k+n)*isz, *(char**)ptr+k*isz, (*len-k)*isz), *len+= n, k
-        : -(size_t)*(char**)ptr
-        ;
+void* _dyarr_insert(void** ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n) {
+    size_t nln = *len+n;
+    if (*cap < nln && !_dyarr_resize(ptr, isz, cap, nln)) return NULL;
+    memmove(*(char**)ptr+(k+n)*isz, *(char**)ptr+k*isz, (*len-k)*isz);
+    *len = nln;
+    return *(char**)ptr+k*isz;
 }
 
-void _dyarr_remove(void* ptr, size_t isz, size_t* len, size_t k, size_t n) {
+void _dyarr_remove(void** ptr, size_t isz, size_t* len, size_t k, size_t n) {
     memmove(*(char**)ptr+k*isz, *(char**)ptr+(k+n)*isz, ((*len-= n)-k)*isz);
+}
+
+void* _dyarr_replace(void** ptr, size_t isz, size_t* cap, size_t* len, size_t k, size_t n, void* spt, size_t sln) {
+    size_t nln = *len+sln-n;
+    if (n < sln && *cap < nln && !_dyarr_resize(ptr, isz, cap, nln)) return NULL;
+    memmove(*(char**)ptr+(k+sln)*isz, *(char**)ptr+(k+n)*isz, (*len-n-k)*isz);
+    memcpy(*(char**)ptr+k*isz, spt, sln*isz);
+    *len = nln;
+    return *(char**)ptr+k*isz;
 }
 
 #endif /* dyarr */

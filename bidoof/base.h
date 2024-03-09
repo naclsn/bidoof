@@ -6,6 +6,7 @@
 #endif
 
 #include <dirent.h>
+#include <setjmp.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -68,29 +69,12 @@ void putbhi(buf const b, char cref ref keywords, char cref ref string_pairs, cha
 
 void buf_free(buf const self);
 
-#define with_buf_as_write_file(__buf, __name, ...) do {     \
-    FILE* __name = tmpfile();                               \
-    if (!__name) exitf("could not open a temporary file");  \
-    { __VA_ARGS__; }                                        \
-    (__buf).len = ftell(__name);                            \
-    (__buf).ptr = malloc(r.len);                            \
-    if (!(__buf).ptr) exitf("OOM");                         \
-    fseek(__name, 0, SEEK_SET);                             \
-    fread((__buf).ptr, 1, (__buf).len, __name);             \
-    fclose(__name);                                         \
-} while (0)
-
-#define with_buf_as_read_file(__buf, __name, ...) do {      \
-    FILE* __name = tmpfile();                               \
-    if (!__name) exitf("could not open a temporary file");  \
-    fwrite((__buf).ptr, 1, (__buf).len, __name);            \
-    fseek(__name, 0, SEEK_SET);                             \
-    { __VA_ARGS__; }                                        \
-    fclose(__name);                                         \
-} while (0)
-
 buf bufcpy(buf const other);
 void bufcat(buf ref to, buf const other);
+buf bufbeg(buf const b, buf const w);
+buf bufend(buf const b, buf const w);
+buf buftrimbeg(buf const b, char cref w);
+buf buftrimend(buf const b, char cref w);
 
 u16 peek16le(buf const b, sz const k);
 u32 peek32le(buf const b, sz const k);
@@ -121,22 +105,57 @@ void path_join(buf ref to, buf const other);
 } while (0)
 #define swap(__x, __y) swapn((__x), (__y), sizeof(__x))
 
+#define with_buf_as_write_file(__buf, __name) for (            \
+    FILE* _hid_##__name = tmpfile(), * __name = _hid_##__name  \
+        ? _hid_##__name                                        \
+        : (exitf("could not open a temporary file"), NULL);    \
+    _hid_##__name;                                             \
+    ((__buf).ptr = malloc((__buf).len=ftell(_hid_##__name)))   \
+        ? fseek(_hid_##__name, 0, SEEK_SET),                   \
+          fread((__buf).ptr, 1, (__buf).len, _hid_##__name)    \
+        : (exitf("OOM"), 0),                                   \
+    fclose(_hid_##__name), _hid_##__name = NULL)
+
+#define with_buf_as_read_file(__buf, __name, ...) for (        \
+    FILE* _hid_##__name = tmpfile(), * __name = _hid_##__name  \
+        ? fwrite((__buf).ptr, 1, (__buf).len, _hid_##__name),  \
+          fseek(_hid_##__name, 0, SEEK_SET),                   \
+          _hid_##__name                                        \
+        : (exitf("could not open a temporary file"), NULL);    \
+    _hid_##__name;                                             \
+    fclose(_hid_##__name), _hid_##__name = NULL)
+
 #define for_lines(__sl, __inbuf) for (                                            \
     buf _inbuf = (__inbuf), __sl = {.ptr= memchr(_inbuf.ptr, '\n', _inbuf.len)};  \
     __sl.ptr && (__sl.len = __sl.ptr - _inbuf.ptr, __sl.ptr = _inbuf.ptr);        \
     __sl.ptr = memchr(_inbuf.ptr+= __sl.len+1, '\n', _inbuf.len-= __sl.len+1))
 
+#define _try_catch_scope_x(__n) _try_catch_scope_##__n
+#define _try_catch_scope(__n) _try_catch_scope_x(__n)
+#define try_catch(...)                                                 \
+    if (!dyarr_push(&catch_stack)) notif("OOM"), exit(1);              \
+    bool _try_catch_scope(__LINE__) = true;                            \
+    if (!setjmp(catch_stack.ptr[catch_stack.len-1])) for (             \
+        __VA_ARGS__;                                                   \
+        _try_catch_scope(__LINE__) ? catch_stack.len--, true : false;  \
+        _try_catch_scope(__LINE__) = false)
+
 #define _HERE_STR(__ln) #__ln
 #define _HERE_XSTR(__ln) _HERE_STR(__ln)
 #define HERE __FILE__ ":" _HERE_XSTR(__LINE__)
-#define exitf(...) (printf(HERE ": " __VA_ARGS__), putchar('\n'), exit(1))
+#define exitf(...) (notif(__VA_ARGS__), catch_stack.len ? longjmp(catch_stack.ptr[--catch_stack.len], 1) : exit(1))
 #define notif(...) (notify_stream ? fprintf(notify_stream, HERE ": " __VA_ARGS__), fputc('\n', notify_stream) : 0)
 
-extern FILE* notify_stream;
+#ifdef BIDOOF_IMPLEMENTATION
+#define _extern(__ty, __nm, ...) __ty __nm = __VA_ARGS__
+#else
+#define _extern(__ty, __nm, ...) extern __ty __nm
+#endif
+_extern(dyarr(jmp_buf), catch_stack, {0});
+_extern(FILE*, notify_stream, NULL);
+#undef _extern
 
 #ifdef BIDOOF_IMPLEMENTATION
-
-FILE* notify_stream = NULL;
 
 void xxd(buf const b, sz const ln) {
     if (0 == b.len) return;
@@ -343,9 +362,34 @@ void bufcat(buf ref to, buf const other) {
     //u8* dest = dyarr_insert(to, to->len, other.len); // FIXME: this no work, see why
     //if (!dest) exitf("OOM");
     //memcpy(dest, other.ptr, other.len);
-    if (!dyarr_resize(to, to->len+other.len)) exitf("OOM");
-    memcpy(to->ptr+to->len, other.ptr, other.len);
-    to->len+= other.len;
+    //
+    //if (!dyarr_resize(to, to->len+other.len)) exitf("OOM");
+    //memcpy(to->ptr+to->len, other.ptr, other.len);
+    //to->len+= other.len;
+    //
+    dyarr_replace(to, to->len, 0, &other);
+}
+
+buf bufbeg(buf const b, buf const w) {
+    for (sz i = w.len; i < b.len; i++) if (!memcmp(b.ptr+i-w.len, w.ptr, w.len)) return mkbufsl(b.ptr, i-w.len, b.len);
+    return (buf){0};
+}
+
+buf bufend(buf const b, buf const w) {
+    for (sz i = w.len; i < b.len; i++) if (!memcmp(b.ptr+b.len-i, w.ptr, w.len)) return mkbufsl(b.ptr, 0, b.len-i);
+    return (buf){0};
+}
+
+buf buftrimbeg(buf const b, char cref w) {
+    buf r = b;
+    for (; r.ptr < b.ptr+b.len; r.ptr++) if (!strchr(w, *r.ptr)) break;
+    return r;
+}
+
+buf buftrimend(buf const b, char cref w) {
+    buf r = b;
+    for (; r.len; r.len--) if (!strchr(w, r.ptr[r.len-1])) break;
+    return r;
 }
 
 u16 peek16le(buf const b, sz const k) {
