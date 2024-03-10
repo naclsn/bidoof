@@ -128,13 +128,17 @@ bipa_struct(zip_data, 3
 adapt_bipa_type(zip_data)
 
 typedef struct zip_entry {
-    struct zip_data const* zip;
+    struct zip_data* zip;
     struct local_file* file;
     struct central_directory_header* header;
 } zip_entry;
 
 buf zip_find_by_path(zip_data cref zip, buf const path);
 
+// not strictly needed as `zip_add_entry` will allocate appropriately, but when
+// it does it can invalidate previously held `zip_entry`s, so it is recommended
+// when the count is known in advance
+void zip_reserve_entries(zip_data ref zip, sz const count);
 zip_entry zip_add_entry(zip_data ref zip);
 zip_entry zip_get_entry(zip_data cref zip, sz const k);
 void zip_entry_file_name(zip_entry ref en, buf const file_name);
@@ -148,9 +152,15 @@ void zip_central_dir_comment(zip_data ref zip, buf const com);
 #ifdef BIDOOF_IMPLEMENTATION
 
 buf zip_find_by_path(zip_data cref zip, buf const path) {
+    exitf("NIY");
     (void)zip;
     (void)path;
     return (buf){0};
+}
+
+void zip_reserve_entries(zip_data ref zip, sz const count) {
+    if (zip->local_files.cap < count && !dyarr_resize(&zip->local_files, count)) exitf("OOM");
+    if (zip->central_directory_headers.cap < count && !dyarr_resize(&zip->central_directory_headers, count)) exitf("OOM");
 }
 
 zip_entry zip_add_entry(zip_data ref zip) {
@@ -170,7 +180,7 @@ zip_entry zip_add_entry(zip_data ref zip) {
 zip_entry zip_get_entry(zip_data cref zip, sz const k) {
     struct local_file* file = zip->local_files.ptr+k;
     struct central_directory_header* header = zip->central_directory_headers.ptr+k;
-    return (zip_entry){.zip= zip, .file= file, .header= header};
+    return (zip_entry){.zip= (void*)zip, .file= file, .header= header};
 }
 
 void zip_entry_file_name(zip_entry ref en, buf const file_name) {

@@ -23,6 +23,7 @@ static struct _list_deps_item const _list_deps_me_jvm = {_list_deps_first, "jvm"
 #define _list_deps_first &_list_deps_me_jvm
 #endif
 
+// paras(jvm_bytecode) {{{
 #define _op_u16_f(k) (u16)(bytes[k]<<8 | bytes[k+1])
 #define _op_u16_e(k) args[k].u>>8 & 0xff, args[k].u & 0xff
 #define _op_i16_f(k) (i16)(bytes[k]<<8 | bytes[k+1])
@@ -316,7 +317,9 @@ paras_make_instrset(jvm_bytecode,
     paras_make_instr(impdep1,         (0xfe),             (0xff),                   (""),                                (codes[0]))
     paras_make_instr(impdep2,         (0xff),             (0xff),                   (""),                                (codes[0]))
 )
+// }}}
 
+// bipa(jvm_class) {{{
 bipa_packed(jvm_class_access_flags, u16be, 15
         , 1, acc_public
         , 1, acc_private
@@ -447,19 +450,45 @@ bipa_struct(jvm_attr_Code, 8
         , (u16be,), attributes_count
         , (array, jvm_class_attribute_infos, k < self->attributes_count), attributes
         )
+// }}}
 
 // https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html
 adapt_bipa_type(jvm_class)
 adapt_bipa_type(jvm_attr_ConstantValue)
 adapt_bipa_type(jvm_attr_Code)
 
-struct jvm_class_field_info* jvm_field(jvm_class cref cls, buf const name);
-struct jvm_class_method_info* jvm_method(jvm_class cref cls, buf const name);
-struct jvm_class_attribute_info* jvm_field_attribute(jvm_class cref cls, struct jvm_class_field_info cref m, buf const name);
-struct jvm_class_attribute_info* jvm_method_attribute(jvm_class cref cls, struct jvm_class_method_info cref m, buf const name);
+typedef struct jvm_class_member {
+    jvm_class* cls;
+    struct jvm_class_access_flags* access_flags;
+    u16* name_index;
+    u16* descriptor_index;
+    u16* attributes_count;
+    struct jvm_class_attribute_infos* attributes;
+} jvm_class_member;
+
+buf jvm_list_fields(jvm_class cref cls);
+void jvm_reserve_fields(jvm_class ref cls, sz const count);
+jvm_class_member jvm_get_field(jvm_class cref cls, buf const name);
+jvm_class_member jvm_add_field(jvm_class ref cls, buf const name);
+
+buf jvm_list_methods(jvm_class cref cls);
+void jvm_reserve_methods(jvm_class ref cls, sz const count);
+jvm_class_member jvm_get_method(jvm_class cref cls, buf const name);
+jvm_class_member jvm_add_method(jvm_class ref cls, buf const name);
+
+#define jvm_list_attributes(__cls)  jvm_member_list_attributes (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes})
+#define jvm_reserve_attributes(__cls, __count)  jvm_member_reserve_attributes(&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__count))
+#define jvm_get_attribute(__cls, __name)  jvm_member_get_attribute (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__name))
+#define jvm_add_attribute(__cls, __name, __info)  jvm_member_add_attribute (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__name), (__info))
+
+buf jvm_member_list_attributes(jvm_class_member cref mbr);
+void jvm_member_reserve_attributes(jvm_class_member ref mbr, sz const count);
+struct jvm_class_attribute_info* jvm_member_get_attribute(jvm_class_member cref mbr, buf const name);
+struct jvm_class_attribute_info* jvm_member_add_attribute(jvm_class_member cref mbr, buf const name, buf const info);
 
 #ifdef BIDOOF_IMPLEMENTATION
 
+// private paras stuff {{{
 bool _jvm_tableswitch_f(buf cref src, sz ref at, buf ref res) {
     // TODO: overrun checks
     char _buf[256], *_h = _buf;
@@ -532,60 +561,173 @@ bool _jvm_lookupswitch_e(buf cref line, buf ref res) {
     }
     return true;
 }
+// }}}
 
-struct jvm_class_field_info* jvm_field(jvm_class cref cls, buf const name) {
+// fields {{{
+buf jvm_list_fields(jvm_class cref cls) {
+    buf r = {0};
+    for (sz k = 0; k < cls->fields.len; k++) {
+        struct jvm_class_field_info ref it = cls->fields.ptr+k;
+        unsigned n = it->name_index-1;
+        if (n < cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
+            if (jvm_class_cp_info_tag_Utf8 == fo->tag) {
+                bufcat(&r, (buf){.ptr= fo->val.Utf8.bytes, .len= fo->val.Utf8.length+1});
+                r.ptr[r.len-1] = '\n';
+            }
+        }
+    }
+    return r;
+}
+
+void jvm_reserve_fields(jvm_class ref cls, sz const count) {
+    if (cls->fields.cap < count && !dyarr_resize(&cls->fields, count)) exitf("OOM");
+}
+
+jvm_class_member jvm_get_field(jvm_class cref cls, buf const name) {
     for (sz k = 0; k < cls->fields.len; k++) {
         struct jvm_class_field_info ref it = cls->fields.ptr+k;
         unsigned n = it->name_index-1;
         if (n < cls->constant_pool_count) {
             struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
             if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
-                return it;
+                return (jvm_class_member){
+                    .cls= (void*)cls,
+                    .access_flags= &it->access_flags,
+                    .name_index= &it->name_index,
+                    .descriptor_index= &it->descriptor_index,
+                    .attributes_count= &it->attributes_count,
+                    .attributes= &it->attributes,
+                };
         }
     }
     exitf("field not found in class: '%.*s'", (unsigned)name.len, name.ptr);
 }
 
-struct jvm_class_method_info* jvm_method(jvm_class cref cls, buf const name) {
+jvm_class_member jvm_add_field(jvm_class ref cls, buf const name) {
+    struct jvm_class_field_info ref it = dyarr_push(&cls->fields);
+    if (!it) exitf("OOM");
+    // TODO: add constant (name)
+    cls->fields_count++;
+    return (jvm_class_member){
+        .cls= (void*)cls,
+        .access_flags= &it->access_flags,
+        .name_index= &it->name_index,
+        .descriptor_index= &it->descriptor_index,
+        .attributes_count= &it->attributes_count,
+        .attributes= &it->attributes,
+    };
+}
+// }}}
+
+// methods {{{
+buf jvm_list_methods(jvm_class cref cls) {
+    buf r = {0};
+    for (sz k = 0; k < cls->methods.len; k++) {
+        struct jvm_class_method_info ref it = cls->methods.ptr+k;
+        unsigned n = it->name_index-1;
+        if (n < cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
+            if (jvm_class_cp_info_tag_Utf8 == fo->tag) {
+                bufcat(&r, (buf){.ptr= fo->val.Utf8.bytes, .len= fo->val.Utf8.length+1});
+                r.ptr[r.len-1] = '\n';
+            }
+        }
+    }
+    return r;
+}
+
+void jvm_reserve_methods(jvm_class ref cls, sz const count) {
+    if (cls->methods.cap < count && !dyarr_resize(&cls->methods, count)) exitf("OOM");
+}
+
+jvm_class_member jvm_get_method(jvm_class cref cls, buf const name) {
     for (sz k = 0; k < cls->methods.len; k++) {
         struct jvm_class_method_info ref it = cls->methods.ptr+k;
         unsigned n = it->name_index-1;
         if (n < cls->constant_pool_count) {
             struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
             if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
-                return it;
+                return (jvm_class_member){
+                    .cls= (void*)cls,
+                    .access_flags= &it->access_flags,
+                    .name_index= &it->name_index,
+                    .descriptor_index= &it->descriptor_index,
+                    .attributes_count= &it->attributes_count,
+                    .attributes= &it->attributes,
+                };
         }
     }
     exitf("method not found in class: '%.*s'", (unsigned)name.len, name.ptr);
 }
 
-struct jvm_class_attribute_info* jvm_field_attribute(jvm_class cref cls, struct jvm_class_field_info cref m, buf const name) {
-    for (sz k = 0; k < m->attributes.len; k++) {
-        struct jvm_class_attribute_info ref it = m->attributes.ptr+k;
+jvm_class_member jvm_add_method(jvm_class ref cls, buf const name) {
+    struct jvm_class_method_info ref it = dyarr_push(&cls->methods);
+    if (!it) exitf("OOM");
+    // TODO: add constant (name)
+    cls->methods_count++;
+    return (jvm_class_member){
+        .cls= (void*)cls,
+        .access_flags= &it->access_flags,
+        .name_index= &it->name_index,
+        .descriptor_index= &it->descriptor_index,
+        .attributes_count= &it->attributes_count,
+        .attributes= &it->attributes,
+    };
+}
+// }}}
+
+// attributes {{{
+buf jvm_member_list_attributes(jvm_class_member cref mbr) {
+    buf r = {0};
+    for (sz k = 0; k < mbr->attributes->len; k++) {
+        struct jvm_class_attribute_info ref it = mbr->attributes->ptr+k;
         unsigned n = it->attribute_name_index-1;
-        if (n < cls->constant_pool_count) {
-            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
-            if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
-                return it;
+        if (n < mbr->cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = mbr->cls->constant_pool.ptr+n;
+            if (jvm_class_cp_info_tag_Utf8 == fo->tag) {
+                bufcat(&r, (buf){.ptr= fo->val.Utf8.bytes, .len= fo->val.Utf8.length+1});
+                r.ptr[r.len-1] = '\n';
+            }
         }
     }
-    struct jvm_class_Utf8 ref ufo = &cls->constant_pool.ptr[m->name_index-1].val.Utf8;
-    exitf("attribute not found in field: '%.*s' in '%.*s'", (unsigned)name.len, name.ptr, ufo->length, ufo->bytes);
+    return r;
 }
 
-struct jvm_class_attribute_info* jvm_method_attribute(jvm_class cref cls, struct jvm_class_method_info cref m, buf const name) {
-    for (sz k = 0; k < m->attributes.len; k++) {
-        struct jvm_class_attribute_info ref it = m->attributes.ptr+k;
+void jvm_member_reserve_attributes(jvm_class_member ref mbr, sz const count) {
+    if (mbr->attributes->cap < count && !dyarr_resize(mbr->attributes, count)) exitf("OOM");
+}
+
+struct jvm_class_attribute_info* jvm_member_get_attribute(jvm_class_member cref mbr, buf const name) {
+    for (sz k = 0; k < mbr->attributes->len; k++) {
+        struct jvm_class_attribute_info ref it = mbr->attributes->ptr+k;
         unsigned n = it->attribute_name_index-1;
-        if (n < cls->constant_pool_count) {
-            struct jvm_class_cp_info ref fo = cls->constant_pool.ptr+n;
+        if (n < mbr->cls->constant_pool_count) {
+            struct jvm_class_cp_info ref fo = mbr->cls->constant_pool.ptr+n;
             if (jvm_class_cp_info_tag_Utf8 == fo->tag && !memcmp(name.ptr, fo->val.Utf8.bytes, fo->val.Utf8.length))
                 return it;
         }
     }
-    struct jvm_class_Utf8 ref ufo = &cls->constant_pool.ptr[m->name_index-1].val.Utf8;
-    exitf("attribute not found in method: '%.*s' in '%.*s'", (unsigned)name.len, name.ptr, ufo->length, ufo->bytes);
+    exitf("attribute not found: '%.*s'", (unsigned)name.len, name.ptr);
 }
+
+struct jvm_class_attribute_info* jvm_member_add_attribute(jvm_class_member cref mbr, buf const name, buf const info) {
+    struct jvm_class_attribute_info* r = dyarr_push(mbr->attributes);
+    // TODO: (better) add constant
+    struct jvm_class_cp_info* na = dyarr_push(&mbr->cls->constant_pool);
+    if (!r || !na) exitf("OOM");
+    na->tag = jvm_class_cp_info_tag_Utf8;
+    na->val.Utf8.length = name.len;
+    na->val.Utf8.bytes = bufcpy(name).ptr;
+    r->attribute_name_index = ++mbr->cls->constant_pool_count;
+    r->attribute_length = info.len;
+    r->info = bufcpy(info).ptr;
+    ++*mbr->attributes_count;
+    return r;
+}
+// }}}
+
+// vi: fdm=marker fdl=0
 
 #endif // BIDOOF_IMPLEMENTATION
 

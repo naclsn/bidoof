@@ -76,6 +76,8 @@ buf bufend(buf const b, buf const w);
 buf buftrimbeg(buf const b, char cref w);
 buf buftrimend(buf const b, char cref w);
 
+long long parsenum(buf const b, sz opref ends);
+
 u16 peek16le(buf const b, sz const k);
 u32 peek32le(buf const b, sz const k);
 u64 peek64le(buf const b, sz const k);
@@ -359,14 +361,6 @@ buf bufcpy(buf const other) {
 }
 
 void bufcat(buf ref to, buf const other) {
-    //u8* dest = dyarr_insert(to, to->len, other.len); // FIXME: this no work, see why
-    //if (!dest) exitf("OOM");
-    //memcpy(dest, other.ptr, other.len);
-    //
-    //if (!dyarr_resize(to, to->len+other.len)) exitf("OOM");
-    //memcpy(to->ptr+to->len, other.ptr, other.len);
-    //to->len+= other.len;
-    //
     dyarr_replace(to, to->len, 0, &other);
 }
 
@@ -389,6 +383,29 @@ buf buftrimbeg(buf const b, char cref w) {
 buf buftrimend(buf const b, char cref w) {
     buf r = b;
     for (; r.len; r.len--) if (!strchr(w, r.ptr[r.len-1])) break;
+    return r;
+}
+
+long long parsenum(buf const b, sz opref ends) {
+    long long r = 0;
+    sz k = 0;
+    if (b.len) {
+        bool const minus = '-' == b.ptr[k];
+        if (minus || '+' == b.ptr[k]) k++;
+        unsigned shft = 0;
+        char const* dgts = "0123456789";
+        if (k < b.len && '0' == b.ptr[k]) switch (b.ptr[++k]|32) {
+            case 'b': k++; shft = 1; dgts = "01";               break;
+            case 'o': k++; shft = 3; dgts = "01234567";         break;
+            case 'x': k++; shft = 4; dgts = "0123456789abcdef"; break;
+        }
+        char const* v = strchr(dgts, b.ptr[k]|32);
+        if (!v) exitf("expected digit in \"%s\" but got '%c'", dgts, b.ptr[k-1]);
+        do r = (!shft ? r*10 : r<<shft) + (v-dgts);
+        while (++k < b.len && (v = strchr(dgts, b.ptr[k]|32)));
+        if (minus) r*= -1;
+    }
+    if (ends) *ends = k;
     return r;
 }
 
@@ -577,23 +594,24 @@ struct _list_deps_item { struct _list_deps_item cref next; char cref name; };
                      : (argc--, atoi(*argv++))                                         \
                      );
 
-#define make_cmd(__invocation, __description, ...)                       \
-    if (_is_h) puts("\t" #__invocation ":\t" __description);             \
-    else {                                                               \
-        static char const invocation[] = #__invocation;                  \
-        if (!strncmp(invocation, *argv, strcspn(invocation, " \t("))) {  \
-            argc--, argv++;                                              \
-            if (argc && !strcmp("-h", *argv)) {                          \
-                puts(#__invocation ":\t" __description);                 \
-                static bool const _is_h = true;                          \
-                __VA_ARGS__                                              \
-                return 0;                                                \
-            }                                                            \
-            static bool const _is_h = false;                             \
-            __VA_ARGS__                                                  \
-            __invocation;                                                \
-            return 0;                                                    \
-        }                                                                \
+#define make_cmd(__invocation, __description, ...)                    \
+    if (_is_h) puts("\t" #__invocation ":\t" __description);          \
+    else {                                                            \
+        static char const invocation[] = #__invocation;               \
+        if (!strncmp(invocation, *argv, strcspn(invocation, " \t("))  \
+                && !(*argv)[strcspn(invocation, " \t(")]) {           \
+            argc--, argv++;                                           \
+            if (argc && !strcmp("-h", *argv)) {                       \
+                puts(#__invocation ":\t" __description);              \
+                static bool const _is_h = true;                       \
+                __VA_ARGS__                                           \
+                return 0;                                             \
+            }                                                         \
+            static bool const _is_h = false;                          \
+            __VA_ARGS__                                               \
+            __invocation;                                             \
+            return 0;                                                 \
+        }                                                             \
     }
 
 #define make_main(__summary, ...)                  \
