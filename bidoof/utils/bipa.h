@@ -1,3 +1,5 @@
+// TODO: [lc]str should make a single colored span (ansi esc)
+
 /// public macros:
 ///  - bipa_struct(typename, fields count, ... fields type+name pairs)
 ///  - bipa_union(typename, kinds count, ... kinds type+(tag type, tag value, name) pairs)
@@ -133,6 +135,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
 #define _JOIN(__l, __r) __l##__r
 #define _XJOIN(__l, __r) _JOIN(__l, __r)
 #define _CALL(__macro, ...) __macro(__VA_ARGS__)
+#define _UNPAR(...) __VA_ARGS__
 
 #define  _FOR_TYNM_1(__n, __macro, __inv, __ty, __nm)       __macro((__n- 1), __n, __inv, __ty, __nm)
 #define  _FOR_TYNM_2(__n, __macro, __inv, __ty, __nm, ...)  __macro((__n- 2), __n, __inv, __ty, __nm)  _FOR_TYNM_1(__n, __macro, __inv, __VA_ARGS__)
@@ -524,7 +527,7 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
         union {                                                                                             \
             _FOR_TYNM(__n_kinds, _union_kinds_typename_one, 0, __VA_ARGS__)                                 \
         } val;                                                                                              \
-        enum {                                                                                              \
+        enum __tname##_tag_enum {                                                                           \
             _FOR_TYNM(__n_kinds, _union_kinds_tagname_one, __tname, __VA_ARGS__)                            \
         } tag;                                                                                              \
     };                                                                                                      \
@@ -652,12 +655,53 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
 
 #define _packed_fields_typename_one(__k, __n, __inv, __sz, __nm)  unsigned __nm :__sz;
 
-#define _packed_fields_dump_one(__k, __n, __inv, __sz, __nm)    \
-        fprintf(strm, "." _hidump_id(#__nm) "= "                \
-                _hidump_nb("%u") _hidump_ex(":%u") ",\n%*.s",   \
-                self->__nm, __sz,                               \
-                (depth+(__k+1!=__n))*2, "");                    \
+#define _packed_fields_mask_one_tname(__tname, ...) __tname
 
+#define  _packed_fields_mask_one_sumto_1(__k, __i, __sz, __nm)       (__i- 1 < __k)*__sz
+#define  _packed_fields_mask_one_sumto_2(__k, __i, __sz, __nm, ...)  (__i- 2 < __k)*__sz +  _packed_fields_mask_one_sumto_1(__k, __i, __VA_ARGS__)
+#define  _packed_fields_mask_one_sumto_3(__k, __i, __sz, __nm, ...)  (__i- 3 < __k)*__sz +  _packed_fields_mask_one_sumto_2(__k, __i, __VA_ARGS__)
+#define  _packed_fields_mask_one_sumto_4(__k, __i, __sz, __nm, ...)  (__i- 4 < __k)*__sz +  _packed_fields_mask_one_sumto_3(__k, __i, __VA_ARGS__)
+#define  _packed_fields_mask_one_sumto_5(__k, __i, __sz, __nm, ...)  (__i- 5 < __k)*__sz +  _packed_fields_mask_one_sumto_4(__k, __i, __VA_ARGS__)
+#define  _packed_fields_mask_one_sumto_6(__k, __i, __sz, __nm, ...)  (__i- 6 < __k)*__sz +  _packed_fields_mask_one_sumto_5(__k, __i, __VA_ARGS__)
+#define  _packed_fields_mask_one_sumto_7(__k, __i, __sz, __nm, ...)  (__i- 7 < __k)*__sz +  _packed_fields_mask_one_sumto_6(__k, __i, __VA_ARGS__)
+#define  _packed_fields_mask_one_sumto_8(__k, __i, __sz, __nm, ...)  (__i- 8 < __k)*__sz +  _packed_fields_mask_one_sumto_7(__k, __i, __VA_ARGS__)
+#define  _packed_fields_mask_one_sumto_9(__k, __i, __sz, __nm, ...)  (__i- 9 < __k)*__sz +  _packed_fields_mask_one_sumto_8(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_10(__k, __i, __sz, __nm, ...)  (__i-10 < __k)*__sz +  _packed_fields_mask_one_sumto_9(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_11(__k, __i, __sz, __nm, ...)  (__i-11 < __k)*__sz + _packed_fields_mask_one_sumto_10(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_12(__k, __i, __sz, __nm, ...)  (__i-12 < __k)*__sz + _packed_fields_mask_one_sumto_11(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_13(__k, __i, __sz, __nm, ...)  (__i-13 < __k)*__sz + _packed_fields_mask_one_sumto_12(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_14(__k, __i, __sz, __nm, ...)  (__i-14 < __k)*__sz + _packed_fields_mask_one_sumto_13(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_15(__k, __i, __sz, __nm, ...)  (__i-15 < __k)*__sz + _packed_fields_mask_one_sumto_14(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_16(__k, __i, __sz, __nm, ...)  (__i-16 < __k)*__sz + _packed_fields_mask_one_sumto_15(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_17(__k, __i, __sz, __nm, ...)  (__i-17 < __k)*__sz + _packed_fields_mask_one_sumto_16(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_18(__k, __i, __sz, __nm, ...)  (__i-18 < __k)*__sz + _packed_fields_mask_one_sumto_17(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_19(__k, __i, __sz, __nm, ...)  (__i-19 < __k)*__sz + _packed_fields_mask_one_sumto_18(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_20(__k, __i, __sz, __nm, ...)  (__i-20 < __k)*__sz + _packed_fields_mask_one_sumto_19(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_21(__k, __i, __sz, __nm, ...)  (__i-21 < __k)*__sz + _packed_fields_mask_one_sumto_20(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_22(__k, __i, __sz, __nm, ...)  (__i-22 < __k)*__sz + _packed_fields_mask_one_sumto_21(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_23(__k, __i, __sz, __nm, ...)  (__i-23 < __k)*__sz + _packed_fields_mask_one_sumto_22(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_24(__k, __i, __sz, __nm, ...)  (__i-24 < __k)*__sz + _packed_fields_mask_one_sumto_23(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_25(__k, __i, __sz, __nm, ...)  (__i-25 < __k)*__sz + _packed_fields_mask_one_sumto_24(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_26(__k, __i, __sz, __nm, ...)  (__i-26 < __k)*__sz + _packed_fields_mask_one_sumto_25(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_27(__k, __i, __sz, __nm, ...)  (__i-27 < __k)*__sz + _packed_fields_mask_one_sumto_26(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_28(__k, __i, __sz, __nm, ...)  (__i-28 < __k)*__sz + _packed_fields_mask_one_sumto_27(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_29(__k, __i, __sz, __nm, ...)  (__i-29 < __k)*__sz + _packed_fields_mask_one_sumto_28(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_30(__k, __i, __sz, __nm, ...)  (__i-30 < __k)*__sz + _packed_fields_mask_one_sumto_29(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_31(__k, __i, __sz, __nm, ...)  (__i-31 < __k)*__sz + _packed_fields_mask_one_sumto_30(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_32(__k, __i, __sz, __nm, ...)  (__i-32 < __k)*__sz + _packed_fields_mask_one_sumto_31(__k, __i, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto_(__k, __tname, __n_fields, ...) _CALL(_packed_fields_mask_one_sumto_##__n_fields, __k, __n_fields, __VA_ARGS__)
+#define _packed_fields_mask_one_sumto(__k, ...) (_packed_fields_mask_one_sumto_(__k, __VA_ARGS__))
+
+#define _packed_fields_mask_one(__k, __n, __tn_nf_fs, __sz, __nm)   \
+    _XJOIN(_packed_fields_mask_one_tname __tn_nf_fs, _mask_##__nm)  \
+        = ((1<<__sz) -1)                                            \
+        << _packed_fields_mask_one_sumto(__k, _UNPAR __tn_nf_fs),
+
+#define _packed_fields_dump_one(__k, __n, __inv, __sz, __nm)  \
+    fprintf(strm, "." _hidump_id(#__nm) "= "                  \
+            _hidump_nb("%u") _hidump_ex(":%u") ",\n%*.s",     \
+            self->__nm, __sz,                                 \
+            (depth+(__k+1!=__n))*2, "");                      \
 
 #define _packed_fields_isflags_one(__k, __n, __inv, __sz, __nm)  1 == __sz &&
 #define _packed_fields_asflags_one(__k, __n, __inv, __sz, __nm)  if (self->__nm) fprintf(strm, "%s", first ? first = false, #__nm : " " #__nm);
@@ -669,6 +713,9 @@ static void bipa_xxd(FILE ref strm, u8 cref ptr, sz const len, int depth) _bipa_
 #define bipa_packed(__tname, __under_ty, __n_fields, ...)                                                   \
     struct __tname {                                                                                        \
         _FOR_TYNM(__n_fields, _packed_fields_typename_one, 0, __VA_ARGS__)                                  \
+    };                                                                                                      \
+    enum __tname##_mask_enum {                                                                              \
+        _FOR_TYNM(__n_fields, _packed_fields_mask_one, (__tname, __n_fields, __VA_ARGS__), __VA_ARGS__)     \
     };                                                                                                      \
     void bipa_dump_##__tname(struct __tname cref self, FILE* const strm, int const depth) _bipa_declonly({  \
         static char const _san_check[                                                                       \

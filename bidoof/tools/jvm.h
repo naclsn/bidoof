@@ -339,31 +339,31 @@ bipa_packed(jvm_class_access_flags, u16be, 15
         )
 
 bipa_union(jvm_class_reference_kind, 9
-        , (void,), (u8, 1, getField)
-        , (void,), (u8, 2, getStatic)
-        , (void,), (u8, 3, putField)
-        , (void,), (u8, 4, putStatic)
-        , (void,), (u8, 5, invokeVirtual)
-        , (void,), (u8, 6, invokeStatic)
-        , (void,), (u8, 7, invokeSpecial)
-        , (void,), (u8, 8, newInvokeSpecial)
-        , (void,), (u8, 9, invokeInterface)
+        , (void,), (u8, 1, getField)         /* Fieldref */
+        , (void,), (u8, 2, getStatic)        /* Fieldref */
+        , (void,), (u8, 3, putField)         /* Fieldref */
+        , (void,), (u8, 4, putStatic)        /* Fieldref */
+        , (void,), (u8, 5, invokeVirtual)    /* Methodref */
+        , (void,), (u8, 6, invokeStatic)     /* Methodref */
+        , (void,), (u8, 7, invokeSpecial)    /* Methodref */
+        , (void,), (u8, 8, newInvokeSpecial) /* Methodref */
+        , (void,), (u8, 9, invokeInterface)  /* InterfaceMethodref */
         )
 
-bipa_struct(jvm_class_Class,              1, (u16be,), name_index)
-bipa_struct(jvm_class_Fieldref,           2, (u16be,), class_index, (u16be,), name_and_type_index)
-bipa_struct(jvm_class_Methodref,          2, (u16be,), class_index, (u16be,), name_and_type_index)
-bipa_struct(jvm_class_InterfaceMethodref, 2, (u16be,), class_index, (u16be,), name_and_type_index)
-bipa_struct(jvm_class_String,             1, (u16be,), string_index)
+bipa_struct(jvm_class_Class,              1, (u16be,/*Utf8*/), name_index)
+bipa_struct(jvm_class_Fieldref,           2, (u16be,/*Class*/), class_index, (u16be,/*NameAndType*/), name_and_type_index)
+bipa_struct(jvm_class_Methodref,          2, (u16be,/*Class*/), class_index, (u16be,/*NameAndType*/), name_and_type_index)
+bipa_struct(jvm_class_InterfaceMethodref, 2, (u16be,/*Class*/), class_index, (u16be,/*NameAndType*/), name_and_type_index)
+bipa_struct(jvm_class_String,             1, (u16be,/*Utf8*/), string_index)
 bipa_struct(jvm_class_Integer,            1, (u32be,), bytes)
 bipa_struct(jvm_class_Float,              1, (u32be,), bytes)
 bipa_struct(jvm_class_Long,               1, (u64be,), bytes)
 bipa_struct(jvm_class_Double,             1, (u64be,), bytes)
-bipa_struct(jvm_class_NameAndType,        2, (u16be,), name_index, (u16be,), descriptor_index)
+bipa_struct(jvm_class_NameAndType,        2, (u16be,/*Utf8*/), name_index, (u16be,/*Utf8*/), descriptor_index)
 bipa_struct(jvm_class_Utf8,               2, (u16be,), length, (lstr, self->length), bytes)
-bipa_struct(jvm_class_MethodHandle,       2, (union, jvm_class_reference_kind), reference_kind, (u16be,), reference_index)
-bipa_struct(jvm_class_MethodType,         1, (u16be,), descriptor_index)
-bipa_struct(jvm_class_InvokeDynamic,      2, (u16be,), bootstrap_method_attr_index, (u16be,), name_and_type_index)
+bipa_struct(jvm_class_MethodHandle,       2, (union, jvm_class_reference_kind), reference_kind, (u16be,), /* see jvm_class_reference_kind */ reference_index)
+bipa_struct(jvm_class_MethodType,         1, (u16be,/*Utf8*/), descriptor_index)
+bipa_struct(jvm_class_InvokeDynamic,      2, (u16be,), bootstrap_method_attr_index, (u16be,/*NameAndType*/), name_and_type_index)
 
 bipa_union(jvm_class_cp_info, 14
         , (struct, jvm_class_Class),              (u8, 7,  Class)
@@ -383,10 +383,10 @@ bipa_union(jvm_class_cp_info, 14
         )
 bipa_array(jvm_class_cp_infos, (struct, jvm_class_cp_info))
 
-bipa_array(jvm_class_interfaces, (u16be,))
+bipa_array(jvm_class_interfaces, (u16be,/*Class*/))
 
 bipa_struct(jvm_class_attribute_info, 3
-        , (u16be,), attribute_name_index
+        , (u16be,/*Utf8*/), attribute_name_index
         , (u32be,), attribute_length
         , (lstr, self->attribute_length), info
         )
@@ -394,8 +394,8 @@ bipa_array(jvm_class_attribute_infos, (struct, jvm_class_attribute_info))
 
 bipa_struct(jvm_class_field_info, 5
         , (packed, jvm_class_access_flags), access_flags
-        , (u16be,), name_index
-        , (u16be,), descriptor_index
+        , (u16be,/*Utf8*/), name_index
+        , (u16be,/*Utf8*/), descriptor_index
         , (u16be,), attributes_count
         , (array, jvm_class_attribute_infos, k < self->attributes_count), attributes
         )
@@ -403,8 +403,8 @@ bipa_array(jvm_class_field_infos, (struct, jvm_class_field_info))
 
 bipa_struct(jvm_class_method_info, 5
         , (packed, jvm_class_access_flags), access_flags
-        , (u16be,), name_index
-        , (u16be,), descriptor_index
+        , (u16be,/*Utf8*/), name_index
+        , (u16be,/*Utf8*/), descriptor_index
         , (u16be,), attributes_count
         , (array, jvm_class_attribute_infos, k < self->attributes_count), attributes
         )
@@ -418,8 +418,8 @@ bipa_struct(jvm_class, 16
         , (u16be,), constant_pool_count
         , (array, jvm_class_cp_infos, k+1 < self->constant_pool_count), constant_pool
         , (packed, jvm_class_access_flags), access_flags
-        , (u16be,), this_class
-        , (u16be,), super_class
+        , (u16be,/*Class*/), this_class
+        , (u16be,/*Class*/), super_class
         , (u16be,), interfaces_count
         , (array, jvm_class_interfaces, k < self->interfaces_count), interfaces
         , (u16be,), fields_count
@@ -726,8 +726,6 @@ struct jvm_class_attribute_info* jvm_member_add_attribute(jvm_class_member cref 
     return r;
 }
 // }}}
-
-// vi: fdm=marker fdl=0
 
 #endif // BIDOOF_IMPLEMENTATION
 
