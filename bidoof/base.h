@@ -61,7 +61,7 @@ void putbhi(buf const b, char cref ref keywords, char cref ref string_pairs, cha
 #define HI_LUA_STRING_PAIRS  "\"", "\"", "'", "'", "[[", "]]", "[=[", "]=]", "[==[", "]==]", "[===[", "]===]"
 #define HI_LUA_COMMENT_PAIRS "--", "\n", "--[[", "]]", "--[=[", "]=]", "--[==[", "]==]", "--[===[", "]===]"
 #define HI_PY_KEYWORDS      "False", "await", "else", "import", "pass", "None", "break", "except", "in", "raise", "True", "class", "finally", "is", "return", "and", "continue", "for", "lambda", "try", "as", "def", "from", "nonlocal", "while", "assert", "del", "global", "not", "with", "async", "elif", "if", "or", "yield"
-#define HI_PY_STRING_PAIRS  "\"", "\"", "'", "'", "\"\"\"", "\"\"\"", "'''", "'''", "f\"", "f\"", "f'", "f'", "f\"\"\"", "f\"\"\"", "f'''", "f'''"
+#define HI_PY_STRING_PAIRS  "\"", "\"", "'", "'", "\"\"\"", "\"\"\"", "'''", "'''", "f\"", "\"", "f'", "'", "f\"\"\"", "\"\"\"", "f'''", "'''"
 #define HI_PY_COMMENT_PAIRS "#", "\n"
 #define HI_JS_KEYWORDS      "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "null", "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "let", "static", "yield", "await"
 #define HI_JS_STRING_PAIRS  "\"", "\"", "'", "'", "`", "`"
@@ -144,9 +144,10 @@ void path_join(buf ref to, buf const other);
 
 #define _HERE_STR(__ln) #__ln
 #define _HERE_XSTR(__ln) _HERE_STR(__ln)
-#define HERE __FILE__ ":" _HERE_XSTR(__LINE__)
-#define exitf(...) (notif(__VA_ARGS__), catch_stack.len ? longjmp(catch_stack.ptr[--catch_stack.len], 1) : exit(1))
-#define notif(...) (notify_stream ? fprintf(notify_stream, HERE ": " __VA_ARGS__), fputc('\n', notify_stream) : 0)
+#define HERE(__fmt, ...) __FILE__ ":" _HERE_XSTR(__LINE__) ": (in %s) " __fmt "%c", __func__, __VA_ARGS__ '\n'
+#define exitf(...) (notif(__VA_ARGS__), catch_stack.len ? longjmp(catch_stack.ptr[--catch_stack.len], 1) : exit(EXIT_FAILURE))
+#define notif(...) (notify_stream ? fprintf(notify_stream, HERE(__VA_ARGS__,)), fputc('\n', notify_stream) : 0)
+
 
 #ifdef BIDOOF_IMPLEMENTATION
 #define _extern(__ty, __nm, ...) __ty __nm = __VA_ARGS__
