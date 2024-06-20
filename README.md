@@ -42,10 +42,11 @@ but basically the things are in [bidoof/tools/](bidoof/tools/)
 - `dyarr.h`: the backing things for the `buf` type
 - `frame.h`: minimal open a window with GL context (tested with Win32, X11)
 - `paras.h`: (limited) parser+assembler generator
+- `buizel.h`: (somewhat wip) binary stream read/write
 
 ---
 
 the `.gitignore` lists a `unreleased/`
-it is essentially a private  unversioned space for testing and development
-if there is a `unreleased/Makefile`, any tool in `unreleased/bidoof/tools/` will be integrated the same way as the normal `bidoof/tools/`
+it is essentially a private unversioned space for testing and development
+if there is a `unreleased/Makefile`, any tool it lists in `x-toolnames` will be integrated the same way as the normal `toolnames` (in `bidoof/tools/`)
 see the comment in the main [Makefile](Makefile)

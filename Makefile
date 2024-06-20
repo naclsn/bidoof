@@ -4,7 +4,15 @@ CFLAGS = -ggdb -O1 -std=c99 $(warnings)
 build := build
 bidoof := bidoof
 
-toolnames := archives checks compressions encodings encryptions images jvm views
+toolnames :=      \
+    archives      \
+    checks        \
+    compressions  \
+    encodings     \
+    encryptions   \
+    images        \
+    jvm           \
+    views         \
 
 all: list
 
