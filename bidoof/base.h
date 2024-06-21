@@ -502,9 +502,7 @@ buf file_read(buf const path) {
     FILE* f = fopen(local, "rb");
     if (!f) exitf("could not open file %.*s", (int)path.len, path.ptr);
     if (0 != fseek(f, 0, SEEK_END)) exitf("could not read file %.*s", (int)path.len, path.ptr);
-    r.len = ftell(f);
-    r.ptr = malloc(r.len);
-    if (!r.ptr) exitf("OOM");
+    if (!(r.ptr = malloc(r.len = r.cap = ftell(f)))) exitf("OOM");
     fseek(f, 0, SEEK_SET);
     fread(r.ptr, 1, r.len, f);
     fclose(f);
