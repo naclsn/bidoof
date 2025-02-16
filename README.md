@@ -1,3 +1,5 @@
+old version of a toolbox that I worked on in c
+
 ### the name was just supposed to be a placeholder for real but here we are and now `README.md` has been crossed out of the to-do list yes that is probably good enough for now
 
 framework-ish thing to play around with files of bytes
@@ -50,3 +52,16 @@ the `.gitignore` lists a `unreleased/`
 it is essentially a private unversioned space for testing and development
 if there is a `unreleased/Makefile`, any tool it lists in `x-toolnames` will be integrated the same way as the normal `toolnames` (in `bidoof/tools/`)
 see the comment in the main [Makefile](Makefile)
+
+---
+
+```NOTES.md
+extends TextureRect
+TODO: doc comments more or less everywhere
+
+- deflates less dumb (api?)
+- filters less dumb (api?)
+
+aec (what this?)
+idn (what this?)
+```

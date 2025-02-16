@@ -476,10 +476,10 @@ void jvm_reserve_methods(jvm_class ref cls, sz const count);
 jvm_class_member jvm_get_method(jvm_class cref cls, buf const name);
 jvm_class_member jvm_add_method(jvm_class ref cls, buf const name);
 
-#define jvm_list_attributes(__cls)  jvm_member_list_attributes (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes})
-#define jvm_reserve_attributes(__cls, __count)  jvm_member_reserve_attributes(&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__count))
-#define jvm_get_attribute(__cls, __name)  jvm_member_get_attribute (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__name))
-#define jvm_add_attribute(__cls, __name, __info)  jvm_member_add_attribute (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__name), (__info))
+#define jvm_list_attributes(__cls)                jvm_member_list_attributes   (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes})
+#define jvm_reserve_attributes(__cls, __count)    jvm_member_reserve_attributes(&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__count))
+#define jvm_get_attribute(__cls, __name)          jvm_member_get_attribute     (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__name))
+#define jvm_add_attribute(__cls, __name, __info)  jvm_member_add_attribute     (&(jvm_class_member){.cls= (__cls), .attributes_count= &(__cls)->attributes_count, .attributes= &(__cls)->attributes}, (__name), (__info))
 
 buf jvm_member_list_attributes(jvm_class_member cref mbr);
 void jvm_member_reserve_attributes(jvm_class_member ref mbr, sz const count);

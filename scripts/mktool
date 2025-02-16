@@ -51,7 +51,8 @@ with open('bidoof/tools/'+args['lname']+'.h', "w") as file:
     if bipa: print('#include "../_common_conf/bipa.h"', file=file)
     if paras: print('#include "../_common_conf/paras.h"', file=file)
 
-    print('''#ifdef BIDOOF_LIST_DEPS
+    print('''
+#ifdef BIDOOF_LIST_DEPS
 static struct _list_deps_item const _list_deps_me_{lname} = {{_list_deps_first, "{lname}"}};
 #undef _list_deps_first
 #define _list_deps_first &_list_deps_me_{lname}

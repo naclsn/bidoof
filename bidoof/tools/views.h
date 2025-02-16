@@ -2,6 +2,7 @@
 #define __BIDOOF_T_VIEWS___
 
 #include "../base.h"
+
 #ifdef BIDOOF_IMPLEMENTATION
 #define FRAME_IMPLEMENTATION
 #include "../utils/frame.h"

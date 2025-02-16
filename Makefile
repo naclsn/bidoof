@@ -6,6 +6,7 @@ bidoof := bidoof
 
 toolnames :=      \
     archives      \
+    ${barcodes=}      \
     checks        \
     compressions  \
     encodings     \
@@ -50,4 +51,5 @@ entries := $(bidoof)/base.h $(foreach t,$(toolnames),$(bidoof)/tools/$(t).h) $(f
 objs    := $(build)/bdf-base.o $(toolobjs) $(x-toolobjs)
 $(foreach t,$(x-toolnames),$(eval CFLAGS-a-$(t) := -Iunreleased -I$$(bidoof)/tools))
 LDFLAGS := $(foreach t,$(toolnames) $(x-toolnames),$(LDFLAGS-$(t)))
+_CFLAGS ?= $(CFLAGS) -DLOC_NOTIF
 -include $(cintre)/../driver.makefile
